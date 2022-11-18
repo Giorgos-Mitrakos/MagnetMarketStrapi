@@ -1,0 +1,19 @@
+{
+  "collectionName": "components_footer_footer_sections",
+  "info": {
+    "displayName": "footer_section",
+    "icon": "user-secret",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "label": {
+      "type": "string"
+    },
+    "links": {
+      "type": "component",
+      "repeatable": true,
+      "component": "footer.link"
+    }
+  }
+}

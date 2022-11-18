@@ -1,0 +1,37 @@
+{
+    "info": {
+        "tableName": "charvaluemap",
+        "singularName": "charvaluemap",
+        "pluralName": "charvaluemaps",
+        "displayName": "CharValuemap",
+        "description": "Mapping Characteristics Value",
+        "kind": "collectionType"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {
+        "content-manager": {
+            "visible": true
+        },
+        "content-type-builder": {
+            "visible": false
+        }
+    },
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "value": {
+            "type": "string",
+            "required": true
+        },
+        "related_import": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.importxml",
+            "inversedBy": "char_value_map"
+        }
+    }
+}

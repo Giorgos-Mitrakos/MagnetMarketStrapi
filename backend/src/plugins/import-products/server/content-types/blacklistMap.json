@@ -1,0 +1,45 @@
+{
+    "info": {
+        "tableName": "blacklistmap",
+        "singularName": "blacklistmap",
+        "pluralName": "blacklistmaps",
+        "displayName": "Blacklistmap",
+        "description": "Mapping Blacklist Categories",
+        "kind": "collectionType"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {
+        "content-manager": {
+            "visible": true
+        },
+        "content-type-builder": {
+            "visible": false
+        }
+    },
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "related_import": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.importxml",
+            "inversedBy": "blacklist_map"
+        },
+        "parentcategory": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.blacklistmap",
+            "inversedBy": "subcategory"
+        },
+        "subcategory": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "plugin::import-products.blacklistmap",
+            "mappedBy": "parentcategory"
+        }
+    }
+}

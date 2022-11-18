@@ -1,0 +1,18 @@
+{
+  "collectionName": "components_categories_brand_percents",
+  "info": {
+    "displayName": "brand_percent",
+    "icon": "percent"
+  },
+  "options": {},
+  "attributes": {
+    "brand": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::brand.brand"
+    },
+    "percentage": {
+      "type": "decimal"
+    }
+  }
+}

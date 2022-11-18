@@ -1,0 +1,45 @@
+{
+    "info": {
+        "tableName": "whitelistmap",
+        "singularName": "whitelistmap",
+        "pluralName": "whitelistmaps",
+        "displayName": "Whitelistmap",
+        "description": "Mapping Whitelist Categories",
+        "kind": "collectionType"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {
+        "content-manager": {
+            "visible": true
+        },
+        "content-type-builder": {
+            "visible": false
+        }
+    },
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "related_import": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.importxml",
+            "inversedBy": "whitelist_map"
+        },
+        "parentcategory": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.whitelistmap",
+            "inversedBy": "subcategory"
+        },
+        "subcategory": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "plugin::import-products.whitelistmap",
+            "mappedBy": "parentcategory"
+        }
+    }
+}

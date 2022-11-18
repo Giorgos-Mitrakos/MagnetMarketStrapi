@@ -1,0 +1,12 @@
+{
+  "collectionName": "components_products_images_supplier_urls",
+  "info": {
+    "displayName": "imagesSupplierURLS"
+  },
+  "options": {},
+  "attributes": {
+    "url": {
+      "type": "string"
+    }
+  }
+}

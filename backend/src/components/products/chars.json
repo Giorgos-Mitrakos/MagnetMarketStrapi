@@ -1,0 +1,19 @@
+{
+  "collectionName": "components_products_chars",
+  "info": {
+    "displayName": "chars",
+    "icon": "feather-alt",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "value": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

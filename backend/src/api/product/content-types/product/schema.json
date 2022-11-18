@@ -1,0 +1,184 @@
+{
+  "kind": "collectionType",
+  "collectionName": "products",
+  "info": {
+    "singularName": "product",
+    "pluralName": "products",
+    "displayName": "product",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": false
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "sku": {
+      "type": "string",
+      "required": false,
+      "unique": true
+    },
+    "mpn": {
+      "type": "string",
+      "unique": true,
+      "required": false
+    },
+    "barcode": {
+      "type": "string",
+      "required": false
+    },
+    "description": {
+      "type": "text"
+    },
+    "short_description": {
+      "type": "text"
+    },
+    "price": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "sale_price": {
+      "type": "decimal",
+      "min": 0
+    },
+    "is_sale": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_hot": {
+      "type": "boolean",
+      "default": false
+    },
+    "inventory": {
+      "type": "integer"
+    },
+    "additionalFiles": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "files"
+      ]
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos"
+      ]
+    },
+    "additionalImages": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::category.category",
+      "mappedBy": "products"
+    },
+    "brand": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::brand.brand",
+      "inversedBy": "products"
+    },
+    "collections": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::collection.collection",
+      "inversedBy": "products"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "InStock",
+        "MediumStock",
+        "LowStock",
+        "backorder",
+        "OutOfStock"
+      ],
+      "default": "InStock",
+      "required": true
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::tag.tag",
+      "inversedBy": "products"
+    },
+    "incl_prod_coupon": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::coupon.coupon",
+      "inversedBy": "included_products"
+    },
+    "excl_prod_coupon": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::coupon.coupon",
+      "inversedBy": "excluded_products"
+    },
+    "seo": {
+      "type": "component",
+      "repeatable": true,
+      "component": "shared.seo"
+    },
+    "supplierInfo": {
+      "type": "component",
+      "repeatable": true,
+      "component": "products.info"
+    },
+    "prod_chars": {
+      "displayName": "chars",
+      "type": "component",
+      "repeatable": true,
+      "component": "products.chars"
+    },
+    "related_import": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::import-products.importxml",
+      "mappedBy": "related_products"
+    },
+    "ImageURLS": {
+      "displayName": "imagesSupplierURLS",
+      "type": "component",
+      "repeatable": true,
+      "component": "products.images-supplier-urls"
+    },
+    "is_fixed_price": {
+      "type": "boolean",
+      "default": false
+    },
+    "related_with": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::product.product",
+      "inversedBy": "related_to"
+    },
+    "related_to": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::product.product",
+      "inversedBy": "related_with"
+    }
+  }
+}

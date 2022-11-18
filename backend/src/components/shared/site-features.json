@@ -1,0 +1,20 @@
+{
+  "collectionName": "components_homepage_site_features",
+  "info": {
+    "displayName": "site_features",
+    "icon": "feather",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "icon": {
+      "type": "string"
+    },
+    "header": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    }
+  }
+}

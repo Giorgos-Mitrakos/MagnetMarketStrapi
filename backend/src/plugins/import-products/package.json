@@ -1,0 +1,24 @@
+{
+  "name": "import-products",
+  "version": "0.0.0",
+  "description": "Εισαγωγή προϊόντων",
+  "strapi": {
+    "name": "Εισαγωγή προϊόντων",
+    "description": "Κάνε εισαγωγή τα προϊόντα σου με ένα κουμπί",
+    "kind": "plugin"
+  },
+  "dependencies": {},
+  "author": {
+    "name": "Giorgos Mitrakos"
+  },
+  "maintainers": [
+    {
+      "name": "Giorgos Mitrakos"
+    }
+  ],
+  "engines": {
+    "node": ">=12.x.x <=16.x.x",
+    "npm": ">=6.0.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,33 @@
+{
+    "info": {
+        "tableName": "stockmap",
+        "singularName": "stockmap",
+        "pluralName": "stockmaps",
+        "displayName": "Stockmap",
+        "description": "Stock mapping",
+        "kind": "collectionType"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {
+        "content-manager": {
+            "visible": true
+        },
+        "content-type-builder": {
+            "visible": false
+        }
+    },
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "related_import": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.importxml",
+            "inversedBy": "stock_map"
+        }
+    }
+}

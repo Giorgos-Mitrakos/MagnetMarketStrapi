@@ -1,0 +1,13 @@
+{
+  "collectionName": "components_products_supplier_related_products",
+  "info": {
+    "displayName": "supplier_related_products",
+    "icon": "link"
+  },
+  "options": {},
+  "attributes": {
+    "mpn": {
+      "type": "string"
+    }
+  }
+}

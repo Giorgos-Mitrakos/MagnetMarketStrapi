@@ -1,0 +1,19 @@
+{
+  "collectionName": "components_products_price_progresses",
+  "info": {
+    "displayName": "Price Progress",
+    "icon": "align-center",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "date": {
+      "type": "datetime",
+      "required": true
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    }
+  }
+}

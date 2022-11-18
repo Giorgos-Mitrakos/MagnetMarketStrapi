@@ -1,0 +1,55 @@
+{
+    "info": {
+        "tableName": "categorymap",
+        "singularName": "categorymap",
+        "pluralName": "categorymaps",
+        "displayName": "Categorymap",
+        "description": "Mapping Categories",
+        "kind": "collectionType"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {
+        "content-manager": {
+            "visible": true
+        },
+        "content-type-builder": {
+            "visible": false
+        }
+    },
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "value": {
+            "type": "string",
+            "required": true
+        },
+        "contains": {
+            "displayName": "contains_in_name",
+            "type": "component",
+            "repeatable": true,
+            "component": "imports.contains-name"
+        },
+        "related_import": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.importxml",
+            "inversedBy": "categories_map"
+        },
+        "parentcategory": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "plugin::import-products.categorymap",
+            "inversedBy": "subcategory"
+        },
+        "subcategory": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "plugin::import-products.categorymap",
+            "mappedBy": "parentcategory"
+        }
+    }
+}

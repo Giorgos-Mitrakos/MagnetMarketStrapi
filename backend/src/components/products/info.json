@@ -1,0 +1,50 @@
+{
+  "collectionName": "components_products_infos",
+  "info": {
+    "displayName": "Info",
+    "icon": "info",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "wholesale": {
+      "type": "decimal",
+      "required": true
+    },
+    "quantity": {
+      "type": "integer"
+    },
+    "supplierProductId": {
+      "type": "string",
+      "required": true
+    },
+    "supplierProductURL": {
+      "type": "string",
+      "required": false
+    },
+    "recycle_tax": {
+      "type": "decimal",
+      "default": 0,
+      "required": true
+    },
+    "in_offer": {
+      "type": "boolean",
+      "default": false
+    },
+    "price": {
+      "type": "decimal"
+    },
+    "sale_price": {
+      "type": "decimal"
+    },
+    "price_progress": {
+      "displayName": "Price Progress",
+      "type": "component",
+      "repeatable": true,
+      "component": "products.price-progress"
+    }
+  }
+}
