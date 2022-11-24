@@ -1257,7 +1257,7 @@ module.exports = ({ strapi }) => ({
                         console.log("File readen successfully\n");
                     }
                 })
-            }
+            } 
 
             await page.goto('https://novatronsec.com/', { waitUntil: "networkidle0" });
             const pageUrl = page.url();

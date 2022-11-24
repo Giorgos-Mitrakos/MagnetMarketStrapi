@@ -17,7 +17,7 @@
     "cross-env": "^7.0.3",
     "jsdom": "^19.0.0",
     "mysql": "2.18.1",
-    "puppeteer": "^19.2.2",
+    "puppeteer": "^19.3.0",
     "sharp": "^0.31.2",
     "slugify": "^1.6.5",
     "xlsx": "^0.18.5",
