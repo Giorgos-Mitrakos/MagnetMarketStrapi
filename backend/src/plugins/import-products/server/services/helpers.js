@@ -2748,11 +2748,7 @@ module.exports = ({ strapi }) => ({
         // return { supplierInfo, relatedImportId, productPrice }
         // console.log("categoryInfo:", categoryInfo, "productPrice:", productPrice)
 
-        const imgUrls = [{ url: `https://www.oktabit.gr/media/products/heroes/${parsedDataTitles.supplierCode}/${parsedDataTitles.supplierCode}.jpg` }]
-        for (let j = 1; j < 5; j++) {
-            imgUrls.push({ url: `https://www.oktabit.gr/media/products/${parsedDataTitles.supplierCode}/${parsedDataTitles.supplierCode}_${j}.jpg` })
-
-        }
+        const imgUrls = []
         await strapi.entityService.update('api::product.product', entryCheck.id, {
             data: {
                 price: parseFloat(productPrice),
