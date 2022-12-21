@@ -5,6 +5,11 @@ module.exports = {
       resolve: './src/plugins/import-products'
     },
 
+    'platforms-scraper': {
+      enabled: true,
+      resolve: './src/plugins/platforms-scraper'
+    },
+
     upload: {
       config: {
         providerOptions: {

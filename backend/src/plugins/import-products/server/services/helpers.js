@@ -179,6 +179,128 @@ module.exports = ({ strapi }) => ({
         return await checkIfEntry
     },
 
+    async updateAndFilterScrapProducts(products, categoryMap, report, entry) {
+        try {
+            const newProducts = []
+            let stockLevelFilter = []
+            for (let stock of categoryMap.stock_map) {
+                stockLevelFilter.push(stock.name)
+            }
+
+            for (let product of products) {
+                // console.log(product) 
+                if (stockLevelFilter.includes(product.stockLevel)) {
+                    // console.log(product)
+
+                    const query = {
+                        where: {
+                            // name: product.title,
+                            mpn: { supplierProductURL: product.link }
+                        }
+                    }
+                    const checkIfEntry = await strapi.db.query('api::product.product').findOne({
+                        where: {
+                            // name: product.title,
+                            supplierInfo: {
+                                supplierProductId: product.supplierCode
+                            }
+                        },
+                        populate: {
+                            supplierInfo: {
+                                // where: {
+                                //     // name: product.title,
+                                //     supplierProductId: product.supplierCode
+                                // },
+                                populate: {
+                                    price_progress: true,
+                                }
+                            },
+                            related_import: true,
+                            categories: {
+                                populate: {
+                                    cat_percentage: {
+                                        populate: {
+                                            brand_perc: {
+                                                populate: {
+                                                    brand: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    });
+
+                    // console.log("checkIfEntry:", checkIfEntry)
+
+                    if (checkIfEntry) {
+                        const checkIfIsInSupplier = checkIfEntry.supplierInfo.find(x => x.name === entry.name)
+
+                        // console.log("checkIfIsInSupplier:", checkIfIsInSupplier)
+
+                        if (parseFloat(checkIfIsInSupplier.wholesale).toFixed(2) !== parseFloat(product.price).toFixed(2)) {
+                            // console.log(product)
+                            console.log("productINdb:", product, "wholesale:", checkIfIsInSupplier.wholesale)
+
+                            const supplierInfo = checkIfEntry.supplierInfo
+
+
+                            const supplierInfoUpdate = checkIfEntry.supplierInfo.find((o, i) => {
+
+                                if (o.name === entry.name) {
+                                    const price_progress = o.price_progress;
+                                    price_progress.push({
+                                        date: new Date(),
+                                        price: o.wholesale
+                                    })
+
+                                    supplierInfo[i] = {
+                                        name: entry.name,
+                                        wholesale: parseFloat(product.price).toFixed(2),
+                                        supplierProductId: product.supplierCode,
+                                        // price: parseFloat(salePrice).toFixed(2),
+                                        supplierProductURL: checkIfIsInSupplier.supplierProductURL,
+                                        price_progress: price_progress,
+                                    }
+                                    return true;
+                                }
+                            })
+
+                            const productPrice = await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .setPriceOnUpdate(checkIfEntry, supplierInfo);
+
+                            console.log("supplierInfoUpdate:", supplierInfoUpdate)
+
+                            await strapi.entityService.update('api::product.product', checkIfEntry.id, {
+                                data: {
+                                    price: parseFloat(productPrice),
+                                    supplierInfo: supplierInfo,
+                                },
+                            });
+                            report.updated += 1
+                        }
+                        else {
+                            report.skipped += 1
+                        }
+                        report.related_entries.push(checkIfEntry.id)
+
+                    }
+                    else {
+                        newProducts.push(product)
+                    }
+                }
+            }
+
+            return newProducts
+        } catch (error) {
+            console.log(error)
+        }
+
+    },
+
     async getImportMapping(entry) {
         try {
             const categoryMap = await strapi.entityService.findOne('plugin::import-products.importxml', entry.id, {
@@ -805,7 +927,7 @@ module.exports = ({ strapi }) => ({
 
             const charMaps = await this.parseCharsToMap(char_name_map, char_value_map);
 
-            let newCategories = await this.filterCategories(categories, isWhitelistSelected, whitelist_map, blacklist_map)
+            let newCategories = this.filterCategories(categories, isWhitelistSelected, whitelist_map, blacklist_map)
 
             // console.dir(newCategories)
             for (let category of newCategories) {
@@ -1239,6 +1361,445 @@ module.exports = ({ strapi }) => ({
         }
     },
 
+    async scrapQuest(categoryMap, report, entry, auth) {
+        try {
+
+            let filteredCategories = {
+                categories: [],
+            }
+            // const browser = await puppeteer.launch()
+            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
+            const page = await browser.newPage();
+            await page.setViewport({ width: 1200, height: 500 })
+            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
+            if (fs.existsSync('./public/QuestCookies.json')) {
+                fs.readFile('./public/QuestCookies.json', async (err, data) => {
+                    if (err)
+                        console.log(err);
+                    else {
+                        const cookies = JSON.parse(data);
+                        await page.setCookie(...cookies);
+                        console.log("File readen successfully\n");
+                    }
+                })
+            }
+
+            await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
+            const pageUrl = page.url();
+
+            if (pageUrl === "https://www.questonline.gr/Special-Pages/Logon?ReturnUrl=%2f") {
+                const bodyHandle = await page.$('body');
+
+                const acceptCookiesForm = await page.$('#CybotCookiebotDialog')
+                if (acceptCookiesForm) {
+                    const acceptCookiesButton = await page.$('#CybotCookiebotDialogBodyButtonAccept')
+                    acceptCookiesButton.click();
+                }
+
+                const formHandle = await bodyHandle.$('form');
+
+                const usernameWrapper = await formHandle.$('#username');
+                const username = await usernameWrapper.$('input');
+                const passwordWrapper = await formHandle.$('#password');
+                const password = await passwordWrapper.$('input');
+                const button = await formHandle.$('#submit-button');
+                await username.type(process.env.QUEST_USERNAME)
+                await password.type(process.env.QUEST_PASSWORD)
+                await Promise.all([
+                    await button.click(),
+                    await page.waitForNavigation()
+                ])
+                await page.cookies()
+                    .then((cookies) => {
+                        const cookiesJson = JSON.stringify(cookies, null, 2)
+                        return cookiesJson
+                    })
+                    .then((cookiesJson) => {
+                        fs.writeFile('./public/QuestCookies.json', cookiesJson, (err) => {
+                            if (err)
+                                console.log(err);
+                            else {
+                                console.log("File written successfully\n");
+                            }
+                        })
+                    })
+                    .catch((error) => console.log(error))
+            }
+
+            const bodyHandle = await page.$('body');
+            const navListWrapper = await page.$("div.nav-2-wrapper")
+            let scrapCategories = await page.$eval('div.nav-2-wrapper', (element) => {
+                const navList = element.querySelectorAll(".nav-2")
+                // let liElements = navList.length
+
+                const categories = []
+                for (let ul of navList) {
+                    let categoriesList = ul.querySelectorAll("li");
+
+                    for (let li of categoriesList) {
+                        let category = {}
+                        const categoryAnchor = li.querySelector('a')
+                        const categoryTitleSpan = li.querySelector('span')
+                        category.title = categoryTitleSpan.textContent.trim()
+                        category.link = categoryAnchor.getAttribute("href")
+                        category.subCategories = []
+                        categories.push(category)
+                    }
+                }
+                return categories;
+            })
+
+            // filteredCategories.categories = scrapCategories
+
+            let newCategories = this.filterCategories(scrapCategories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+
+            filteredCategories.categories = newCategories
+            // console.log(newCategories)
+            const charMaps = await this.parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
+
+            for (let category of newCategories) {
+                await this.scrapQuestSubcategories(page, category, filteredCategories, categoryMap, report, entry, auth);
+                // filteredCategories.categories = await this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+            }
+
+
+            // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, report, entry, auth)
+            await browser.close();
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async scrapQuestSubcategories(page, category, filteredCategories, categoryMap, report, entry, auth) {
+        try {
+            await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
+            const scrapSub = await page.$eval('.side-menu', (element) => {
+                const subList = element.querySelector('ul')
+                const subcategoriesList = subList.querySelectorAll('li')
+
+                const subcategories = []
+                for (let sub of subcategoriesList) {
+                    let subcategory = {}
+                    const subcategoryAnchor = sub.querySelector('a')
+                    subcategory.title = subcategoryAnchor.textContent.trim()
+                    subcategory.link = subcategoryAnchor.getAttribute('href')
+                    subcategory.subCategories = []
+                    subcategories.push(subcategory)
+                }
+                return subcategories
+            })
+
+            const catIndex = filteredCategories.categories.findIndex(x => x.title === category.title)
+            filteredCategories.categories[catIndex].subCategories = scrapSub
+            filteredCategories.categories = this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+
+            for (let sub of filteredCategories.categories[catIndex].subCategories) {
+                await this.scrapQuestSubcategories2(page, category.title, sub, filteredCategories, categoryMap, report, entry, auth)
+            }
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async scrapQuestSubcategories2(page, category, subcategory, filteredCategories, categoryMap, report, entry, auth) {
+        try {
+            await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
+            const sideMenu = await page.$('.side-menu')
+
+            const catIndex = filteredCategories.categories.findIndex(x => x.title === category)
+            const subIndex = filteredCategories.categories[catIndex].subCategories.findIndex(x => x.title === subcategory.title)
+
+            if (sideMenu) {
+                const scrapSub = await page.$eval('.side-menu', (element) => {
+                    const subList = element.querySelector('ul')
+                    const subcategoriesList = subList.querySelectorAll('li')
+
+                    const subcategories = []
+                    for (let sub of subcategoriesList) {
+                        let subcategory = {}
+                        const subcategoryAnchor = sub.querySelector('a')
+                        subcategory.title = subcategoryAnchor.textContent.trim()
+                        subcategory.link = subcategoryAnchor.getAttribute('href')
+                        subcategory.subCategories = []
+                        subcategories.push(subcategory)
+                    }
+                    return subcategories
+                })
+
+
+                filteredCategories.categories[catIndex].subCategories[subIndex].subCategories = scrapSub
+                filteredCategories.categories = this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+
+                for (let sub2 of filteredCategories.categories[catIndex].subCategories[subIndex].subCategories) {
+                    await this.scrapQuestCategory(page, sub2.link, category, subcategory.title, sub2.title, categoryMap, report, entry, auth)
+                }
+            }
+            else {
+                await this.scrapQuestCategory(page, subcategory.link, category, subcategory.title, null, categoryMap, report, entry, auth)
+            }
+
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async scrapQuestCategory(page, link, category, subcategory, sub2category, categoryMap, report, entry, auth) {
+        try {
+            await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
+
+            const scrapProducts = await page.$eval('div.region-area-three>div.inner-area.inner-area-three', (element) => {
+                const productListWrapper = element.querySelector('div.box>ul.product-list')
+                const productList = productListWrapper.querySelectorAll('li>article>div.description-container')
+
+                const products = []
+                for (let prod of productList) {
+                    let product = {}
+                    const leftContainer = prod.querySelector('div.description-container-left')
+                    const titleWrapper = leftContainer.querySelector('header.title-container>h2.title>a')
+                    product.title = titleWrapper.textContent.trim()
+                    product.link = titleWrapper.getAttribute('href')
+                    product.supplierCode = leftContainer.querySelector('.product-code').textContent.split('.')[1].trim();
+
+                    const rightContainer = prod.querySelector('.description-container-right')
+                    const productAvailability = rightContainer.querySelector('div.availability>span').textContent.trim()
+                    const priceWrapper = rightContainer.querySelector('.price-container')
+                    product.price = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
+
+                    product.stockLevel = productAvailability
+                    products.push(product)
+                }
+                return products
+            })
+
+            const products = await this.updateAndFilterScrapProducts(scrapProducts, categoryMap, report, entry)
+
+            // console.log(products)
+            for (let product of products) {
+                // if (stockLevelFilter.includes(product.stockLevel)) {
+                //     console.log(product)
+                await this.scrapQuestProduct(page, product.link, category, subcategory, sub2category, categoryMap, report, entry, auth)
+                // }
+            }
+
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async scrapQuestProduct(page, productLink, category, subcategory, sub2category, categoryMap, report, entry, auth) {
+        try {
+            await page.goto(`https://www.questonline.gr${productLink}`, { waitUntil: "networkidle0" });
+
+            const scrapProduct = await page.$eval('.details-page', (scrap) => {
+                const product = {}
+
+                const element = scrap.querySelector('div.content-container div.region-area-two')
+                const titleWrapper = element.querySelector('div.content-container div.region-area-two .inner-area-one .title')
+                product.title = titleWrapper.textContent.trim();
+                const supplierCodeWrapper = element.querySelector('#SkuNumber')
+                product.supplierCode = supplierCodeWrapper.textContent.split('.')[1].trim();
+
+                const imageWrapper = element.querySelectorAll('.box-two .thumbnails li img')
+                product.imagesSrc = []
+                for (let imgSrc of imageWrapper) {
+                    const src = imgSrc.getAttribute('src').split('?')[0]
+                    // const imageLink = src.startsWith('/') ? `https://www.questonline.gr${src}` : src;
+                    if (src.startsWith('/'))
+                        product.imagesSrc.push(`https://www.questonline.gr${src}`)
+                }
+
+                const priceWrapper = element.querySelector('.box-three')
+                product.deletedPrice = priceWrapper.querySelector('.deleted-price')?.textContent.replace('€', '').replace(',', '.').trim()
+                product.price = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
+
+                product.stockLevel = priceWrapper.querySelector('#realAvail').textContent.trim()
+
+                const tabsWrapper = scrap.querySelector('.tabs-content .technical-charact')
+
+                const liWrappers = tabsWrapper.querySelectorAll('li')
+
+                const prod_chars = []
+                for (let i = 0; i < liWrappers.length; i += 2) {
+                    prod_chars.push({
+                        name: liWrappers[i].querySelector('span').textContent.trim(),
+                        value: liWrappers[i + 1].querySelector('span').textContent.trim(),
+                    })
+                }
+
+                product.prod_chars = prod_chars
+
+                return product
+            })
+
+            await this.importQuestProduct(scrapProduct, `https://www.questonline.gr${productLink}`, category, subcategory, sub2category,
+                categoryMap, report, entry, auth)
+
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async importQuestProduct(product, productLink, category, subcategory, sub2category,
+        categoryMap, report, entry, auth) {
+        console.log("category:", category, "subcategory:", subcategory, "sub2category:", sub2category)
+        try {
+            let stockLevelFilter = []
+            for (let stock of categoryMap.stock_map) {
+                stockLevelFilter.push(stock.name)
+            }
+
+            if (!stockLevelFilter.includes(product.stockLevel)) {
+                return
+            }
+
+            let minPrice = categoryMap.minimumPrice ? categoryMap.minimumPrice : 0;
+            let maxPrice;
+            if (categoryMap.maximumPrice && categoryMap.maximumPrice > 0) {
+                maxPrice = categoryMap.maximumPrice;
+            }
+            else {
+                maxPrice = 100000;
+            }
+
+            let mpn = product.prod_chars.find(x => x.name === "Part Number").value;
+
+            let price = product.price;
+            let salePrice = product.deletedPrice ? product.deletedPrice : "";
+
+            if (price < minPrice || price > maxPrice) {
+                return
+            }
+
+            console.log("price:", price, "salePrice:", salePrice)
+            const entryCheck = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .checkIfProductExists(mpn);
+
+            let brandName = product.prod_chars.find(x => x.name === "Κατασκευαστής")?.value;
+
+            const brandId = await this.brandIdCheck(brandName);
+
+            //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
+            const categoryInfo = await this.getCategory(categoryMap.categories_map, product.title, category, subcategory, sub2category);
+
+            console.log("categoryInfo:", categoryInfo, "brandId:", brandId)
+
+            if (!entryCheck) {
+                try {
+                    const productPrice = await this.setPriceOnCreation(price.trim(), categoryInfo, brandId);
+
+                    const charMaps = await this.parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
+                    //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
+                    const { mapCharNames, mapCharValues } = charMaps
+                    const parsedChars = await this.parseChars(product.prod_chars, mapCharNames, mapCharValues)
+
+                    let imageUrls = []
+                    for (let imageUrl of product.imagesSrc) {
+                        imageUrls.push({ url: imageUrl })
+                    }
+
+                    const data = {
+                        name: product.title,
+                        // short_description: product.productMiniDescription,
+                        // description: product.productDescription,
+                        categories: categoryInfo.id,
+                        price: parseFloat(productPrice).toFixed(2),
+                        mpn: mpn ? mpn : null,
+                        slug: slugify(`${product.title}-${mpn}`, { lower: true, remove: /[*+~=#.,±°;_()/'"!:@]/g }),
+                        publishedAt: new Date(),
+                        status: "InStock",
+                        brand: { id: brandId },
+                        related_import: entry.id,
+                        supplierInfo: [{
+                            name: entry.name,
+                            wholesale: parseFloat(price).toFixed(2),
+                            supplierProductId: product.supplierCode,
+                            // sale_price: parseFloat(salePrice).toFixed(2),
+                            supplierProductURL: productLink
+                        }],
+                        prod_chars: parsedChars,
+                        ImageURLS: imageUrls,
+                    }
+
+                    const newEntry = await strapi.entityService.create('api::product.product', {
+                        data: data,
+                    });
+
+                    report.related_entries.push(newEntry.id)
+                    report.created += 1;
+                    console.log("Created:", report.created)
+
+                    //Κατεβάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
+                    let responseImage = await this.getAndConvertImgToWep(product.imagesSrc, data, newEntry.id, auth);
+
+                    // //Δημιουργώ αυτόματα το SEO για το προϊόν
+                    await this.saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
+
+                } catch (error) {
+                    console.log(error.details.errors)
+                }
+            }
+            else {
+                try {
+                    report.related_entries.push(entryCheck.id)
+
+                    const supplierInfo = [] //entryCheck.supplierInfo
+                    const relatedImport = entryCheck.related_import;
+                    const relatedImportId = []
+                    relatedImport.forEach(x => {
+                        relatedImportId.push(x.id)
+                    })
+                    relatedImportId.push(entry.id)
+                    let searchSupplierInfo = supplierInfo.find((o, i) => {
+                        if (o.name === entry.name) {
+                            supplierInfo[i] = {
+                                name: entry.name,
+                                wholesale: parseFloat(price).toFixed(2),
+                                supplierProductId: product.supplierCode,
+                                // price: parseFloat(salePrice).toFixed(2),
+                                supplierProductURL: productLink
+                            }
+                            return true;
+                        }
+                    })
+
+                    if (!searchSupplierInfo) {
+                        supplierInfo.push({
+                            name: entry.name,
+                            wholesale: parseFloat(price).toFixed(2),
+                            supplierProductId: product.supplierCode,
+                            // price: parseFloat(salePrice).toFixed(2),
+                            supplierProductURL: productLink
+                        })
+                    }
+
+                    const productPrice = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .setPriceOnUpdate(entryCheck, supplierInfo, brandId);
+
+                    await strapi.entityService.update('api::product.product', entryCheck.id, {
+                        data: {
+                            name: product.productTitle,
+                            categories: categoryInfo.id,
+                            price: parseFloat(productPrice),
+                            supplierInfo: supplierInfo,
+                            related_import: relatedImportId,
+                        },
+                    });
+                    report.updated += 1
+                    console.log("Updated:", report.updated)
+                } catch (error) {
+                    console.log(error)
+                }
+            }
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
     async scrapNovatronCategories(categoryMap, report, entry, auth) {
         try {
             // const browser = await puppeteer.launch()
@@ -1257,7 +1818,7 @@ module.exports = ({ strapi }) => ({
                         console.log("File readen successfully\n");
                     }
                 })
-            } 
+            }
 
             await page.goto('https://novatronsec.com/', { waitUntil: "networkidle0" });
             const pageUrl = page.url();
@@ -1324,7 +1885,8 @@ module.exports = ({ strapi }) => ({
                 return categories
             });
 
-            let newCategories = await this.filterCategories(scrapProduct, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+            let newCategories = this.filterCategories(scrapProduct, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+
 
             const charMaps = await this.parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
 
@@ -1335,7 +1897,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async filterCategories(categories, isWhitelistSelected, whitelist_map, blacklist_map) {
+    filterCategories(categories, isWhitelistSelected, whitelist_map, blacklist_map) {
 
         try {
             let newData = []
@@ -1347,20 +1909,20 @@ module.exports = ({ strapi }) => ({
                             let subCategories = []
                             if (whitelist_map[catIndex].subcategory.length > 0) {
                                 for (let sub of cat.subCategories) {
-                                    let subIndex = whitelist_map[catIndex].subcategory.findIndex((x) => sub.title.trim().includes(x.name.trim()))
+                                    let subIndex = whitelist_map[catIndex].subcategory.findIndex((x) => sub.title.trim() === x.name.trim())
                                     if (subIndex !== -1) {
                                         let subCategories2 = []
                                         if (whitelist_map[catIndex].subcategory[subIndex].subcategory.length > 0) {
-                                            for (let sub2 of sub.subCategories2) {
-                                                let sub2Index = whitelist_map[catIndex].subcategory[subIndex].subcategory.findIndex((x) => sub2.title.trim().includes(x.name.trim()))
+                                            for (let sub2 of sub.subCategories) {
+                                                let sub2Index = whitelist_map[catIndex].subcategory[subIndex].subcategory.findIndex((x) => sub2.title.trim() === x.name.trim())
                                                 if (sub2Index !== -1) {
                                                     subCategories2.push({ title: sub2.title, link: sub2.link })
                                                 }
                                             }
                                         }
                                         else {
-                                            if (sub.subCategories2) {
-                                                for (let sub2 of sub.subCategories2) {
+                                            if (sub.subCategories) {
+                                                for (let sub2 of sub.subCategories) {
                                                     subCategories2.push({ title: sub2.title, link: sub2.link })
                                                 }
                                             }
@@ -1373,8 +1935,8 @@ module.exports = ({ strapi }) => ({
                                 if (cat.subCategories) {
                                     for (let sub of cat.subCategories) {
                                         let subCategories2 = []
-                                        if (sub.subCategories2) {
-                                            for (let sub2 of sub.subCategories2) {
+                                        if (sub.subCategories) {
+                                            for (let sub2 of sub.subCategories) {
                                                 subCategories2.push({ title: sub2.title, link: sub2.link })
                                             }
                                         }
@@ -1383,7 +1945,7 @@ module.exports = ({ strapi }) => ({
                                     }
                                 }
                             }
-                            newData.push({ category: cat.title.trim(), subCategories: subCategories })
+                            newData.push({ title: cat.title.trim(), link: cat.link, subCategories: subCategories })
                         }
                     }
                     else {
@@ -1391,8 +1953,8 @@ module.exports = ({ strapi }) => ({
                         if (cat.subCategories) {
                             for (let sub of cat.subCategories) {
                                 let subCategories2 = []
-                                if (sub.subCategories2) {
-                                    for (let sub2 of sub.subCategories2) {
+                                if (sub.subCategories) {
+                                    for (let sub2 of sub.subCategories) {
                                         subCategories2.push({ title: sub2.title, link: sub2.link })
                                     }
                                 }
@@ -1400,7 +1962,7 @@ module.exports = ({ strapi }) => ({
                                 subCategories.push({ title: sub.title, link: sub.link, subCategories: subCategories2 })
                             }
                         }
-                        newData.push({ category: cat.title.trim(), subCategories: subCategories })
+                        newData.push({ title: cat.title.trim(), link: cat.link, subCategories: subCategories })
                     }
                 }
                 else {
@@ -1410,12 +1972,12 @@ module.exports = ({ strapi }) => ({
                             let subCategories = []
                             if (blacklist_map[catIndex].subcategory.length > 0) {
                                 for (let sub of cat.subCategories) {
-                                    let subIndex = blacklist_map[catIndex].subcategory.findIndex((x) => sub.title.trim().includes(x.name.trim()))
+                                    let subIndex = blacklist_map[catIndex].subcategory.findIndex((x) => sub.title.trim() === x.name.trim())
                                     if (subIndex !== -1) {
                                         let subCategories2 = []
                                         if (blacklist_map[catIndex].subcategory[subIndex].subcategory.length > 0) {
-                                            for (let sub2 of sub.subCategories2) {
-                                                let subIndex2 = blacklist_map[catIndex].subcategory[subIndex].subcategory.findIndex((x) => sub2.title.trim().includes(x.name.trim()))
+                                            for (let sub2 of sub.subCategories) {
+                                                let subIndex2 = blacklist_map[catIndex].subcategory[subIndex].subcategory.findIndex((x) => sub2.title.trim() === x.name.trim())
                                                 if (subIndex2 === -1) {
                                                     subCategories2.push({ title: sub2.title, link: sub2.link })
                                                 }
@@ -1425,15 +1987,15 @@ module.exports = ({ strapi }) => ({
                                     }
                                     else {
                                         let subCategories2 = []
-                                        if (sub.subCategories2) {
-                                            for (let sub2 of sub.subCategories2) {
+                                        if (sub.subCategories) {
+                                            for (let sub2 of sub.subCategories) {
                                                 subCategories2.push({ title: sub2.title, link: sub2.link })
                                             }
                                         }
                                         subCategories.push({ title: sub.title, link: sub.link, subCategories: subCategories2 })
                                     }
                                 }
-                                newData.push({ category: cat.title.trim(), subCategories: subCategories })
+                                newData.push({ title: cat.title.trim(), link: cat.link, subCategories: subCategories })
                             }
                         }
                         else {
@@ -1441,8 +2003,8 @@ module.exports = ({ strapi }) => ({
                             if (cat.subCategories) {
                                 for (let sub of cat.subCategories) {
                                     let subCategories2 = []
-                                    if (sub.subCategories2) {
-                                        for (let sub2 of sub.subCategories2) {
+                                    if (sub.subCategories) {
+                                        for (let sub2 of sub.subCategories) {
                                             subCategories2.push({ title: sub2.title, link: sub2.link })
                                         }
                                     }
@@ -1450,7 +2012,7 @@ module.exports = ({ strapi }) => ({
                                     subCategories.push({ title: sub.title, link: sub.link, subCategories: subCategories2 })
                                 }
                             }
-                            newData.push({ category: cat.title.trim(), subCategories: subCategories })
+                            newData.push({ title: cat.title.trim(), link: cat.link, subCategories: subCategories })
                         }
                     }
                     else {
@@ -1458,8 +2020,8 @@ module.exports = ({ strapi }) => ({
                         if (cat.subCategories) {
                             for (let sub of cat.subCategories) {
                                 let subCategories2 = []
-                                if (sub.subCategories2) {
-                                    for (let sub2 of sub.subCategories2) {
+                                if (sub.subCategories) {
+                                    for (let sub2 of sub.subCategories) {
                                         subCategories2.push({ title: sub2.title, link: sub2.link })
                                     }
                                 }
@@ -1467,7 +2029,7 @@ module.exports = ({ strapi }) => ({
                                 subCategories.push({ title: sub.title, link: sub.link, subCategories: subCategories2 })
                             }
                         }
-                        newData.push({ category: cat.category.trim(), subCategories: subCategories })
+                        newData.push({ title: cat.title.trim(), link: cat.link, subCategories: subCategories })
                     }
                 }
             }
@@ -1491,19 +2053,49 @@ module.exports = ({ strapi }) => ({
                     let scrap = await bodyHandle.evaluate(() => {
                         const productsGrid = document.querySelector(".products-grid");
                         const productsRow = productsGrid.querySelector(".row");
-                        const products = productsRow.querySelectorAll(".product");
+                        const productsList = productsRow.querySelectorAll(".product");
 
-                        let productLinks = []
-                        for (let prod of products) {
+                        let products = []
+                        for (let prod of productsList) {
+                            const product = {}
                             const anchor = prod.querySelector("a");
-                            const productLink = anchor.getAttribute("href");
-                            productLinks.push(productLink)
+                            product.link = anchor.getAttribute("href");
+
+                            const productBody = prod.querySelector('.product-body')
+                            const productTitleAnchor = productBody.querySelector('.product-title>a')
+                            product.title = productTitleAnchor.textContent.trim()
+                            product.price = productBody.querySelector('.product-price>div>div>span').textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
+                            product.supplierCode = productBody.querySelector('.product-code').textContent.trim()
+                            const stockLevelWrapper = productBody.querySelector('div>p>img');
+                            const productStockImg = stockLevelWrapper.getAttribute('src')
+                            const stockLevelImg = productStockImg.split('/')[4].split('.')[0].split('-')[1].trim()
+
+                            switch (stockLevelImg) {
+                                case '3':
+                                    product.stockLevel = "InStock"
+                                    break;
+                                case '2':
+                                    product.stockLevel = "MediumStock"
+                                    break;
+                                case '1':
+                                    product.stockLevel = "LowStock"
+                                    break;
+                                default:
+                                    product.stockLevel = "OutOfStock"
+                                    break;
+                            }
+
+                            products.push(product)
                         }
-                        return productLinks
+                        return products
                     })
 
-                    for (let prod of scrap) {
-                        await this.scrapNovatronProduct(prod, page, cat.category, sub.title, categoryMap, charMaps, report, entry, auth)
+                    const products = await this.updateAndFilterScrapProducts(scrap, categoryMap, report, entry)
+
+                    // console.log(products)
+
+                    for (let prod of products) {
+                        await this.scrapNovatronProduct(prod.link, page, cat.title, sub.title, categoryMap, charMaps, report, entry, auth)
                     }
                 }
             }
@@ -1680,7 +2272,7 @@ module.exports = ({ strapi }) => ({
             //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
             const categoryInfo = await this.getCategory(categoryMap.categories_map, product.productTitle, category, subcategory, null);
 
-            console.log(categoryInfo)
+            console.log("categoryInfo:", categoryInfo)
             if (!entryCheck) {
                 try {
                     const productPrice = await this.setPriceOnCreation(price.trim(), categoryInfo, brandId);
@@ -1724,6 +2316,7 @@ module.exports = ({ strapi }) => ({
                     report.related_entries.push(newEntry.id)
                     report.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
                     report.created += 1;
+                    console.log("Created:", report.created)
 
                     //Κατεβάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
                     let responseImage = await this.getAndConvertImgToWep(product.imagesSrc, data, newEntry.id, auth);
@@ -1784,12 +2377,13 @@ module.exports = ({ strapi }) => ({
                         },
                     });
                     report.updated += 1
+                    console.log("Updated:", report.updated)
                 } catch (error) {
                     console.log(error)
                 }
             }
         } catch (error) {
-
+            console.log(error)
         }
     },
 
@@ -1988,7 +2582,7 @@ module.exports = ({ strapi }) => ({
                             }
                         })
                         .catch(err => {
-                            console.error("Error processing files, let's clean it up", err, "File:", data[" GS Description "], "Globalsat Code:", data["GS Code"]);
+                            console.error("Error processing files, let's clean it up", err, "File:", product.title, "supplier Code:", product.supplierCode);
                             try {
                                 // fs.unlinkSync(`./src/tmp/${data[" GS Description "]}_${index}.webp`);
                             } catch (e) {
@@ -2267,6 +2861,8 @@ module.exports = ({ strapi }) => ({
             delete entries.id;
             delete entries.name;
 
+            console.log(entries.related_products.length)
+
             for (let entry of entries.related_products) {
                 let newEntry = {
                     name: entry.name,
@@ -2278,7 +2874,7 @@ module.exports = ({ strapi }) => ({
                     short_description: entry.short_description,
                     barcode: entry.barcode,
                     category: entry.categories[0].name,
-                    brand: entry.brand.name
+                    brand: entry.brand ? entry.brand?.name : ""
                 }
 
                 let chars1 = []
@@ -2806,7 +3402,7 @@ module.exports = ({ strapi }) => ({
         await strapi.entityService.update('plugin::import-products.importxml', entry.id,
             {
                 data: {
-                    report: `Created: ${importRef.created}, Updated: ${importRef.updated}, Deleted: ${importRef.deleted}`,
+                    report: `Created: ${importRef.created}, Updated: ${importRef.updated}, Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted}`,
                 },
             })
     },

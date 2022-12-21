@@ -893,6 +893,7 @@ module.exports = ({ strapi }) => ({
 
     async parseGerasisXml({ entry, auth }) {
         try {
+
             const importRef = {
                 created: 0,
                 updated: 0,
@@ -1031,6 +1032,7 @@ module.exports = ({ strapi }) => ({
             let report = {
                 created: 0,
                 updated: 0,
+                skipped: 0,
                 deleted: 0,
                 related_entries: [],
                 related_products: [],
@@ -1123,6 +1125,42 @@ module.exports = ({ strapi }) => ({
             //             report: `Created: ${report.created}, Updated: ${report.updated}, Deleted: ${report.deleted}`,
             //         },
             //     })
+
+            console.log("End of Import")
+            return { "message": "ok" }
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async parseQuestXml({ entry, auth }) {
+        try {
+
+            let report = {
+                created: 0,
+                updated: 0,
+                skipped: 0,
+                deleted: 0,
+                related_entries: [],
+                related_products: [],
+            }
+
+            const categoryMap = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .getImportMapping(entry);
+
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .scrapQuest(categoryMap, report, entry, auth);
+
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .deleteEntry(entry, report);
+
+            console.log(report)
 
             console.log("End of Import")
             return { "message": "ok" }

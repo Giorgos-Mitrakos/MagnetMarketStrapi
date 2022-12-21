@@ -14,7 +14,7 @@ import instance from "../../utils/axiosInstance";
 import { exportToXML, getImportedFile, ImportedFileSuccess, postParseToJson, saveURL } from '../../utils/api';
 import { Loader } from '@strapi/design-system/Loader';
 import { ProgressBar } from '@strapi/design-system/ProgressBar';
-import { auth } from '@strapi/helper-plugin';
+import { auth } from '@strapi/helper-plugin/build/helper-plugin.production';
 
 const UploadFileForm = () => {
 

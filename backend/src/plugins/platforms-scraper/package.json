@@ -1,0 +1,25 @@
+{
+  "name": "platforms-scraper",
+  "version": "0.1.0",
+  "description": "Αναζήτηση τιμών στις πλατφόρμες και προσαρμογή των τιμών μας σε αυτές με στόχο το μέγιστο κέρδος.",
+  "strapi": {
+    "name": "Scraper πλατφορμών",
+    "description": "Αναζήτηση τιμών στις πλατφόρμες και προσαρμογή των τιμών μας σε αυτές με στόχο το μέγιστο κέρδος.",
+    "kind": "plugin",
+    "displayName": "Platforms Scraper"
+  },
+  "dependencies": {},
+  "author": {
+    "name": "Giorgos Mitrakos"
+  },
+  "maintainers": [
+    {
+      "name": "Giorgos Mitrakos"
+    }
+  ],
+  "engines": {
+    "node": ">=14.19.1 <=18.x.x",
+    "npm": ">=6.0.0"
+  },
+  "license": "MIT"
+}

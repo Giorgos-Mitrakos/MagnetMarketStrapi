@@ -39,6 +39,12 @@ module.exports = {
         .service('parseService')
         .parseNovatronXml(ctx.request.body);
     }
+    else if (ctx.request.body.entry.name === 'QUEST') {
+      ctx.body = await strapi
+        .plugin('import-products')
+        .service('parseService')
+        .parseQuestXml(ctx.request.body);
+    }
     else if (ctx.request.body.entry.name === 'Damkalidis') {
       ctx.body = await strapi
         .plugin('import-products')
