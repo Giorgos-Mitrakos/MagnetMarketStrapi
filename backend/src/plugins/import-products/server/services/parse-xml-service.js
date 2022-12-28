@@ -528,6 +528,7 @@ module.exports = ({ strapi }) => ({
         const importRef = {
             created: 0,
             updated: 0,
+            skipped: 0,
             deleted: 0,
             related_entries: [],
             related_products: []
@@ -1141,6 +1142,7 @@ module.exports = ({ strapi }) => ({
                 updated: 0,
                 skipped: 0,
                 deleted: 0,
+                republished:0,
                 related_entries: [],
                 related_products: [],
             }

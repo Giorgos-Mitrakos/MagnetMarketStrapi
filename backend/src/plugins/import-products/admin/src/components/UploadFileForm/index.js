@@ -157,7 +157,7 @@ const UploadFileForm = () => {
                                 <Link to={`/plugins/import-products/mapping/${entry.id}`}>
                                     mapping
                                 </Link>
-                                <Link onClick={(e) => handleExportClick(entry.name)}>Export xml</Link>
+                                {/* <Link onClick={(e) => handleExportClick(entry.name)}>Export xml</Link> */}
                             </Flex>
                         </Td>
                         <Td>

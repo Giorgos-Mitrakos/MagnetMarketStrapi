@@ -1,7 +1,7 @@
 'use strict';
 
-const myController = require('./my-controller');
+const platformController = require('./platform-controller');
 
 module.exports = {
-  myController,
+  platformController,
 };

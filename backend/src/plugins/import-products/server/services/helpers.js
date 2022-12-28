@@ -192,12 +192,7 @@ module.exports = ({ strapi }) => ({
                 if (stockLevelFilter.includes(product.stockLevel)) {
                     // console.log(product)
 
-                    const query = {
-                        where: {
-                            // name: product.title,
-                            mpn: { supplierProductURL: product.link }
-                        }
-                    }
+
                     const checkIfEntry = await strapi.db.query('api::product.product').findOne({
                         where: {
                             // name: product.title,
@@ -239,6 +234,15 @@ module.exports = ({ strapi }) => ({
 
                         // console.log("checkIfIsInSupplier:", checkIfIsInSupplier)
 
+                        if (!checkIfEntry.publishedAt) {
+                            await strapi.entityService.update('api::product.product', checkIfEntry.id, {
+                                data: {
+                                    publishedAt: new Date()
+                                },
+                            });
+                            report.republished += 1
+                        }
+
                         if (parseFloat(checkIfIsInSupplier.wholesale).toFixed(2) !== parseFloat(product.price).toFixed(2)) {
                             // console.log(product)
                             console.log("productINdb:", product, "wholesale:", checkIfIsInSupplier.wholesale)
@@ -252,7 +256,7 @@ module.exports = ({ strapi }) => ({
                                     const price_progress = o.price_progress;
                                     price_progress.push({
                                         date: new Date(),
-                                        price: o.wholesale
+                                        price: product.price
                                     })
 
                                     supplierInfo[i] = {
@@ -289,7 +293,8 @@ module.exports = ({ strapi }) => ({
 
                     }
                     else {
-                        newProducts.push(product)
+                        if (product.price)
+                            newProducts.push(product)
                     }
                 }
             }
@@ -889,9 +894,9 @@ module.exports = ({ strapi }) => ({
     async scrapGlobalsat(importRef, entry, auth) {
         try {
 
-            const dataFromExcel = await this.getData(entry)
-            const browser = await puppeteer.launch()
-            // const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
+            // const dataFromExcel = await this.getData(entry)
+            // const browser = await puppeteer.launch()
+            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
             const page = await browser.newPage();
             await page.setViewport({ width: 1200, height: 500 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
@@ -1018,9 +1023,11 @@ module.exports = ({ strapi }) => ({
                 return productLinks
             })
 
-            for (let productLink of productLinksList) {
-                await this.scrapGlobalsatProduct(page, categoryMap, category, subCategory, sub2Category, productLink, charMaps, dataFromExcel, importRef, entry, auth)
-            }
+            console.log(productLinksList)
+
+            // for (let productLink of productLinksList) {
+            //     await this.scrapGlobalsatProduct(page, categoryMap, category, subCategory, sub2Category, productLink, charMaps, dataFromExcel, importRef, entry, auth)
+            // }
 
         } catch (error) {
             console.error(error)
@@ -1663,6 +1670,7 @@ module.exports = ({ strapi }) => ({
             }
 
             let mpn = product.prod_chars.find(x => x.name === "Part Number").value;
+            let barcode = product.prod_chars.find(x => x.name === "EAN Number").value;
 
             let price = product.price;
             let salePrice = product.deletedPrice ? product.deletedPrice : "";
@@ -1707,6 +1715,7 @@ module.exports = ({ strapi }) => ({
                         categories: categoryInfo.id,
                         price: parseFloat(productPrice).toFixed(2),
                         mpn: mpn ? mpn : null,
+                        barcode: barcode ? barcode : null,
                         slug: slugify(`${product.title}-${mpn}`, { lower: true, remove: /[*+~=#.,±°;_()/'"!:@]/g }),
                         publishedAt: new Date(),
                         status: "InStock",
@@ -2845,6 +2854,12 @@ module.exports = ({ strapi }) => ({
                 where: { name: supplier },
                 populate: {
                     related_products: {
+                        where: {
+                            $not: {
+                                publishedAt: null
+                            }
+
+                        },
                         populate: {
                             categories: { fields: ['name'] },
                             brand: { fields: ['name'] },
@@ -3348,6 +3363,7 @@ module.exports = ({ strapi }) => ({
         await strapi.entityService.update('api::product.product', entryCheck.id, {
             data: {
                 price: parseFloat(productPrice),
+                publishedAt: new Date(),
                 supplierInfo: supplierInfo,
                 related_import: relatedImportId,
                 ImageURLS: imgUrls
@@ -3362,7 +3378,15 @@ module.exports = ({ strapi }) => ({
 
         const importXmlFile = await strapi.entityService.findMany('plugin::import-products.importxml',
             {
-                populate: { related_products: true },
+                populate: {
+                    related_products: {
+                        filters: {
+                            $not: {
+                                publishedAt: null
+                            }
+                        },
+                    }
+                },
                 filters: { id: entry.id },
             });
 
@@ -3384,16 +3408,20 @@ module.exports = ({ strapi }) => ({
                     })
                     supplierInfo.splice(index, 1)
 
-                    // await strapi.entityService.update('api::product.product', product.id, {
-                    //     data: {
-                    //         supplierInfo: supplierInfo,
-                    //     },
-                    // });
+                    await strapi.entityService.update('api::product.product', product.id, {
+                        data: {
+                            supplierInfo: supplierInfo,
+                        },
+                    });
                     importRef.updated += 1
                 }
                 else {
                     console.log("Product Deleted:", product.name)
-                    await strapi.entityService.delete('api::product.product', product.id);
+                    await strapi.entityService.update('api::product.product', product.id, {
+                        data: {
+                            publishedAt: null,
+                        },
+                    });
                     importRef.deleted += 1;
                 }
             }

@@ -1,10 +1,10 @@
 {
     "info": {
-        "tableName": "charvaluemap",
-        "singularName": "charvaluemap",
-        "pluralName": "charvaluemaps",
-        "displayName": "CharValuemap",
-        "description": "Mapping Characteristics Value",
+        "tableName": "platform-category",
+        "singularName": "platform-category",
+        "pluralName": "platform-categories",
+        "displayName": "platformCategories",
+        "description": "platformCategory ",
         "kind": "collectionType"
     },
     "options": {
@@ -12,7 +12,7 @@
     },
     "pluginOptions": {
         "content-manager": {
-            "visible": false
+            "visible": true
         },
         "content-type-builder": {
             "visible": false
@@ -23,15 +23,20 @@
             "type": "string",
             "required": true
         },
-        "value": {
+        "link": {
             "type": "string",
             "required": true
         },
-        "related_import": {
+        "isChecked": {
+            "type": "boolean",
+            "default": false,
+            "required": true
+        },
+        "platform": {
             "type": "relation",
             "relation": "manyToOne",
-            "target": "plugin::import-products.importxml",
-            "inversedBy": "char_value_map"
+            "target": "plugin::platforms-scraper.platform",
+            "inversedBy": "categories"
         }
     }
 }

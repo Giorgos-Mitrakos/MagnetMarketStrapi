@@ -1,0 +1,45 @@
+{
+    "info": {
+        "tableName": "platform",
+        "singularName": "platform",
+        "pluralName": "platforms",
+        "displayName": "Platform",
+        "description": "Platforms ",
+        "kind": "collectionType"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "pluginOptions": {
+        "content-manager": {
+            "visible": true
+        },
+        "content-type-builder": {
+            "visible": false
+        }
+    },
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "entryURL":{
+            "type": "string",
+            "required": true
+        },
+        "categoryMerchantFee": {
+            "type": "media",
+            "multiple": false,
+            "required": false,
+            "allowedTypes": [
+                "files"
+            ]
+        },
+        "categories": {
+            "type": "relation",
+            "relation": "oneToMany",
+            "target": "plugin::platforms-scraper.platform-category",
+            "mappedBy": "platform"
+        }
+    }
+}
