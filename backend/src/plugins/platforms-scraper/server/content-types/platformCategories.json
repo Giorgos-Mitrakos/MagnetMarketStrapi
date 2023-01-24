@@ -27,10 +27,28 @@
             "type": "string",
             "required": true
         },
+        "numberOfProducts": {
+            "type": "integer",
+            "required": true,
+            "default": 0,
+            "min": 0
+        },
         "isChecked": {
             "type": "boolean",
             "default": false,
             "required": true
+        },
+        "marketPlaceFee": {
+            "type": "decimal",
+            "required": true,
+            "default": 0,
+            "min": 0
+        },
+        "cpsFee": {
+            "type": "decimal",
+            "required": true,
+            "default": 0,
+            "min": 0
         },
         "platform": {
             "type": "relation",

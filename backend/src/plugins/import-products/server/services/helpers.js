@@ -17,7 +17,6 @@ const { DOMParser, XMLSerializer, DOMImplementation } = require('xmldom');
 module.exports = ({ strapi }) => ({
 
     async xPathFilter(result, entry) {
-
         const docParser = new DOMParser()
         var serializer = new XMLSerializer();
         const doc = docParser.parseFromString(result.data, "application/xml")
@@ -45,28 +44,46 @@ module.exports = ({ strapi }) => ({
         } catch (error) {
             return result.data
         }
-
-
     },
 
     async parseXml(xml) {
-        const parser = new xml2js.Parser();
-        return new Promise((resolve, reject) => {
-            parser.parseString(xml, (err, result) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(result);
-                }
+        try {
+            if (!xml)
+                return
+
+            const parser = new xml2js.Parser();
+            return new Promise((resolve, reject) => {
+                parser.parseString(xml, (err, result) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(result);
+                    }
+                });
             });
-        });
+        } catch (error) {
+            return
+        }
+
     },
 
-    async getData(entry) {
+    async getData(entry, categoryMap) {
         const parser = new xml2js.Parser();
 
         // console.log("importedURL:", entry.importedURL)
         if (entry.importedURL) {
+            if (entry.name === "Oktabit") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('oktabitHelper')
+                    .getOktabitData(entry, categoryMap)
+            }
+            else if (entry.name === "Shopflix") {
+                let { data } = await Axios.get(`${entry.importedURL}`)
+                const xml = await this.parseXml(await data)
+
+                return await xml;
+            }
             let data = Axios.get(`${entry.importedURL}`)
             const xPath = await this.xPathFilter(await data, entry);
             const xml = await this.parseXml(xPath)
@@ -114,17 +131,32 @@ module.exports = ({ strapi }) => ({
         return { newData, categoryMap, charMaps }
     },
 
-    async brandIdCheck(brand) {
+    async brandIdCheck(brand, name) {
         try {
+            let brandId;
+            if (!brand) {
+                const brandEntries = await strapi.entityService.findMany('api::brand.brand', {
+                    fields: ['name'],
+                });
+
+                // const brands = brandEntries.map(x => x.name)
+
+                const brandFound = brandEntries.find(x => name.toLowerCase().includes(x.name.toLowerCase()))
+
+                if (brandFound) {
+                    brandId = brandFound.id
+                    return brandId
+                }
+            }
+
             const brandCheck = await strapi.db.query('api::brand.brand').findOne({
                 // select: ['mpn', 'id', 'relatedSupplier'],
                 where: { name: brand },
             });
 
-            let brandId = brandCheck?.id
+            brandId = brandCheck?.id
 
-
-            if (!brandCheck) {
+            if (!brandCheck && brand) {
                 let newbrand = await strapi.entityService.create('api::brand.brand', {
                     data: {
                         name: brand,
@@ -134,8 +166,8 @@ module.exports = ({ strapi }) => ({
                 })
 
                 brandId = await newbrand.id
-
             }
+
             return brandId;
         } catch (error) {
             console.log(error)
@@ -160,7 +192,7 @@ module.exports = ({ strapi }) => ({
                     }
                 },
                 related_import: true,
-                categories: {
+                category: {
                     populate: {
                         cat_percentage: {
                             populate: {
@@ -179,7 +211,7 @@ module.exports = ({ strapi }) => ({
         return await checkIfEntry
     },
 
-    async updateAndFilterScrapProducts(products, categoryMap, report, entry) {
+    async updateAndFilterScrapProducts(products, categoryMap, category, subcategory, sub2category, report, entry) {
         try {
             const newProducts = []
             let stockLevelFilter = []
@@ -191,7 +223,6 @@ module.exports = ({ strapi }) => ({
                 // console.log(product) 
                 if (stockLevelFilter.includes(product.stockLevel)) {
                     // console.log(product)
-
 
                     const checkIfEntry = await strapi.db.query('api::product.product').findOne({
                         where: {
@@ -210,8 +241,9 @@ module.exports = ({ strapi }) => ({
                                     price_progress: true,
                                 }
                             },
+                            brand: true,
                             related_import: true,
-                            categories: {
+                            category: {
                                 populate: {
                                     cat_percentage: {
                                         populate: {
@@ -230,25 +262,32 @@ module.exports = ({ strapi }) => ({
                     // console.log("checkIfEntry:", checkIfEntry)
 
                     if (checkIfEntry) {
+                        let dbChange = ''
+                        const data = {}
                         const checkIfIsInSupplier = checkIfEntry.supplierInfo.find(x => x.name === entry.name)
 
                         // console.log("checkIfIsInSupplier:", checkIfIsInSupplier)
 
+                        const supplierInfo = checkIfEntry.supplierInfo
+
+                        const categoryInfo = await this.getCategory(categoryMap.categories_map, product.title, category, subcategory, sub2category);
+
+                        data.category = categoryInfo.id
+
                         if (!checkIfEntry.publishedAt) {
-                            await strapi.entityService.update('api::product.product', checkIfEntry.id, {
-                                data: {
-                                    publishedAt: new Date()
-                                },
-                            });
-                            report.republished += 1
+                            data.publishedAt = new Date()
+                            dbChange = 'republished'
+                        }
+
+                        if (!checkIfEntry.brand) {
+                            const brandId = await this.brandIdCheck(null, checkIfEntry.name)
+                            if (brandId)
+                                data.brand = brandId
                         }
 
                         if (parseFloat(checkIfIsInSupplier.wholesale).toFixed(2) !== parseFloat(product.price).toFixed(2)) {
                             // console.log(product)
-                            console.log("productINdb:", product, "wholesale:", checkIfIsInSupplier.wholesale)
-
-                            const supplierInfo = checkIfEntry.supplierInfo
-
+                            console.log("New wholesale:", product.price, "Previous wholesale:", checkIfIsInSupplier.wholesale)
 
                             const supplierInfoUpdate = checkIfEntry.supplierInfo.find((o, i) => {
 
@@ -256,7 +295,9 @@ module.exports = ({ strapi }) => ({
                                     const price_progress = o.price_progress;
                                     price_progress.push({
                                         date: new Date(),
-                                        price: product.price
+                                        price: product.price,
+                                        in_offer: product.in_offer,
+                                        discount: product.discount
                                     })
 
                                     supplierInfo[i] = {
@@ -265,32 +306,47 @@ module.exports = ({ strapi }) => ({
                                         supplierProductId: product.supplierCode,
                                         // price: parseFloat(salePrice).toFixed(2),
                                         supplierProductURL: checkIfIsInSupplier.supplierProductURL,
+                                        in_offer: product.in_offer,
                                         price_progress: price_progress,
                                     }
                                     return true;
                                 }
                             })
 
-                            const productPrice = await strapi
-                                .plugin('import-products')
-                                .service('helpers')
-                                .setPriceOnUpdate(checkIfEntry, supplierInfo);
-
                             console.log("supplierInfoUpdate:", supplierInfoUpdate)
 
-                            await strapi.entityService.update('api::product.product', checkIfEntry.id, {
-                                data: {
-                                    price: parseFloat(productPrice),
-                                    supplierInfo: supplierInfo,
-                                },
-                            });
-                            report.updated += 1
-                        }
-                        else {
-                            report.skipped += 1
-                        }
-                        report.related_entries.push(checkIfEntry.id)
+                            data.supplierInfo = supplierInfo
 
+                            dbChange = 'updated'
+                        }
+
+                        const productPrice = await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .setPrice(checkIfEntry, supplierInfo, categoryInfo, checkIfEntry.brand?.id);
+
+                        data.price = productPrice
+
+                        await strapi.entityService.update('api::product.product', checkIfEntry.id, {
+                            data: data,
+                        });
+
+                        switch (dbChange) {
+                            case 'republished':
+                                report.republished += 1
+                                console.log("Republished:", report.republished)
+                                break;
+                            case 'updated':
+                                report.updated += 1
+                                console.log("Update:", report.updated)
+                                break;
+                            default:
+                                report.skipped += 1
+                                console.log("Skipped:", report.skipped)
+                                break;
+                        } 
+
+                        report.related_entries.push(checkIfEntry.id)
                     }
                     else {
                         if (product.price)
@@ -744,8 +800,7 @@ module.exports = ({ strapi }) => ({
     },
 
     async getCategory(categoryMap, name, category, sub_category, sub_category2) {
-
-        let cat = categoryMap.find(x => x.name.trim() === category.trim())
+        let cat = categoryMap.find(x => x.name.trim().toLowerCase() === category.trim().toLowerCase())
 
         let categoryMapping = "Uncategorized"
 
@@ -1368,544 +1423,6 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuest(categoryMap, report, entry, auth) {
-        try {
-
-            let filteredCategories = {
-                categories: [],
-            }
-            // const browser = await puppeteer.launch()
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
-            const page = await browser.newPage();
-            await page.setViewport({ width: 1200, height: 500 })
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
-
-            if (fs.existsSync('./public/QuestCookies.json')) {
-                fs.readFile('./public/QuestCookies.json', async (err, data) => {
-                    if (err)
-                        console.log(err);
-                    else {
-                        const cookies = JSON.parse(data);
-                        await page.setCookie(...cookies);
-                        console.log("File readen successfully\n");
-                    }
-                })
-            }
-
-            await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
-            const pageUrl = page.url();
-
-            if (pageUrl === "https://www.questonline.gr/Special-Pages/Logon?ReturnUrl=%2f") {
-                const bodyHandle = await page.$('body');
-
-                const acceptCookiesForm = await page.$('#CybotCookiebotDialog')
-                if (acceptCookiesForm) {
-                    const acceptCookiesButton = await page.$('#CybotCookiebotDialogBodyButtonAccept')
-                    acceptCookiesButton.click();
-                }
-
-                const formHandle = await bodyHandle.$('form');
-
-                const usernameWrapper = await formHandle.$('#username');
-                const username = await usernameWrapper.$('input');
-                const passwordWrapper = await formHandle.$('#password');
-                const password = await passwordWrapper.$('input');
-                const button = await formHandle.$('#submit-button');
-                await username.type(process.env.QUEST_USERNAME)
-                await password.type(process.env.QUEST_PASSWORD)
-                await Promise.all([
-                    await button.click(),
-                    await page.waitForNavigation()
-                ])
-                await page.cookies()
-                    .then((cookies) => {
-                        const cookiesJson = JSON.stringify(cookies, null, 2)
-                        return cookiesJson
-                    })
-                    .then((cookiesJson) => {
-                        fs.writeFile('./public/QuestCookies.json', cookiesJson, (err) => {
-                            if (err)
-                                console.log(err);
-                            else {
-                                console.log("File written successfully\n");
-                            }
-                        })
-                    })
-                    .catch((error) => console.log(error))
-            }
-
-            const bodyHandle = await page.$('body');
-            const navListWrapper = await page.$("div.nav-2-wrapper")
-            let scrapCategories = await page.$eval('div.nav-2-wrapper', (element) => {
-                const navList = element.querySelectorAll(".nav-2")
-                // let liElements = navList.length
-
-                const categories = []
-                for (let ul of navList) {
-                    let categoriesList = ul.querySelectorAll("li");
-
-                    for (let li of categoriesList) {
-                        let category = {}
-                        const categoryAnchor = li.querySelector('a')
-                        const categoryTitleSpan = li.querySelector('span')
-                        category.title = categoryTitleSpan.textContent.trim()
-                        category.link = categoryAnchor.getAttribute("href")
-                        category.subCategories = []
-                        categories.push(category)
-                    }
-                }
-                return categories;
-            })
-
-            // filteredCategories.categories = scrapCategories
-
-            let newCategories = this.filterCategories(scrapCategories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
-
-            filteredCategories.categories = newCategories
-            // console.log(newCategories)
-            const charMaps = await this.parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
-
-            for (let category of newCategories) {
-                await this.scrapQuestSubcategories(page, category, filteredCategories, categoryMap, report, entry, auth);
-                // filteredCategories.categories = await this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
-            }
-
-
-            // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, report, entry, auth)
-            await browser.close();
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async scrapQuestSubcategories(page, category, filteredCategories, categoryMap, report, entry, auth) {
-        try {
-            await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
-            const scrapSub = await page.$eval('.side-menu', (element) => {
-                const subList = element.querySelector('ul')
-                const subcategoriesList = subList.querySelectorAll('li')
-
-                const subcategories = []
-                for (let sub of subcategoriesList) {
-                    let subcategory = {}
-                    const subcategoryAnchor = sub.querySelector('a')
-                    subcategory.title = subcategoryAnchor.textContent.trim()
-                    subcategory.link = subcategoryAnchor.getAttribute('href')
-                    subcategory.subCategories = []
-                    subcategories.push(subcategory)
-                }
-                return subcategories
-            })
-
-            const catIndex = filteredCategories.categories.findIndex(x => x.title === category.title)
-            filteredCategories.categories[catIndex].subCategories = scrapSub
-            filteredCategories.categories = this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
-
-            for (let sub of filteredCategories.categories[catIndex].subCategories) {
-                await this.scrapQuestSubcategories2(page, category.title, sub, filteredCategories, categoryMap, report, entry, auth)
-            }
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async scrapQuestSubcategories2(page, category, subcategory, filteredCategories, categoryMap, report, entry, auth) {
-        try {
-            await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
-            const sideMenu = await page.$('.side-menu')
-
-            const catIndex = filteredCategories.categories.findIndex(x => x.title === category)
-            const subIndex = filteredCategories.categories[catIndex].subCategories.findIndex(x => x.title === subcategory.title)
-
-            if (sideMenu) {
-                const scrapSub = await page.$eval('.side-menu', (element) => {
-                    const subList = element.querySelector('ul')
-                    const subcategoriesList = subList.querySelectorAll('li')
-
-                    const subcategories = []
-                    for (let sub of subcategoriesList) {
-                        let subcategory = {}
-                        const subcategoryAnchor = sub.querySelector('a')
-                        subcategory.title = subcategoryAnchor.textContent.trim()
-                        subcategory.link = subcategoryAnchor.getAttribute('href')
-                        subcategory.subCategories = []
-                        subcategories.push(subcategory)
-                    }
-                    return subcategories
-                })
-
-
-                filteredCategories.categories[catIndex].subCategories[subIndex].subCategories = scrapSub
-                filteredCategories.categories = this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
-
-                for (let sub2 of filteredCategories.categories[catIndex].subCategories[subIndex].subCategories) {
-                    await this.scrapQuestCategory(page, sub2.link, category, subcategory.title, sub2.title, categoryMap, report, entry, auth)
-                }
-            }
-            else {
-                await this.scrapQuestCategory(page, subcategory.link, category, subcategory.title, null, categoryMap, report, entry, auth)
-            }
-
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async scrapQuestCategory(page, link, category, subcategory, sub2category, categoryMap, report, entry, auth) {
-        try {
-            await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
-
-            const scrapProducts = await page.$eval('div.region-area-three>div.inner-area.inner-area-three', (element) => {
-                const productListWrapper = element.querySelector('div.box>ul.product-list')
-                const productList = productListWrapper.querySelectorAll('li>article>div.description-container')
-
-                const products = []
-                for (let prod of productList) {
-                    let product = {}
-                    const leftContainer = prod.querySelector('div.description-container-left')
-                    const titleWrapper = leftContainer.querySelector('header.title-container>h2.title>a')
-                    product.title = titleWrapper.textContent.trim()
-                    product.link = titleWrapper.getAttribute('href')
-                    product.supplierCode = leftContainer.querySelector('.product-code').textContent.split('.')[1].trim();
-
-                    const rightContainer = prod.querySelector('.description-container-right')
-                    const productAvailability = rightContainer.querySelector('div.availability>span').textContent.trim()
-                    const priceWrapper = rightContainer.querySelector('.price-container')
-                    product.price = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
-
-                    product.stockLevel = productAvailability
-                    products.push(product)
-                }
-                return products
-            })
-
-            const products = await this.updateAndFilterScrapProducts(scrapProducts, categoryMap, report, entry)
-
-            // console.log(products)
-            for (let product of products) {
-                // if (stockLevelFilter.includes(product.stockLevel)) {
-                //     console.log(product)
-                await this.scrapQuestProduct(page, product.link, category, subcategory, sub2category, categoryMap, report, entry, auth)
-                // }
-            }
-
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async scrapQuestProduct(page, productLink, category, subcategory, sub2category, categoryMap, report, entry, auth) {
-        try {
-            await page.goto(`https://www.questonline.gr${productLink}`, { waitUntil: "networkidle0" });
-
-            const scrapProduct = await page.$eval('.details-page', (scrap) => {
-                const product = {}
-
-                const element = scrap.querySelector('div.content-container div.region-area-two')
-                const titleWrapper = element.querySelector('div.content-container div.region-area-two .inner-area-one .title')
-                product.title = titleWrapper.textContent.trim();
-                const supplierCodeWrapper = element.querySelector('#SkuNumber')
-                product.supplierCode = supplierCodeWrapper.textContent.split('.')[1].trim();
-
-                const imageWrapper = element.querySelectorAll('.box-two .thumbnails li img')
-                product.imagesSrc = []
-                for (let imgSrc of imageWrapper) {
-                    const src = imgSrc.getAttribute('src').split('?')[0]
-                    // const imageLink = src.startsWith('/') ? `https://www.questonline.gr${src}` : src;
-                    if (src.startsWith('/'))
-                        product.imagesSrc.push(`https://www.questonline.gr${src}`)
-                }
-
-                const priceWrapper = element.querySelector('.box-three')
-                product.deletedPrice = priceWrapper.querySelector('.deleted-price')?.textContent.replace('€', '').replace(',', '.').trim()
-                product.price = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
-
-                product.stockLevel = priceWrapper.querySelector('#realAvail').textContent.trim()
-
-                const tabsWrapper = scrap.querySelector('.tabs-content .technical-charact')
-
-                const liWrappers = tabsWrapper.querySelectorAll('li')
-
-                const prod_chars = []
-                for (let i = 0; i < liWrappers.length; i += 2) {
-                    prod_chars.push({
-                        name: liWrappers[i].querySelector('span').textContent.trim(),
-                        value: liWrappers[i + 1].querySelector('span').textContent.trim(),
-                    })
-                }
-
-                product.prod_chars = prod_chars
-
-                return product
-            })
-
-            await this.importQuestProduct(scrapProduct, `https://www.questonline.gr${productLink}`, category, subcategory, sub2category,
-                categoryMap, report, entry, auth)
-
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async importQuestProduct(product, productLink, category, subcategory, sub2category,
-        categoryMap, report, entry, auth) {
-        console.log("category:", category, "subcategory:", subcategory, "sub2category:", sub2category)
-        try {
-            let stockLevelFilter = []
-            for (let stock of categoryMap.stock_map) {
-                stockLevelFilter.push(stock.name)
-            }
-
-            if (!stockLevelFilter.includes(product.stockLevel)) {
-                return
-            }
-
-            let minPrice = categoryMap.minimumPrice ? categoryMap.minimumPrice : 0;
-            let maxPrice;
-            if (categoryMap.maximumPrice && categoryMap.maximumPrice > 0) {
-                maxPrice = categoryMap.maximumPrice;
-            }
-            else {
-                maxPrice = 100000;
-            }
-
-            let mpn = product.prod_chars.find(x => x.name === "Part Number").value;
-            let barcode = product.prod_chars.find(x => x.name === "EAN Number").value;
-
-            let price = product.price;
-            let salePrice = product.deletedPrice ? product.deletedPrice : "";
-
-            if (price < minPrice || price > maxPrice) {
-                return
-            }
-
-            console.log("price:", price, "salePrice:", salePrice)
-            const entryCheck = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .checkIfProductExists(mpn);
-
-            let brandName = product.prod_chars.find(x => x.name === "Κατασκευαστής")?.value;
-
-            const brandId = await this.brandIdCheck(brandName);
-
-            //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-            const categoryInfo = await this.getCategory(categoryMap.categories_map, product.title, category, subcategory, sub2category);
-
-            console.log("categoryInfo:", categoryInfo, "brandId:", brandId)
-
-            if (!entryCheck) {
-                try {
-                    const productPrice = await this.setPriceOnCreation(price.trim(), categoryInfo, brandId);
-
-                    const charMaps = await this.parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
-                    //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
-                    const { mapCharNames, mapCharValues } = charMaps
-                    const parsedChars = await this.parseChars(product.prod_chars, mapCharNames, mapCharValues)
-
-                    let imageUrls = []
-                    for (let imageUrl of product.imagesSrc) {
-                        imageUrls.push({ url: imageUrl })
-                    }
-
-                    const data = {
-                        name: product.title,
-                        // short_description: product.productMiniDescription,
-                        // description: product.productDescription,
-                        categories: categoryInfo.id,
-                        price: parseFloat(productPrice).toFixed(2),
-                        mpn: mpn ? mpn : null,
-                        barcode: barcode ? barcode : null,
-                        slug: slugify(`${product.title}-${mpn}`, { lower: true, remove: /[*+~=#.,±°;_()/'"!:@]/g }),
-                        publishedAt: new Date(),
-                        status: "InStock",
-                        brand: { id: brandId },
-                        related_import: entry.id,
-                        supplierInfo: [{
-                            name: entry.name,
-                            wholesale: parseFloat(price).toFixed(2),
-                            supplierProductId: product.supplierCode,
-                            // sale_price: parseFloat(salePrice).toFixed(2),
-                            supplierProductURL: productLink
-                        }],
-                        prod_chars: parsedChars,
-                        ImageURLS: imageUrls,
-                    }
-
-                    const newEntry = await strapi.entityService.create('api::product.product', {
-                        data: data,
-                    });
-
-                    report.related_entries.push(newEntry.id)
-                    report.created += 1;
-                    console.log("Created:", report.created)
-
-                    //Κατεβάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
-                    let responseImage = await this.getAndConvertImgToWep(product.imagesSrc, data, newEntry.id, auth);
-
-                    // //Δημιουργώ αυτόματα το SEO για το προϊόν
-                    await this.saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
-
-                } catch (error) {
-                    console.log(error.details.errors)
-                }
-            }
-            else {
-                try {
-                    report.related_entries.push(entryCheck.id)
-
-                    const supplierInfo = [] //entryCheck.supplierInfo
-                    const relatedImport = entryCheck.related_import;
-                    const relatedImportId = []
-                    relatedImport.forEach(x => {
-                        relatedImportId.push(x.id)
-                    })
-                    relatedImportId.push(entry.id)
-                    let searchSupplierInfo = supplierInfo.find((o, i) => {
-                        if (o.name === entry.name) {
-                            supplierInfo[i] = {
-                                name: entry.name,
-                                wholesale: parseFloat(price).toFixed(2),
-                                supplierProductId: product.supplierCode,
-                                // price: parseFloat(salePrice).toFixed(2),
-                                supplierProductURL: productLink
-                            }
-                            return true;
-                        }
-                    })
-
-                    if (!searchSupplierInfo) {
-                        supplierInfo.push({
-                            name: entry.name,
-                            wholesale: parseFloat(price).toFixed(2),
-                            supplierProductId: product.supplierCode,
-                            // price: parseFloat(salePrice).toFixed(2),
-                            supplierProductURL: productLink
-                        })
-                    }
-
-                    const productPrice = await strapi
-                        .plugin('import-products')
-                        .service('helpers')
-                        .setPriceOnUpdate(entryCheck, supplierInfo, brandId);
-
-                    await strapi.entityService.update('api::product.product', entryCheck.id, {
-                        data: {
-                            name: product.productTitle,
-                            categories: categoryInfo.id,
-                            price: parseFloat(productPrice),
-                            supplierInfo: supplierInfo,
-                            related_import: relatedImportId,
-                        },
-                    });
-                    report.updated += 1
-                    console.log("Updated:", report.updated)
-                } catch (error) {
-                    console.log(error)
-                }
-            }
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async scrapNovatronCategories(categoryMap, report, entry, auth) {
-        try {
-            // const browser = await puppeteer.launch()
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
-            const page = await browser.newPage();
-            await page.setViewport({ width: 1200, height: 500 })
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
-
-            if (fs.existsSync('./public/NovatronCookies.json')) {
-                fs.readFile('./public/NovatronCookies.json', async (err, data) => {
-                    if (err)
-                        console.log(err);
-                    else {
-                        const cookies = JSON.parse(data);
-                        await page.setCookie(...cookies);
-                        console.log("File readen successfully\n");
-                    }
-                })
-            }
-
-            await page.goto('https://novatronsec.com/', { waitUntil: "networkidle0" });
-            const pageUrl = page.url();
-
-            if (pageUrl === "https://novatronsec.com/Account/Login?ReturnUrl=%2F") {
-                const bodyHandle = await page.$('body');
-                const formHandle = await bodyHandle.$('form');
-
-                const username = await formHandle.$('#Email');
-                const password = await formHandle.$('#Password');
-                const button = await formHandle.$('button');
-                await username.type(process.env.NOVARTONSEC_USERNAME)
-                await password.type(process.env.NOVARTONSEC_PASSWORD)
-                await Promise.all([
-                    await button.click(),
-                    await page.waitForNavigation()
-                ])
-                await page.cookies()
-                    .then((cookies) => {
-                        const cookiesJson = JSON.stringify(cookies, null, 2)
-                        return cookiesJson
-                    })
-                    .then((cookiesJson) => {
-                        fs.writeFile('./public/NovatronCookies.json', cookiesJson, (err) => {
-                            if (err)
-                                console.log(err);
-                            else {
-                                console.log("File written successfully\n");
-                            }
-                        })
-                    })
-                    .catch((error) => console.log(error))
-            }
-
-            const navList = await page.$("ul.navbar-nav")
-            let scrapProduct = await navList.evaluate(() => {
-                const navListElements = document.querySelectorAll("li.nav-item")
-                let liElements = navListElements.length
-
-                const categories = []
-                for (let li of navListElements) {
-
-                    let category = {}
-                    let categoryAnchor = li.querySelector("a");
-                    let categoryTitle = categoryAnchor.textContent;
-                    category.title = categoryTitle.trim();
-
-                    let subCategoryList = li.querySelectorAll("a.dropdown-item")
-
-                    const subCategories = []
-                    for (let sub of subCategoryList) {
-                        const subCategory = {}
-                        subCategory.title = sub.textContent.substring(0, sub.textContent.lastIndexOf("(")).trim()
-                        subCategory.link = sub.getAttribute("href")
-                        subCategories.push(subCategory)
-                    }
-
-                    category.subCategories = subCategories;
-
-                    categories.push(category)
-
-                }
-
-                return categories
-            });
-
-            let newCategories = this.filterCategories(scrapProduct, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
-
-
-            const charMaps = await this.parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
-
-            let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, report, entry, auth)
-            await browser.close();
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
     filterCategories(categories, isWhitelistSelected, whitelist_map, blacklist_map) {
 
         try {
@@ -2043,354 +1560,6 @@ module.exports = ({ strapi }) => ({
                 }
             }
             return newData
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async scrapNovatronCategory(novatronCategories, page,
-        categoryMap, charMaps, report, entry, auth) {
-        try {
-            for (let cat of novatronCategories) {
-                for (let sub of cat.subCategories) {
-                    await Promise.all(
-                        [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
-                        page.waitForNavigation()]);
-
-                    const bodyHandle = await page.$("body");
-
-                    let scrap = await bodyHandle.evaluate(() => {
-                        const productsGrid = document.querySelector(".products-grid");
-                        const productsRow = productsGrid.querySelector(".row");
-                        const productsList = productsRow.querySelectorAll(".product");
-
-                        let products = []
-                        for (let prod of productsList) {
-                            const product = {}
-                            const anchor = prod.querySelector("a");
-                            product.link = anchor.getAttribute("href");
-
-                            const productBody = prod.querySelector('.product-body')
-                            const productTitleAnchor = productBody.querySelector('.product-title>a')
-                            product.title = productTitleAnchor.textContent.trim()
-                            product.price = productBody.querySelector('.product-price>div>div>span').textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
-                            product.supplierCode = productBody.querySelector('.product-code').textContent.trim()
-                            const stockLevelWrapper = productBody.querySelector('div>p>img');
-                            const productStockImg = stockLevelWrapper.getAttribute('src')
-                            const stockLevelImg = productStockImg.split('/')[4].split('.')[0].split('-')[1].trim()
-
-                            switch (stockLevelImg) {
-                                case '3':
-                                    product.stockLevel = "InStock"
-                                    break;
-                                case '2':
-                                    product.stockLevel = "MediumStock"
-                                    break;
-                                case '1':
-                                    product.stockLevel = "LowStock"
-                                    break;
-                                default:
-                                    product.stockLevel = "OutOfStock"
-                                    break;
-                            }
-
-                            products.push(product)
-                        }
-                        return products
-                    })
-
-                    const products = await this.updateAndFilterScrapProducts(scrap, categoryMap, report, entry)
-
-                    // console.log(products)
-
-                    for (let prod of products) {
-                        await this.scrapNovatronProduct(prod.link, page, cat.title, sub.title, categoryMap, charMaps, report, entry, auth)
-                    }
-                }
-            }
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async scrapNovatronProduct(productLink, page, category, subcategory,
-        categoryMap, charMaps, report, entry, auth) {
-        try {
-            await Promise.all([page.goto(`https://novatronsec.com${productLink}`, { waitUntil: "networkidle0" }),
-            page.waitForNavigation()])
-
-            let productUrl = page.url();
-            const urlArray = productUrl.split("/")
-            const productID = urlArray[urlArray.length - 1].split("?")[0]
-
-            const bodyHandle = await page.$("body");
-
-            let scrapProduct = await bodyHandle.evaluate(() => {
-                const productDetailsSection = document.querySelector("section.product-details");
-                const productImageWrapper = productDetailsSection.querySelector(".owl-thumbs");
-                const productImages = productImageWrapper.querySelectorAll("img");
-                const imagesSrc = []
-                for (let imgSrc of productImages) {
-                    imagesSrc.push(`https://novatronsec.com${imgSrc.getAttribute('src')}`)
-                }
-                const productTitle = productDetailsSection.querySelector("h1.product-title").textContent;
-                const productMiniDescription = productDetailsSection.querySelector("p.mini-description").textContent;
-                const productPriceWrapper = productDetailsSection.querySelector("div.product-price");
-                const productPrice = productPriceWrapper.querySelector("span").textContent;
-
-                const productPriceRetailWrapper = productDetailsSection.querySelector("div.product-price-retail");
-                const productPriceRetail = productPriceRetailWrapper.querySelector("span").textContent;
-
-                const productRow = productDetailsSection.querySelector("div.row");
-                const productStock = productRow.querySelector("div>span>img");
-                const stockImg = productStock.getAttribute('src').trim();
-                let stockLevelImg = stockImg.substring(stockImg.length - 5, stockImg.length - 4);
-
-                let stockLevel = ''
-                switch (stockLevelImg) {
-                    case '3':
-                        stockLevel = "InStock"
-                        break;
-                    case '2':
-                        stockLevel = "MediumStock"
-                        break;
-                    case '1':
-                        stockLevel = "LowStock"
-                        break;
-                    default:
-                        stockLevel = "OutOfStock"
-                        break;
-                }
-
-                const productDetailsExtraSection = document.querySelector("section.product-details-extra");
-
-                const productDescriptionWrapper = productDetailsExtraSection.querySelector("#description");
-
-                let productDescription
-                if (productDescriptionWrapper)
-                    productDescription = productDescriptionWrapper.querySelector("div").innerHTML.trim();
-
-                let productFovContainer
-                let productFovTitle
-                let productFovTable
-
-                const productFovSection = document.querySelector("section.fov");
-                if (productFovSection) {
-                    productFovContainer = productFovSection.querySelector(".container");
-                    productFovTitle = productFovContainer.querySelector("h4").textContent;
-                    productFovTable = productFovContainer.querySelector("table").innerHTML;
-
-                    productDescription += productFovTitle
-                    productDescription += productFovTable
-                }
-
-                const productAdditionalInfoWrapper = productDetailsExtraSection.querySelector("#additional-information");
-
-                let productAdditionalInfoTables
-                let prod_chars = []
-
-                if (productAdditionalInfoWrapper) {
-                    productAdditionalInfoTables = productAdditionalInfoWrapper.querySelectorAll("tbody");
-
-
-                    for (let tbl of productAdditionalInfoTables) {
-                        let tableRows = tbl.querySelectorAll("tr");
-
-                        for (let row of tableRows) {
-                            prod_chars.push({
-                                name: row.querySelector("th").textContent.trim(),
-                                value: row.querySelector("td").textContent.trim(),
-                            })
-                        }
-                    }
-                }
-
-                let relativeProducts = []
-                const productRelativeWrapper = document.querySelector("section.relative-products");
-
-                if (productRelativeWrapper) {
-                    const productRelativeRow = productRelativeWrapper.querySelectorAll("div.product");
-                    for (let prod of productRelativeRow) {
-                        let relativeProductURL = prod.querySelector("a").getAttribute("href").trim();
-                        const urlArray = relativeProductURL.split("/")
-                        let relativeProductID = urlArray[urlArray.length - 1]
-
-                        relativeProducts.push({
-                            mpn: relativeProductID,
-                        })
-                    }
-                }
-
-                return {
-                    imagesSrc, productTitle, productMiniDescription, productPrice,
-                    productPriceRetail, stockLevel, productDescription, prod_chars, relativeProducts,
-                }
-                // return productPriceRetail 
-            })
-
-            scrapProduct.productID = productID
-
-            let importProduct = await this.importNovatronProduct(scrapProduct, `https://novatronsec.com${productLink}`, category, subcategory,
-                categoryMap, charMaps, report, entry, auth)
-
-            return importProduct
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async importNovatronProduct(product, productLink, category, subcategory,
-        categoryMap, charMaps, report, entry, auth) {
-        try {
-            let stockLevelFilter = []
-            for (let stock of categoryMap.stock_map) {
-                stockLevelFilter.push(stock.name)
-            }
-
-            if (!stockLevelFilter.includes(product.stockLevel)) {
-                return
-            }
-
-            let minPrice = categoryMap.minimumPrice ? categoryMap.minimumPrice : 0;
-            let maxPrice;
-            if (categoryMap.maximumPrice && categoryMap.maximumPrice > 0) {
-                maxPrice = categoryMap.maximumPrice;
-            }
-            else {
-                maxPrice = 100000;
-            }
-
-            let mpn = product.productID.toString()
-            let price = product.productPrice.replace('€', '').replace('.', '').replace(',', '.');
-            let salePrice = product.productPriceRetail.replace('€', '').replace('.', '').replace(',', '.');
-
-            if (price < minPrice || price > maxPrice) {
-                return
-            }
-
-            console.log("price:", price, "salePrice:", salePrice)
-            const entryCheck = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .checkIfProductExists(mpn);
-
-            let brandName = product.productTitle.split("-")[0].trim()
-
-            const brandId = await this.brandIdCheck(brandName);
-
-            //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-            const categoryInfo = await this.getCategory(categoryMap.categories_map, product.productTitle, category, subcategory, null);
-
-            console.log("categoryInfo:", categoryInfo)
-            if (!entryCheck) {
-                try {
-                    const productPrice = await this.setPriceOnCreation(price.trim(), categoryInfo, brandId);
-
-                    //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
-                    const { mapCharNames, mapCharValues } = charMaps
-                    const parsedChars = await this.parseChars(product.prod_chars, mapCharNames, mapCharValues)
-
-                    let imageUrls = []
-                    for (let imageUrl of product.imagesSrc) {
-                        imageUrls.push({ url: imageUrl })
-                    }
-
-                    const data = {
-                        name: product.productTitle,
-                        short_description: product.productMiniDescription,
-                        description: product.productDescription,
-                        categories: categoryInfo.id,
-                        price: parseFloat(productPrice).toFixed(2),
-                        mpn: mpn ? mpn : null,
-                        slug: slugify(`${product.productTitle}-${mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
-                        publishedAt: new Date(),
-                        status: product.stockLevel,
-                        brand: { id: brandId },
-                        related_import: entry.id,
-                        supplierInfo: [{
-                            name: entry.name,
-                            wholesale: parseFloat(price).toFixed(2),
-                            supplierProductId: mpn,
-                            sale_price: parseFloat(salePrice).toFixed(2),
-                            supplierProductURL: productLink
-                        }],
-                        prod_chars: parsedChars,
-                        ImageURLS: imageUrls,
-                    }
-
-                    const newEntry = await strapi.entityService.create('api::product.product', {
-                        data: data,
-                    });
-
-                    report.related_entries.push(newEntry.id)
-                    report.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
-                    report.created += 1;
-                    console.log("Created:", report.created)
-
-                    //Κατεβάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
-                    let responseImage = await this.getAndConvertImgToWep(product.imagesSrc, data, newEntry.id, auth);
-
-                    // //Δημιουργώ αυτόματα το SEO για το προϊόν
-                    await this.saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
-
-                } catch (error) {
-                    console.log(error.details.errors)
-                }
-            }
-            else {
-                try {
-                    report.related_entries.push(entryCheck.id)
-                    report.related_products.push({ productID: entryCheck.id, relatedProducts: product.relativeProducts })
-                    const supplierInfo = [] //entryCheck.supplierInfo
-                    const relatedImport = entryCheck.related_import;
-                    const relatedImportId = []
-                    relatedImport.forEach(x => {
-                        relatedImportId.push(x.id)
-                    })
-                    relatedImportId.push(entry.id)
-                    let searchSupplierInfo = supplierInfo.find((o, i) => {
-                        if (o.name === entry.name) {
-                            supplierInfo[i] = {
-                                name: entry.name,
-                                wholesale: parseFloat(price).toFixed(2),
-                                supplierProductId: mpn,
-                                price: parseFloat(salePrice).toFixed(2),
-                                supplierProductURL: productLink
-                            }
-                            return true;
-                        }
-                    })
-
-                    if (!searchSupplierInfo) {
-                        supplierInfo.push({
-                            name: entry.name,
-                            wholesale: parseFloat(price).toFixed(2),
-                            supplierProductId: mpn,
-                            price: parseFloat(salePrice).toFixed(2),
-                            supplierProductURL: productLink
-                        })
-                    }
-
-                    const productPrice = await strapi
-                        .plugin('import-products')
-                        .service('helpers')
-                        .setPriceOnUpdate(entryCheck, supplierInfo, brandId);
-
-                    await strapi.entityService.update('api::product.product', entryCheck.id, {
-                        data: {
-                            name: product.productTitle,
-                            categories: categoryInfo.id,
-                            price: parseFloat(productPrice),
-                            supplierInfo: supplierInfo,
-                            related_import: relatedImportId,
-                        },
-                    });
-                    report.updated += 1
-                    console.log("Updated:", report.updated)
-                } catch (error) {
-                    console.log(error)
-                }
-            }
         } catch (error) {
             console.log(error)
         }
@@ -2539,7 +1708,7 @@ module.exports = ({ strapi }) => ({
                     url: imgUrl,
                     responseType: 'stream'
                 }).catch(err => {
-                    console.log("Axios Error:", err, productName, imgUrl, "Supplier Code:", product.supplierInfo[0].supplierProductId);
+                    console.log("Axios Error:", productName, imgUrl, "Supplier Code:", product.supplierInfo[0].supplierProductId);
                     cont = true;
                 })
 
@@ -2801,7 +1970,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async setPriceOnUpdate(entry, supplierInfo, brandId) {
+    async setPrice(entry, supplierInfo, categoryInfo, brandId) {
         try {
             const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
             const taxRate = process.env.GENERAL_TAX_RATE
@@ -2811,35 +1980,35 @@ module.exports = ({ strapi }) => ({
             })
 
             let generalPercentage = ''
-            entry.categories.forEach(element => {
-                if (element.cat_percentage && element.cat_percentage.length > 0) {
-                    let findPercentage = element.cat_percentage.find(x => x.name === "general")
-                    if (findPercentage) {
-                        if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
-                            let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === brandId)
-                            if (findBrandPercentage) {
-                                generalPercentage = findBrandPercentage.percentage
-                            }
-                            else {
-                                generalPercentage = findPercentage.percentage
-                            }
+            if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
+
+                let findPercentage = categoryInfo.cat_percentage.find(x => x.name === "general")
+
+                if (findPercentage) {
+                    if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
+                        let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === brandId)
+                        if (findBrandPercentage) {
+                            generalPercentage = findBrandPercentage.percentage
                         }
                         else {
                             generalPercentage = findPercentage.percentage
                         }
                     }
                     else {
-                        generalPercentage = generalCategoryPercentage
+                        generalPercentage = findPercentage.percentage
                     }
                 }
                 else {
                     generalPercentage = generalCategoryPercentage
                 }
-            });
+            }
+            else {
+                generalPercentage = generalCategoryPercentage
+            }
 
             let minPrice = parseFloat(minSupplierPrice.wholesale) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
 
-            return entry.price > minPrice && entry.is_fixed_price ? entry.price.toFixed(2) : minPrice.toFixed(2)
+            return entry.price > minPrice && entry.is_fixed_price ? parseFloat(entry.price).toFixed(2) : minPrice.toFixed(2)
 
         } catch (error) {
             console.log(error)
@@ -2858,10 +2027,9 @@ module.exports = ({ strapi }) => ({
                             $not: {
                                 publishedAt: null
                             }
-
                         },
                         populate: {
-                            categories: { fields: ['name'] },
+                            category: { fields: ['name'] },
                             brand: { fields: ['name'] },
                             prod_chars: { fields: ['name', 'value'] },
                             ImageURLS: { fields: ['url'] },
@@ -2888,7 +2056,7 @@ module.exports = ({ strapi }) => ({
                     status: entry.status,
                     short_description: entry.short_description,
                     barcode: entry.barcode,
-                    category: entry.categories[0].name,
+                    category: entry.category.name,
                     brand: entry.brand ? entry.brand?.name : ""
                 }
 
@@ -3219,58 +2387,38 @@ module.exports = ({ strapi }) => ({
     async checkProductAndBrand(mpn, name, brand) {
         const entryCheck = await this.checkIfProductExists(mpn, name);
 
-        const brandId = await this.brandIdCheck(brand);
+        const brandId = await this.brandIdCheck(brand, name);
 
         return { entryCheck, brandId }
 
     },
 
-    async createEntry(parsedDataTitles, product, importRef,
-        prod_chars, mapCharNames, mapCharValues, imageUrls, auth) {
+    async createEntry(parsedDataTitles, product,
+        charMaps, categories_map, importRef, auth) {
 
-        // //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-        // const categoryInfo = await strapi
-        //     .plugin('import-products')
-        //     .service('helpers')
-        //     .getCategory(categories_map, dt[`${dataTitles.title}`], dt[`${dataTitles.category_1}`], null, null);
+        //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
+        const categoryInfo = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .getCategory(categories_map, parsedDataTitles.title, parsedDataTitles.category_1, parsedDataTitles.category_2, parsedDataTitles.category_3);
 
         // console.log("categoryInfo:", categoryInfo)
         const productPrice = await strapi
             .plugin('import-products')
             .service('helpers')
-            .setPriceOnCreation(parsedDataTitles.price, product.categories, product.brand.id);
+            .setPrice(parsedDataTitles, product.supplierInfo, product.category, product.brand.id);
+
+        const { mapCharNames, mapCharValues } = charMaps
 
         //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
         const parsedChars = await strapi
             .plugin('import-products')
             .service('helpers')
-            .parseChars(prod_chars, mapCharNames, mapCharValues)
+            .parseChars(product.prod_chars, mapCharNames, mapCharValues)
 
-        // product.categories = categoryInfo.id;
+        product.category = categoryInfo.id;
         product.price = parseFloat(productPrice);
         product.prod_chars = parsedChars;
-
-        // const data = {
-        //     name: dt[`${dataTitles.title}`],
-        //     description: description,
-        //     categories: categoryInfo.id,
-        //     price: parseFloat(productPrice),
-        //     mpn: mpn ? mpn : null,
-        //     barcode: EAN ? EAN : null,
-        //     slug: slugify(`${dt["ΠΕΡΙΓΡΑΦΗ"]}-${mpn}`, { lower: true, remove: /[*+±~=#.,°;_()/'"!:@]/g }),
-        //     publishedAt: new Date(),
-        //     status: 'InStock',
-        //     brand: { id: brandId },
-        //     related_import: entry.id,
-        //     supplierInfo: [{
-        //         name: entry.name,
-        //         wholesale: dt.TIMH,
-        //         recycle_tax: dt.AHHE,
-        //         supplierProductId: dt['ΚΩΔΙΚΟΣ'].toString(),
-        //         in_offer: inOffer
-        //     }],
-        //     prod_chars: parsedChars
-        // }
 
         const newEntry = await strapi.entityService.create('api::product.product', {
             data: product,
@@ -3278,6 +2426,8 @@ module.exports = ({ strapi }) => ({
 
         importRef.related_entries.push(await newEntry.id)
         importRef.created += 1;
+
+        const imageUrls = product.ImageURLS.map(x => x.url)
 
         //Κατευάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
         let responseImage = await strapi
@@ -3293,21 +2443,51 @@ module.exports = ({ strapi }) => ({
 
     },
 
-    async updateEntry(parsedDataTitles, entryCheck, importRef, productUrl) {
+    async updateEntry(parsedDataTitles, entry, entryCheck, importRef, productUrl, categories_map) {
+        const data = {}
 
         importRef.related_entries.push(entryCheck.id)
         const supplierInfo = entryCheck.supplierInfo;
         const relatedImport = entryCheck.related_import;
         const relatedImportId = []
 
+        let newRelatedImport = false
+
         relatedImport.forEach(x => {
-            if (x.id !== parsedDataTitles.entry.id)
+            if (x.id !== entry.id) {
                 relatedImportId.push(x.id)
+                newRelatedImport = true
+            }
         })
-        relatedImportId.push(parsedDataTitles.entry.id)
+        relatedImportId.push(entry.id)
+
+        if (newRelatedImport) { data.related_import = relatedImportId }
+
+        const categoryInfo = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .getCategory(categories_map, parsedDataTitles.title, parsedDataTitles.category_1, parsedDataTitles.category_2, parsedDataTitles.category_3);
+
+        console.log("CentryCheck:", entryCheck)
+        console.log("category_1:", parsedDataTitles.category_1, "category_2:", parsedDataTitles.category_2)
+        console.log("CategoryInfo ID:", categoryInfo.id)
+
+        // const categoryIsFound = entryCheck.categories.some(x => {
+        //     console.log(x.id)
+
+        //     if (x.id === categoryInfo.id) {
+        //         return true
+        //     }
+        //     return false
+        // })
+
+        if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
+            data.category = categoryInfo.id
+            console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.categories)
+        }
 
         let searchSupplierInfo = supplierInfo.find((o, i) => {
-            if (o.name === parsedDataTitles.entry.name) {
+            if (o.name === entry.name) {
                 const price_progress = o.price_progress;
 
                 if (o.wholesale !== parsedDataTitles.price || price_progress.length === 0) {
@@ -3318,9 +2498,9 @@ module.exports = ({ strapi }) => ({
                 }
 
                 supplierInfo[i] = {
-                    name: parsedDataTitles.entry.name,
-                    wholesale: parsedDataTitles.price,
-                    recycle_tax: parsedDataTitles.recycleTax,
+                    name: entry.name,
+                    wholesale: parseFloat(parsedDataTitles.price),
+                    recycle_tax: parseFloat(parsedDataTitles.recycleTax),
                     supplierProductId: parsedDataTitles.supplierCode.toString(),
                     supplierProductURL: productUrl,
                     price: parsedDataTitles.suggestedPrice,
@@ -3332,7 +2512,7 @@ module.exports = ({ strapi }) => ({
 
         if (!searchSupplierInfo) {
             supplierInfo.push({
-                name: parsedDataTitles.entry.name,
+                name: entry.name,
                 wholesale: parsedDataTitles.price,
                 recycle_tax: parsedDataTitles.recycleTax,
                 supplierProductId: parsedDataTitles.supplierCode.toString(),
@@ -3345,33 +2525,41 @@ module.exports = ({ strapi }) => ({
             })
         }
 
-        // const categoryInfo = await strapi
-        //     .plugin('import-products')
-        //     .service('helpers')
-        //     .getCategory(categories_map, dt[`${dataTitles.title}`], dt[`${dataTitles.category_1}`], null, null);
+        if (supplierInfo !== entryCheck.supplierInfo) {
+            const productPrice = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .setPriceOnUpdate(entryCheck, supplierInfo, categoryInfo, entry.brand.id);
 
-        const productPrice = await strapi
-            .plugin('import-products')
-            .service('helpers')
-            .setPriceOnUpdate(entryCheck, supplierInfo);
-
+            data.price = parseFloat(productPrice).toFixed(2)
+            data.supplierInfo = supplierInfo
+        }
 
         // return { supplierInfo, relatedImportId, productPrice }
         // console.log("categoryInfo:", categoryInfo, "productPrice:", productPrice)
 
-        const imgUrls = []
-        await strapi.entityService.update('api::product.product', entryCheck.id, {
-            data: {
-                price: parseFloat(productPrice),
-                publishedAt: new Date(),
-                supplierInfo: supplierInfo,
-                related_import: relatedImportId,
-                ImageURLS: imgUrls
-            },
-        });
-        importRef.updated += 1
+        if (Object.keys(data).length !== 0) {
+            console.log(data)
+            data.publishedAt = new Date()
+            await strapi.entityService.update('api::product.product', entryCheck.id, {
+                data: data
+                // {
+                //     price: parseFloat(productPrice),
+                //     publishedAt: new Date(),
+                //     // supplierInfo: supplierInfo,
+                //     related_import: relatedImportId, 
+                //     // ImageURLS:  
+                // },
+            });
+            importRef.updated += 1
+        }
+        else {
+            importRef.skipped += 1
+        }
+        // const imgUrls = []
 
-        // console.log(importRef)
+
+        console.log("Updated:", importRef.updated, "Skipped:", importRef.skipped)
     },
 
     async deleteEntry(entry, importRef) {
@@ -3420,6 +2608,7 @@ module.exports = ({ strapi }) => ({
                     await strapi.entityService.update('api::product.product', product.id, {
                         data: {
                             publishedAt: null,
+                            is_fixed_price: false,
                         },
                     });
                     importRef.deleted += 1;

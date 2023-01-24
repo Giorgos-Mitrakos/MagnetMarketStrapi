@@ -21,12 +21,6 @@
       "targetField": "name",
       "required": true
     },
-    "products": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::product.product",
-      "inversedBy": "categories"
-    },
     "parents": {
       "type": "relation",
       "relation": "manyToMany",
@@ -65,6 +59,12 @@
       "type": "component",
       "repeatable": true,
       "component": "categories.percentage"
+    },
+    "products": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::product.product",
+      "mappedBy": "category"
     }
   }
 }

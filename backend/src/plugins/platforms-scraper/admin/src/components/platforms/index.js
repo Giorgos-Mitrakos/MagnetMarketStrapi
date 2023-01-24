@@ -5,14 +5,13 @@ import { Typography } from '@strapi/design-system';
 import { Grid, GridItem } from '@strapi/design-system/Grid';
 import { Flex } from '@strapi/design-system/Flex';
 import { Button } from '@strapi/design-system/Button';
-import { Checkbox } from '@strapi/design-system';
+import { Checkbox } from '@strapi/design-system/Checkbox';
 import { getPlatformCategories, getPlatforms, scrapPlatformCategories } from "../../utils/api";
 
 const PlatformsScreen = () => {
 
     const [isLoading, setIsLoading] = useState(true);
-    const [platforms, setPlatforms] = useState({})
-    const [checkedList, setCheckedList] = useState(false)
+    const [platforms, setPlatforms] = useState({});
 
     const fetchPlatforms = async () => {
         setPlatforms(await getPlatforms()); // Here
@@ -80,7 +79,7 @@ const PlatformsScreen = () => {
                                         <Grid direction="column" alignItems="flex-start">
                                             {platform.categories.map(category =>
                                                 <GridItem key={category.id} col={4}>
-                                                    <Checkbox checked={category.isChecked ? category.isChecked : false} onClick={() => handleCheckBoxClick(platform, category.id)}>{category.name}</Checkbox>
+                                                    <Checkbox checked={category.isChecked ? category.isChecked : false} onClick={() => handleCheckBoxClick(platform, category.id)}>{category.name} ({category.numberOfProducts})</Checkbox>
                                                 </GridItem>
                                             )}
                                         </Grid>

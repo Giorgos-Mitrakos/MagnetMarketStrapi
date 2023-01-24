@@ -13,7 +13,7 @@ module.exports = {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')
-        .parseOktabitXlsx(ctx.request.body);
+        .parseOktabitXml(ctx.request.body);
     }
     else if (ctx.request.body.entry.name === 'Globalsat') {
       ctx.body = await strapi
@@ -50,6 +50,12 @@ module.exports = {
         .plugin('import-products')
         .service('parseService')
         .parseDamkalidisXml(ctx.request.body);
+    }
+    else if (ctx.request.body.entry.name === 'Shopflix') {
+      ctx.body = await strapi
+        .plugin('import-products')
+        .service('parseService')
+        .parseShopflixXml(ctx.request.body);
     }
     else {
       console.log("Wrong file")

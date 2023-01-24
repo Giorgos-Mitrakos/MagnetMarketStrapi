@@ -1,13 +1,15 @@
 'use strict';
 
 const puppeteer = require('puppeteer');
+const xlsx = require('xlsx')
 
 module.exports = ({ strapi }) => ({
   async getPlatforms() {
-    const platforms = await strapi.entityService.findMany('plugin::platforms-scraper.platform', {
+    const platforms = await strapi.db.query('plugin::platforms-scraper.platform').findMany({
       populate: {
-        categories: true
-      }
+        categories: true,
+        merchantFeeCatalogue: true
+      } 
     })
     return platforms;
   },
@@ -27,9 +29,9 @@ module.exports = ({ strapi }) => ({
       if (platform.name === "Skroutz") {
         for (let category of categoriesToScrap) {
           await strapi
-          .plugin('platforms-scraper')
-          .service('skroutzHelpers')
-          .scrapSkroutzCategory(page, category.link);
+            .plugin('platforms-scraper')
+            .service('skroutzHelpers')
+            .scrapSkroutzCategory(page, category.link);
         }
       }
 
@@ -38,7 +40,6 @@ module.exports = ({ strapi }) => ({
       console.log(error)
     }
   },
-
 
   async updatePlatformCategories(platform) {
     try {
@@ -53,5 +54,41 @@ module.exports = ({ strapi }) => ({
     } catch (error) {
       console.log(error)
     }
-  }
+  },
+
+  async updateCategoriesMerchantFee({ name }) {
+    try {
+      const platform = await strapi.db.query('plugin::platforms-scraper.platform').findOne({
+        where: { name: name },
+        populate: {
+          categories: true,
+          merchantFeeCatalogue: true
+        }
+      })
+      const wb = xlsx.readFile(`./public${platform.merchantFeeCatalogue.url}`)
+      const ws = wb.Sheets['Τιμοκατάλογος προμηθειών']
+      const data = xlsx.utils.sheet_to_json(ws)
+
+      for (let category of platform.categories) {
+        const filteredCategories = data.filter(x => x['Κατηγορία'] === category.name)
+        const filteredCategory = filteredCategories[0]
+        console.log(filteredCategory)
+        console.log(filteredCategory['Προμήθεια Marketplace (%)'],
+          filteredCategory['Προμήθεια CPS (%)'])
+
+        const updatedCategory = await strapi.db.query('plugin::platforms-scraper.platform-category').update({
+          where: { name: category.name },
+          data: {
+            marketPlaceFee: parseFloat(filteredCategory['Προμήθεια Marketplace (%)']),
+            cpsFee: parseFloat(filteredCategory['Προμήθεια CPS (%)'])
+          },
+        });
+
+        console.log(updatedCategory)
+      }
+      // console.log(filteredData.length)
+    } catch (error) {
+      console.log(error)
+    }
+  },
 });

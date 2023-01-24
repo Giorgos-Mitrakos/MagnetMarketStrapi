@@ -4,7 +4,13 @@ module.exports = ({ strapi }) => ({
   async getFile() {
     try {
       return await strapi.entityService.findMany('plugin::import-products.importxml', {
-        populate: { importedFile: true },
+        populate: {
+          importedFile: true,
+          stock_map: {
+            fields: ['name'],
+            sort: 'name:asc',
+          },
+        },
       })
     }
     catch (err) {

@@ -27,7 +27,7 @@
             "type": "string",
             "required": true
         },
-        "categoryMerchantFee": {
+        "merchantFeeCatalogue": {
             "type": "media",
             "multiple": false,
             "required": false,
