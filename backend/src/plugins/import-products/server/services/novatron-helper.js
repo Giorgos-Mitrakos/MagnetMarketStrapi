@@ -1,6 +1,7 @@
 'use strict';
 
 const Axios = require('axios');
+const slugify = require("slugify");
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const { env } = require("process");

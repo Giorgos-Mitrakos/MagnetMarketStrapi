@@ -248,7 +248,7 @@ module.exports = ({ strapi }) => ({
                         await strapi
                             .plugin('import-products')
                             .service('helpers')
-                            .updateEntry(dt, entry, entryCheck, importRef, productUrl, categories_map);
+                            .updateEntry(dt, entry, entryCheck,brandId, importRef, productUrl, categories_map);
 
                         // console.log("Updated")
                     } catch (error) {

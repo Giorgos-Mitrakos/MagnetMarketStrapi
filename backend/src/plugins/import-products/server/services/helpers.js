@@ -344,7 +344,7 @@ module.exports = ({ strapi }) => ({
                                 report.skipped += 1
                                 console.log("Skipped:", report.skipped)
                                 break;
-                        } 
+                        }
 
                         report.related_entries.push(checkIfEntry.id)
                     }
@@ -2406,7 +2406,7 @@ module.exports = ({ strapi }) => ({
         const productPrice = await strapi
             .plugin('import-products')
             .service('helpers')
-            .setPrice(parsedDataTitles, product.supplierInfo, product.category, product.brand.id);
+            .setPrice(parsedDataTitles, product.supplierInfo, categoryInfo, product.brand.id);
 
         const { mapCharNames, mapCharValues } = charMaps
 
@@ -2443,61 +2443,45 @@ module.exports = ({ strapi }) => ({
 
     },
 
-    async updateEntry(parsedDataTitles, entry, entryCheck, importRef, productUrl, categories_map) {
+    async updateEntry(parsedDataTitles, entry, entryCheck, brandId, importRef, productUrl, categories_map) {
         const data = {}
 
         importRef.related_entries.push(entryCheck.id)
         const supplierInfo = entryCheck.supplierInfo;
         const relatedImport = entryCheck.related_import;
-        const relatedImportId = []
+        const relatedImportId = relatedImport.map(x => x.id)
 
-        let newRelatedImport = false
+        const findImport = relatedImport.findIndex(x =>
+            x.id === entry.id)
 
-        relatedImport.forEach(x => {
-            if (x.id !== entry.id) {
-                relatedImportId.push(x.id)
-                newRelatedImport = true
-            }
-        })
-        relatedImportId.push(entry.id)
-
-        if (newRelatedImport) { data.related_import = relatedImportId }
+        if (findImport === -1) { data.related_import = [...relatedImportId, entry.id] }
 
         const categoryInfo = await strapi
             .plugin('import-products')
             .service('helpers')
             .getCategory(categories_map, parsedDataTitles.title, parsedDataTitles.category_1, parsedDataTitles.category_2, parsedDataTitles.category_3);
 
-        console.log("CentryCheck:", entryCheck)
-        console.log("category_1:", parsedDataTitles.category_1, "category_2:", parsedDataTitles.category_2)
-        console.log("CategoryInfo ID:", categoryInfo.id)
-
-        // const categoryIsFound = entryCheck.categories.some(x => {
-        //     console.log(x.id)
-
-        //     if (x.id === categoryInfo.id) {
-        //         return true
-        //     }
-        //     return false
-        // })
-
-        if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
+        // if (categoryInfo.id === 51)
+        //     {console.log(parsedDataTitles.title, parsedDataTitles.category_1, parsedDataTitles.category_2, parsedDataTitles.category_3)}
+        if (entryCheck.category.id !== categoryInfo.id) {
             data.category = categoryInfo.id
-            console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.categories)
+            console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.category)
         }
 
-        let searchSupplierInfo = supplierInfo.find((o, i) => {
-            if (o.name === entry.name) {
-                const price_progress = o.price_progress;
+        let isSupplierInfoChanged = false;
 
-                if (o.wholesale !== parsedDataTitles.price || price_progress.length === 0) {
-                    price_progress.push({
-                        date: new Date(),
-                        price: parsedDataTitles.price
-                    })
-                }
+        let searchSupplierInfoIndex = supplierInfo.findIndex(o => o.name === entry.name)
 
-                supplierInfo[i] = {
+        if (searchSupplierInfoIndex !== -1) {
+            const price_progress = supplierInfo[searchSupplierInfoIndex].price_progress;
+
+            if (parseFloat(supplierInfo[searchSupplierInfoIndex].wholesale).toFixed(2) !== parsedDataTitles.price || price_progress.length === 0) {
+                price_progress.push({
+                    date: new Date(),
+                    price: parsedDataTitles.price
+                })
+
+                supplierInfo[searchSupplierInfoIndex] = {
                     name: entry.name,
                     wholesale: parseFloat(parsedDataTitles.price),
                     recycle_tax: parseFloat(parsedDataTitles.recycleTax),
@@ -2506,11 +2490,11 @@ module.exports = ({ strapi }) => ({
                     price: parsedDataTitles.suggestedPrice,
                     price_progress: price_progress,
                 }
-                return true;
-            }
-        })
 
-        if (!searchSupplierInfo) {
+                isSupplierInfoChanged = true;
+            }
+        }
+        else {
             supplierInfo.push({
                 name: entry.name,
                 wholesale: parsedDataTitles.price,
@@ -2523,13 +2507,15 @@ module.exports = ({ strapi }) => ({
                     price: parsedDataTitles.price
                 }]
             })
+            isSupplierInfoChanged = true;
         }
 
-        if (supplierInfo !== entryCheck.supplierInfo) {
+        if (isSupplierInfoChanged) {
+            console.log("New supplier!!!!!!!!")
             const productPrice = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .setPriceOnUpdate(entryCheck, supplierInfo, categoryInfo, entry.brand.id);
+                .setPrice(entryCheck, supplierInfo, categoryInfo, brandId);
 
             data.price = parseFloat(productPrice).toFixed(2)
             data.supplierInfo = supplierInfo
@@ -2540,7 +2526,7 @@ module.exports = ({ strapi }) => ({
 
         if (Object.keys(data).length !== 0) {
             console.log(data)
-            data.publishedAt = new Date()
+            if (entryCheck.publishedAt === null) { data.publishedAt = new Date() }
             await strapi.entityService.update('api::product.product', entryCheck.id, {
                 data: data
                 // {
@@ -2559,7 +2545,7 @@ module.exports = ({ strapi }) => ({
         // const imgUrls = []
 
 
-        console.log("Updated:", importRef.updated, "Skipped:", importRef.skipped)
+        // console.log("Updated:", importRef.updated, "Skipped:", importRef.skipped)
     },
 
     async deleteEntry(entry, importRef) {
