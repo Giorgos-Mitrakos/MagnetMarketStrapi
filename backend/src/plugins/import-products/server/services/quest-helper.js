@@ -7,7 +7,7 @@ const { env } = require("process");
 
 module.exports = ({ strapi }) => ({
 
-    async scrapQuest(categoryMap, report, entry, auth) {
+    async scrapQuest(importRef, entry, auth) {
         try {
 
             let filteredCategories = {
@@ -102,29 +102,25 @@ module.exports = ({ strapi }) => ({
             let newCategories = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .filterCategories(scrapCategories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+                .filterCategories(scrapCategories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
             filteredCategories.categories = newCategories
             // console.log(newCategories)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
 
             for (let category of newCategories) {
-                await this.scrapQuestSubcategories(page, category, filteredCategories, categoryMap, report, entry, auth);
+                await this.scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth);
                 // filteredCategories.categories = await this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
             }
 
 
-            // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, report, entry, auth)
+            // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, importRef, entry, auth)
             await browser.close();
         } catch (error) {
             console.log(error)
         }
     },
 
-    async scrapQuestSubcategories(page, category, filteredCategories, categoryMap, report, entry, auth) {
+    async scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
             const scrapSub = await page.$eval('.side-menu', (element) => {
@@ -148,17 +144,17 @@ module.exports = ({ strapi }) => ({
             filteredCategories.categories = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+                .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
             for (let sub of filteredCategories.categories[catIndex].subCategories) {
-                await this.scrapQuestSubcategories2(page, category.title, sub, filteredCategories, categoryMap, report, entry, auth)
+                await this.scrapQuestSubcategories2(page, category.title, sub, filteredCategories, importRef, entry, auth)
             }
         } catch (error) {
             console.log(error)
         }
     },
 
-    async scrapQuestSubcategories2(page, category, subcategory, filteredCategories, categoryMap, report, entry, auth) {
+    async scrapQuestSubcategories2(page, category, subcategory, filteredCategories, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
             const sideMenu = await page.$('.side-menu')
@@ -188,15 +184,15 @@ module.exports = ({ strapi }) => ({
                 filteredCategories.categories = await strapi
                     .plugin('import-products')
                     .service('helpers')
-                    .filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
+                    .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
                 for (let sub2 of filteredCategories.categories[catIndex].subCategories[subIndex].subCategories) {
-                    await this.scrapQuestCategory(page, sub2.link, category, subcategory.title, sub2.title, categoryMap, report, entry, auth)
+                    await this.scrapQuestCategory(page, sub2.link, category, subcategory.title, sub2.title, importRef, entry, auth)
                     await page.waitForTimeout(1000);
                 }
             }
             else {
-                await this.scrapQuestCategory(page, subcategory.link, category, subcategory.title, null, categoryMap, report, entry, auth)
+                await this.scrapQuestCategory(page, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
             }
 
         } catch (error) {
@@ -204,7 +200,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestCategory(page, link, category, subcategory, sub2category, categoryMap, report, entry, auth) {
+    async scrapQuestCategory(page, link, category, subcategory, sub2category, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
 
@@ -234,7 +230,11 @@ module.exports = ({ strapi }) => ({
                     const rightContainer = prod.querySelector('.description-container-right')
                     const productAvailability = rightContainer.querySelector('div.availability>span').textContent.trim()
                     const priceWrapper = rightContainer.querySelector('.price-container')
-                    product.price = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
+                    const initialWholesale = priceWrapper.querySelector('.deleted-price')
+                    if (initialWholesale) {
+                        product.initial_wholesale = initialWholesale.textContent.replace('€', '').replace(',', '.').trim()
+                    }
+                    product.wholesale = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
 
                     product.stockLevel = productAvailability
                     products.push(product)
@@ -245,13 +245,13 @@ module.exports = ({ strapi }) => ({
             const products = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .updateAndFilterScrapProducts(scrapProducts, categoryMap, category, subcategory, sub2category, report, entry)
+                .updateAndFilterScrapProducts(scrapProducts, category, subcategory, sub2category, importRef, entry)
 
             // console.log(products)
             for (let product of products) {
                 // if (stockLevelFilter.includes(product.stockLevel)) {
                 //     console.log(product)
-                await this.scrapQuestProduct(page, product.link, category, subcategory, sub2category, categoryMap, report, entry, auth)
+                await this.scrapQuestProduct(page, product.link, category, subcategory, sub2category, importRef, entry, auth)
                 // }
             }
 
@@ -260,7 +260,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestProduct(page, productLink, category, subcategory, sub2category, categoryMap, report, entry, auth) {
+    async scrapQuestProduct(page, productLink, category, subcategory, sub2category, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${productLink}`, { waitUntil: "networkidle0" });
 
@@ -293,8 +293,8 @@ module.exports = ({ strapi }) => ({
                 }
 
                 const priceWrapper = element.querySelector('.box-three')
-                product.deletedPrice = priceWrapper.querySelector('.deleted-price')?.textContent.replace('€', '').replace(',', '.').trim()
-                product.price = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
+                product.initial_wholesale = priceWrapper.querySelector('.deleted-price')?.textContent.replace('€', '').replace(',', '.').trim()
+                product.wholesale = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
 
                 product.stockLevel = priceWrapper.querySelector('#realAvail').textContent.trim()
 
@@ -315,75 +315,51 @@ module.exports = ({ strapi }) => ({
                 return product
             })
 
+            scrapProduct.mpn = scrapProduct.prod_chars.find(x => x.name === "Part Number").value;
+            scrapProduct.barcode = scrapProduct.prod_chars.find(x => x.name === "EAN Number").value;
+            scrapProduct.model = scrapProduct.prod_chars.find(x => x.name === "Μοντέλο")?.value;
+            scrapProduct.brand_name = scrapProduct.prod_chars.find(x => x.name === "Κατασκευαστής")?.value;
+
             await this.importQuestProduct(scrapProduct, `https://www.questonline.gr${productLink}`, category, subcategory, sub2category,
-                categoryMap, report, entry, auth)
+                importRef, entry, auth)
 
         } catch (error) {
             console.log(error)
         }
     },
 
-    async importQuestProduct(product, productLink, category, subcategory, sub2category,
-        categoryMap, report, entry, auth) {
+    async importQuestProduct(product, productLink, category, subcategory,
+        sub2category, importRef, entry, auth) {
         console.log("category:", category, "subcategory:", subcategory, "sub2category:", sub2category)
         try {
-            let stockLevelFilter = []
-            for (let stock of categoryMap.stock_map) {
-                stockLevelFilter.push(stock.name)
-            }
-
-            if (!stockLevelFilter.includes(product.stockLevel)) {
-                return
-            }
-
-            let minPrice = categoryMap.minimumPrice ? categoryMap.minimumPrice : 0;
-            let maxPrice;
-            if (categoryMap.maximumPrice && categoryMap.maximumPrice > 0) {
-                maxPrice = categoryMap.maximumPrice;
-            }
-            else {
-                maxPrice = 100000;
-            }
-
-            let mpn = product.prod_chars.find(x => x.name === "Part Number").value;
-            let barcode = product.prod_chars.find(x => x.name === "EAN Number").value;
-
-            let price = product.price;
-            let salePrice = product.deletedPrice ? product.deletedPrice : "";
-
-            if (price < minPrice || price > maxPrice) {
-                return
-            }
-
-            console.log("price:", price, "salePrice:", salePrice)
-            const entryCheck = await strapi
+            // Αν δεν είναι Διαθέσιμο τότε προχώρα στο επόμενο
+            const isAvailable = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .checkIfProductExists(mpn);
+                .filterScrappedProducts(importRef.categoryMap, product);
 
-            let brandName = product.prod_chars.find(x => x.name === "Κατασκευαστής")?.value;
+            if (!isAvailable)
+                return
 
-            const brandId = await strapi
+            const { entryCheck, brandId } = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .brandIdCheck(brandName, product);
+                .checkProductAndBrand(product.mpn, product.title, product.barcode, product.brand_name, product.model);
 
             //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
             const categoryInfo = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getCategory(categoryMap.categories_map, product.title, category, subcategory, sub2category);
+                .getCategory(importRef.categoryMap.categories_map, product.title, category, subcategory, sub2category);
 
-            console.log("categoryInfo:", categoryInfo, "brandId:", brandId)
+            // console.log("categoryInfo:", categoryInfo, "brandId:", brandId)
 
             if (!entryCheck) {
                 try {
-                    const charMaps = await strapi
-                        .plugin('import-products')
-                        .service('helpers')
-                        .parseCharsToMap(categoryMap.char_name_map, categoryMap.char_value_map);
+
                     //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
-                    const { mapCharNames, mapCharValues } = charMaps
+                    const { mapCharNames, mapCharValues } = importRef.charMaps
+
                     const parsedChars = await strapi
                         .plugin('import-products')
                         .service('helpers')
@@ -394,55 +370,76 @@ module.exports = ({ strapi }) => ({
                         imageUrls.push({ url: imageUrl })
                     }
 
-                    const price_progress = []
-                    price_progress.push({
-                        date: new Date(),
-                        price: price,
-                        in_offer: product.in_offer, 
-                        discount: product.discount
-                    })
+                    const price_progress_data = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .createPriceProgress(product)
 
-                    const supplierInfo = [{
-                        name: entry.name,
-                        wholesale: parseFloat(price).toFixed(2),
-                        supplierProductId: product.supplierCode,
-                        // sale_price: parseFloat(salePrice).toFixed(2),
-                        supplierProductURL: productLink,
-                        in_offer: product.in_offer,
-                        price_progress: price_progress
-                    }]
+                    const supplierInfo = [await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .createSupplierInfoData(entry, product, price_progress_data)]
 
                     const productPrice = await strapi
                         .plugin('import-products')
                         .service('helpers')
                         .setPrice(product, supplierInfo, categoryInfo, brandId);
 
-
                     const data = {
                         name: product.title,
-                        // short_description: product.productMiniDescription,
-                        // description: product.productDescription,
+                        slug: slugify(`${product.title}-${product.mpn}`, { lower: true, remove: /[*+~=#.,±°;_()/'"!:@]/g }),
                         category: categoryInfo.id,
                         price: parseFloat(productPrice).toFixed(2),
-                        mpn: mpn ? mpn : null,
-                        barcode: barcode ? barcode : null,
-                        slug: slugify(`${product.title}-${mpn}`, { lower: true, remove: /[*+~=#.,±°;_()/'"!:@]/g }),
                         publishedAt: new Date(),
                         status: "InStock",
-                        brand: { id: brandId },
                         related_import: entry.id,
                         supplierInfo: supplierInfo,
                         prod_chars: parsedChars,
                         ImageURLS: imageUrls,
                     }
 
+                    if (product.mpn) {
+                        data.mpn = product.mpn
+                    }
+
+                    if (product.barcode) {
+                        data.barcode = product.barcode
+                    }
+
+                    if (product.model) {
+                        data.model = product.model
+                    }
+
+                    const dataq = {
+                        // name: product.title,
+                        // short_description: product.productMiniDescription,
+                        // description: product.productDescription,
+                        // category: categoryInfo.id,
+                        // price: parseFloat(productPrice).toFixed(2),
+                        // mpn: product.mpn ? product.mpn : null,
+                        // barcode: product.barcode ? product.barcode : null,
+                        // slug: slugify(`${product.title}-${product.mpn}`, { lower: true, remove: /[*+~=#.,±°;_()/'"!:@]/g }),
+                        // publishedAt: new Date(),
+                        // status: "InStock",
+                        // model: product.model ? product.model : null,
+                        // brand: { id: brandId },
+                        // related_import: entry.id,
+                        // supplierInfo: supplierInfo,
+                        // prod_chars: parsedChars,
+                        // ImageURLS: imageUrls,
+                    }
+
+                    if (brandId) {
+                        data.brand = { id: brandId }
+                    }
+
                     const newEntry = await strapi.entityService.create('api::product.product', {
                         data: data,
                     });
 
-                    report.related_entries.push(newEntry.id)
-                    report.created += 1;
-                    console.log("Created:", report.created)
+                    importRef.related_entries.push(newEntry.id)
+                    importRef.created += 1;
+                    console.log("Created:", importRef.created)
 
                     //Κατεβάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
                     let responseImage = await strapi
@@ -456,59 +453,26 @@ module.exports = ({ strapi }) => ({
                         .service('helpers')
                         .saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
 
-                } catch (error) { 
+                } catch (error) {
                     console.log(error)
                 }
             }
             else {
                 try {
-                    report.related_entries.push(entryCheck.id)
+                    importRef.related_entries.push(entryCheck.id)
 
-                    const supplierInfo = [] //entryCheck.supplierInfo
+                    let supplierInfo = entryCheck.supplierInfo;
                     const relatedImport = entryCheck.related_import;
-                    const relatedImportId = []
-                    relatedImport.forEach(x => {
-                        relatedImportId.push(x.id)
-                    })
+                    const relatedImportId = relatedImport.map(x => x.id)
                     relatedImportId.push(entry.id)
-                    let searchSupplierInfo = supplierInfo.find((o, i) => {
-                        if (o.name === entry.name) {
-                            const price_progress = o.price_progress;
-                            price_progress.push({
-                                date: new Date(),
-                                price: product.price,
-                                in_offer: product.in_offer,
-                                discount: product.discount
-                            })
 
-                            supplierInfo[i] = {
-                                name: entry.name,
-                                wholesale: parseFloat(price).toFixed(2),
-                                supplierProductId: product.supplierCode,
-                                // price: parseFloat(salePrice).toFixed(2),
-                                supplierProductURL: productLink,
-                                in_offer: product.in_offer,
-                                price_progress: price_progress
-                            }
-                            return true;
-                        }
-                    })
+                    const { updatedSupplierInfo, isUpdated } = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .updateSupplierInfo(entry, product, supplierInfo)
 
-                    if (!searchSupplierInfo) {
-                        supplierInfo.push({
-                            name: entry.name,
-                            wholesale: parseFloat(price).toFixed(2),
-                            supplierProductId: product.supplierCode,
-                            // price: parseFloat(salePrice).toFixed(2),
-                            supplierProductURL: productLink,
-                            in_offer: product.in_offer,
-                            price_progress: [{
-                                date: new Date(),
-                                price: product.price,
-                                in_offer: product.in_offer,
-                                discount: product.discount
-                            }]
-                        })
+                    if (isUpdated) {
+                        supplierInfo = updatedSupplierInfo
                     }
 
                     const productPrice = await strapi
@@ -518,21 +482,22 @@ module.exports = ({ strapi }) => ({
 
                     await strapi.entityService.update('api::product.product', entryCheck.id, {
                         data: {
-                            name: product.productTitle,
-                            categories: categoryInfo.id,
+                            name: product.title,
+                            category: categoryInfo.id,
+                            model: product.model ? product.model : null,
                             price: parseFloat(productPrice),
                             supplierInfo: supplierInfo,
                             related_import: relatedImportId,
                         },
                     });
-                    report.updated += 1
-                    console.log("Updated:", report.updated)
+                    importRef.updated += 1
+                    console.log("Updated:", importRef.updated)
                 } catch (error) {
-                    console.log(error)
+                    console.log(error, error.details.errors)
                 }
             }
         } catch (error) {
-            console.log(error)
+            console.log(error, error.details.errors)
         }
     },
 

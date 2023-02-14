@@ -47,18 +47,18 @@ module.exports = ({ strapi }) => ({
             console.log("Ενοποίηση των xml...") 
             for (let prod of availableProducts) {
                 const product = {
-                    supplierCode: prod.code[0],
-                    category_1: prod.category[0], 
-                    category_2: prod.subcategory[0],
+                    supplierCode: prod.code[0].trim(),
+                    category_1: prod.category[0].trim(), 
+                    category_2: prod.subcategory[0].trim(),
                     category_3: '',
-                    partNumber: prod.part_no[0].toString(),
-                    title: prod.titlos[0],
+                    partNumber: prod.part_no[0].trim().toString(),
+                    title: prod.titlos[0].trim(),
                     price: parseFloat(prod.timi[0].replace(',', '.')).toFixed(2),
                     suggestedPrice: parseFloat(prod.lianiki[0]).toFixed(2),
-                    status: prod.availability[0],
+                    status: prod.availability[0].trim(),
                     recycleTax: parseFloat(prod.anakykl[0]).toFixed(2),
-                    brandName: prod.brand[0],
-                    barcode: prod.ean_code[0]
+                    brandName: prod.brand[0].trim(),
+                    barcode: prod.ean_code[0].trim()
                 }
                 const productDescription = productsDescriptions.perigrafes.product.filter(x => x.code[0] === prod.code[0])
 
@@ -118,7 +118,7 @@ module.exports = ({ strapi }) => ({
             const { data } = await response
 
             const iconv = new Iconv('ISO-8859-7', 'UTF-8');
-            const newData = iconv.convert(data);
+            const newData = iconv.convert(await data);
 
             const xml = await strapi
                 .plugin('import-products')

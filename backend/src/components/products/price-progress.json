@@ -11,7 +11,7 @@
       "type": "datetime",
       "required": true
     },
-    "price": {
+    "wholesale": {
       "type": "decimal",
       "required": true
     },
@@ -22,6 +22,9 @@
     "discount": {
       "type": "decimal",
       "required": false
+    },
+    "initial_wholesale": {
+      "type": "decimal"
     }
   }
 }

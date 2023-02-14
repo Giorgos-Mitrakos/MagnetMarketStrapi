@@ -178,7 +178,10 @@
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::product.product",
-      "inversedBy": "related_with"
+      "mappedBy": "related_with"
+    },
+    "model": {
+      "type": "string"
     }
   }
 }

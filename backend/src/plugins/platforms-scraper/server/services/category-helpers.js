@@ -9,7 +9,7 @@ module.exports = ({ strapi }) => ({
       populate: {
         categories: true,
         merchantFeeCatalogue: true
-      } 
+      }
     })
     return platforms;
   },
@@ -80,7 +80,7 @@ module.exports = ({ strapi }) => ({
           where: { name: category.name },
           data: {
             marketPlaceFee: parseFloat(filteredCategory['Προμήθεια Marketplace (%)']),
-            cpsFee: parseFloat(filteredCategory['Προμήθεια CPS (%)'])
+            cpsFee: filteredCategory['Προμήθεια CPS (%)'] === "-" ? null : parseFloat(filteredCategory['Προμήθεια CPS (%)'])
           },
         });
 

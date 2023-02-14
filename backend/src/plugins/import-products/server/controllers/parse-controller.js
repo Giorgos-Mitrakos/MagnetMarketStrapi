@@ -19,7 +19,7 @@ module.exports = {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')
-        .parseGlobalsatXlsx(ctx.request.body);
+        .parseGlobalsat(ctx.request.body);
     }
     else if (ctx.request.body.entry.name === 'Westnet') {
       ctx.body = await strapi

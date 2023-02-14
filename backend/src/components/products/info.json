@@ -34,10 +34,10 @@
       "type": "boolean",
       "default": false
     },
-    "price": {
+    "initial_retail_price": {
       "type": "decimal"
     },
-    "sale_price": {
+    "retail_price": {
       "type": "decimal"
     },
     "price_progress": {

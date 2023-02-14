@@ -174,6 +174,8 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .getData(entry, categoryMap);
 
+            // const products = []
+
             const { categories_map, char_name_map, char_value_map, stock_map,
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = await categoryMap
@@ -187,10 +189,12 @@ module.exports = ({ strapi }) => ({
             let numberOfSame = 0
             for (let dt of products) {
 
+                // console.log("MPN: ", dt.partNumber, " Barcode: ", dt.barcode)
+
                 const { entryCheck, brandId } = await strapi
                     .plugin('import-products')
                     .service('helpers')
-                    .checkProductAndBrand(dt.partNumber, dt.title, dt.brandName.trim());
+                    .checkProductAndBrand(dt.partNumber, dt.barcode, dt.title, dt.brandName.trim(), null);
 
                 //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
                 // const categoryInfo = await strapi
@@ -224,7 +228,7 @@ module.exports = ({ strapi }) => ({
                         price: dt.suggestedPrice,
                         price_progress: [{
                             date: new Date(),
-                            price: dt.price,
+                            wholesale: dt.price,
                         }]
                     }],
                     prod_chars: dt.prod_chars
@@ -237,18 +241,24 @@ module.exports = ({ strapi }) => ({
                         await strapi
                             .plugin('import-products')
                             .service('helpers')
-                            .createEntry(dt, product, charMaps,categories_map,importRef, auth);
+                            .createEntry(dt, product, charMaps, categories_map, importRef, auth);
 
                     } catch (error) {
-                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt["ΠΕΡΙΓΡΑΦΗ"])
+                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
                     }
                 }
                 else {
                     try {
+                        numberOfSame += 1
+                        // if (entryCheck.supplierInfo.length === 1 && entryCheck.supplierInfo[0].name === "Oktabit") {
+                        //     await strapi.entityService.delete('api::product.product', entryCheck.id)
+                        //     console.log(entryCheck.id,entryCheck.supplierInfo)
+                        // }
+
                         await strapi
                             .plugin('import-products')
                             .service('helpers')
-                            .updateEntry(dt, entry, entryCheck,brandId, importRef, productUrl, categories_map);
+                            .updateEntry(dt, entry, entryCheck, brandId, importRef, productUrl, categories_map);
 
                         // console.log("Updated")
                     } catch (error) {
@@ -257,7 +267,7 @@ module.exports = ({ strapi }) => ({
                 }
             }
 
-            console.log(numberOfSame)
+            console.log("Ίδια προιόντα:", numberOfSame)
 
             await strapi
                 .plugin('import-products')
@@ -273,399 +283,21 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async parseOktabitXlsx({ entry, auth }) {
-        try {
-            const importRef = {
-                created: 0,
-                updated: 0,
-                republished: 0,
-                deleted: 0,
-                related_entries: []
-            }
-
-            const data = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .getData(entry);
-
-            // const wb = xlsx.readFile(`./public${entry.importedFile.url}`)
-            // const ws = wb.Sheets['Φύλλο1']
-            // const data = xlsx.utils.sheet_to_json(ws)
-
-            const dataTitles = {
-                entry,
-                category_1: 'ΚΑΤΗΓΟΡΙΑ',
-                category_2: '',
-                category_3: '',
-                brandName: 'ΚΑΤΑΣΚΕΥΑΣΤΗΣ',
-                supplierCode: 'ΚΩΔΙΚΟΣ',
-                productURL: '',
-                title: 'ΠΕΡΙΓΡΑΦΗ',
-                description: '',
-                partNumber: 'PART NO',
-                barcode: '',
-                status: 'St',
-                price: 'TIMH',
-                recycleTax: 'AHHE',
-                suggestedPrice: '__EMPTY'
-            }
-
-            console.log("data:", await data.length)
-
-            // const categoryMap = await strapi
-            //     .plugin('import-products')
-            //     .service('helpers')
-            //     .getImportMapping(entry);
-
-            // const { categories_map, char_name_map, char_value_map, stock_map,
-            //     isWhitelistSelected, whitelist_map, blacklist_map, 
-            //     xPath, minimumPrice, maximumPrice } = await categoryMap
-
-            // const newData = data
-            //     .filter(filterStock)
-            //     .filter(filterPriceRange)
-            //     .filter(filterCategories)
-
-            const editData = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .editData(await data, dataTitles);
-
-            const { newData, categoryMap, charMaps } = await editData;
-
-            const { categories_map, char_name_map, char_value_map, stock_map,
-                isWhitelistSelected, whitelist_map, blacklist_map,
-                xPath, minimumPrice, maximumPrice } = await categoryMap
-
-            console.log("newData:", newData.length)
-
-            const { mapCharNames, mapCharValues } = charMaps
-
-            for (let dt of newData) {
-
-                const parsedDataTitles = await strapi
-                    .plugin('import-products')
-                    .service('helpers')
-                    .parseDatatitles(dt, dataTitles);
-
-                // console.log(parsedDataTitles)
-
-                const { entryCheck, product } = await strapi
-                    .plugin('import-products')
-                    .service('helpers')
-                    .constructProduct(parsedDataTitles);
-
-                // const imageUrls = [`https://www.oktabit.gr/media/products/heroes/${parsedDataTitles.supplierCode}/${parsedDataTitles.supplierCode}.jpg`]
-                // for (let j = 1; j < 5; j++) {
-                //     imageUrls.push(`https://www.oktabit.gr/media/products/${parsedDataTitles.supplierCode}/${parsedDataTitles.supplierCode}_${j}.jpg`)
-                // }
-
-                //Κατασκευάζω το URL του προϊόντος του προμηθευτή
-                let productUrl = `http://www.oktabit.gr/product_details.asp?productid=${parsedDataTitles.supplierCode}`
-
-                // console.log(product)
-                //     const product = {
-                //         name: dt[`${dataTitles.title}`],
-                //         // description: description,
-                //         // categories: categoryInfo.id,
-                //         // price: parseFloat(productPrice),
-                //         mpn: dt[`${dataTitles.partNumber}`] ? dt[`${dataTitles.partNumber}`].toString() : null,
-                //         // barcode: EAN ? EAN : null,
-                //         slug: dt[`${dataTitles.partNumber}`] !== undefined ?
-                //             slugify(`${dt[`${dataTitles.title}`]}-${dt[`${dataTitles.partNumber}`].toString()}`, { lower: true, remove: /[*+±~=#.,°;_()/'"!:@]/g }) :
-                //             slugify(`${dt[`${dataTitles.title}`].toString()}`, { lower: true, remove: /[*+±~=#.,°;_()/'"!:@]/g }),
-                //         publishedAt: new Date(),
-                //         status: 'InStock',
-                //         // brand: { id: brandId },
-                //         related_import: entry.id,
-                //         // supplierInfo: [{
-                //         //     name: entry.name,
-                //         //     wholesale: dt[`${dataTitles.price}`],
-                //         //     recycle_tax: dt[`${dataTitles.recycleTax}`],
-                //         //     supplierProductId: dt[`${dataTitles.supplierCode}`].toString(),
-                //         //     in_offer: inOffer
-                //         // }],
-                //         // prod_chars: parsedChars
-
-                //     }
-
-                //     // let mpn = dt[`${dataTitles.partNumber}`]?.toString()
-
-                //     const { entryCheck, brandId } = await strapi
-                //         .plugin('import-products')
-                //         .service('helpers')
-                //         .checkProductAndBrand(product.mpn, dt[`${dataTitles.brandName}`]);
-
-                //     // console.log("entryCheck:", entryCheck,"brandId:", brandId)
-
-                //     //     const entryCheck = await strapi
-                //     //         .plugin('import-products')
-                //     //         .service('helpers')
-                //     //         .checkIfProductExists(mpn);
-
-                //     //     const brandId = await strapi
-                //     //         .plugin('import-products')
-                //     //         .service('helpers')
-                //     //         .brandIdCheck(dt["ΚΑΤΑΣΚΕΥΑΣΤΗΣ"].trim());
-
-                //     //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
-
-                if (!entryCheck) {
-                    try {
-                        //Κάνω scrap από τη σελίδα του προμηθευτή διαθεσιμότητα, περιγραφή και χαρακτηριστικά
-                        const { scrap } = await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .scrapOktabit(productUrl);
-
-                        const { prod_chars, description, EAN, inOffer, imageUrls } = await scrap
-
-                        // Προσθέτω τις πληροφορίες που πήρα από scrapping
-                        product.description = description;
-                        product.barcode = EAN ? EAN : null;
-                        // product.brand = { id: brandId };
-                        product.supplierInfo = [{
-                            name: entry.name,
-                            wholesale: parsedDataTitles.price,
-                            recycle_tax: parsedDataTitles.recycleTax,
-                            supplierProductId: parsedDataTitles.supplierCode.toString(),
-                            supplierProductURL: productUrl,
-                            in_offer: inOffer,
-                            price_progress: [{
-                                date: new Date(),
-                                price: parsedDataTitles.price,
-                            }]
-                        }]
-
-                        console.log(product)
-
-                        await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .createEntry(parsedDataTitles, product, importRef,
-                                prod_chars, mapCharNames, mapCharValues, imageUrls, auth);
-
-                        //             // //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-                        //             // const categoryInfo = await strapi
-                        //             //     .plugin('import-products')
-                        //             //     .service('helpers')
-                        //             //     .getCategory(categories_map, dt[`${dataTitles.title}`], dt[`${dataTitles.category_2}`], null, null);
-
-                        //             // // console.log("categoryInfo:", categoryInfo)
-                        //             // const productPrice = await strapi
-                        //             //     .plugin('import-products')
-                        //             //     .service('helpers')
-                        //             //     .setPriceOnCreation(dt[`${dataTitles.price}`], categoryInfo, brandId);
-
-                        //             // //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
-                        //             // const parsedChars = await strapi
-                        //             //     .plugin('import-products')
-                        //             //     .service('helpers')
-                        //             //     .parseChars(prod_chars, mapCharNames, mapCharValues)
-
-                        //             // const data = {
-                        //             //     name: dt["ΠΕΡΙΓΡΑΦΗ"],
-                        //             //     description: description,
-                        //             //     categories: categoryInfo.id,
-                        //             //     price: parseFloat(productPrice),
-                        //             //     mpn: mpn ? mpn : null,
-                        //             //     barcode: EAN ? EAN : null,
-                        //             //     slug: slugify(`${dt["ΠΕΡΙΓΡΑΦΗ"]}-${mpn}`, { lower: true, remove: /[*+±~=#.,°;_()/'"!:@]/g }),
-                        //             //     publishedAt: new Date(),
-                        //             //     status: 'InStock',
-                        //             //     brand: { id: brandId },
-                        //             //     related_import: entry.id,
-                        //             //     supplierInfo: [{
-                        //             //         name: "Oktabit",
-                        //             //         wholesale: dt.TIMH,
-                        //             //         recycle_tax: dt.AHHE,
-                        //             //         supplierProductId: dt['ΚΩΔΙΚΟΣ'].toString(),
-                        //             //         in_offer: inOffer
-                        //             //     }],
-                        //             //     prod_chars: parsedChars
-                        //             // }
-
-                        //             //             const newEntry = await strapi.entityService.create('api::product.product', {
-                        //             //                 data: data,
-                        //             //             });
-
-                        //             // importRef.related_entries.push(newEntry.id)
-                        //             // importRef.created += 1;
-
-                        //             //             //Κατευάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
-                        //             //             let responseImage = await strapi
-                        //             //                 .plugin('import-products')
-                        //             //                 .service('helpers')
-                        //             //                 .getAndConvertImgToWep(imageUrls, data, newEntry.id, auth);
-
-                        //             //             //Δημιουργώ αυτόματα το SEO για το προϊόν
-                        //             //             await strapi
-                        //             //                 .plugin('import-products')
-                        //             //                 .service('helpers')
-                        //             //                 .saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
-
-                    } catch (error) {
-                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt["ΠΕΡΙΓΡΑΦΗ"])
-                    }
-                }
-                else {
-                    try {
-                        await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .updateEntry(parsedDataTitles, entryCheck, importRef, productUrl);
-
-                        // console.log(supplierInfo, relatedImportId, productPrice)
-                        //             // console.log(supplierInfo, relatedImportId, categoryInfo, productPrice, importRef.related_entries)
-                        //             // importRef.related_entries.push(entryCheck.id)
-                        //             // const supplierInfo = entryCheck.supplierInfo;
-                        //             // const relatedImport = entryCheck.related_import;
-                        //             // const relatedImportId = []
-
-                        //             // relatedImport.forEach(x => {
-                        //             //     if (x.id !== entry.id)
-                        //             //         relatedImportId.push(x.id)
-                        //             // })
-                        //             // relatedImportId.push(entry.id)
-
-                        //             // console.log("relatedImportId:", relatedImportId)
-
-                        //             // let searchSupplierInfo = supplierInfo.find((o, i) => {
-                        //             //     if (o.name === entry.name) {
-                        //             //         supplierInfo[i] = {
-                        //             //             name: entry.name,
-                        //             //             wholesale: dt[`${dataTitles.price}`],
-                        //             //             recycle_tax: dt[`${dataTitles.recycleTax}`],
-                        //             //             supplierProductId: dt[`${dataTitles.supplierCode}`].toString(),
-                        //             //             price: dt[`${dataTitles.suggestedPrice}`],
-                        //             //         }
-                        //             //         return true;
-                        //             //     }
-                        //             // })
-
-                        //             // if (!searchSupplierInfo) {
-                        //             //     supplierInfo.push({
-                        //             //         name: entry.name,
-                        //             //         wholesale: dt[`${dataTitles.price}`],
-                        //             //         recycle_tax: dt[`${dataTitles.recycleTax}`],
-                        //             //         supplierProductId: dt[`${dataTitles.supplierCode}`].toString(),
-                        //             //         price: dt[`${dataTitles.suggestedPrice}`]
-                        //             //     })
-                        //             // }
-
-                        //             // const categoryInfo = await strapi
-                        //             //     .plugin('import-products')
-                        //             //     .service('helpers')
-                        //             //     .getCategory(categories_map, dt[`${dataTitles.title}`], dt[`${dataTitles.category_2}`], null, null);
-
-                        //             // const productPrice = await strapi
-                        //             //     .plugin('import-products')
-                        //             //     .service('helpers')
-                        //             //     .setPriceOnUpdate(entryCheck, supplierInfo);
-
-
-                        //             // console.log("categoryInfo:", categoryInfo, "productPrice:", productPrice)
-
-
-
-                        //             const imgUrls = [{ url: `https://www.oktabit.gr/media/products/heroes/${dt["ΚΩΔΙΚΟΣ"]}/${dt["ΚΩΔΙΚΟΣ"]}.jpg` }]
-                        //             for (let j = 1; j < 5; j++) {
-                        //                 imgUrls.push({ url: `https://www.oktabit.gr/media/products/${dt["ΚΩΔΙΚΟΣ"]}/${dt["ΚΩΔΙΚΟΣ"]}_${j}.jpg` })
-                        //             }
-
-                        // await strapi.entityService.update('api::product.product', entryCheck.id, {
-                        //     data: {
-                        //         price: parseFloat(productPrice),
-                        //         categories: categoryInfo.id,
-                        //         supplierInfo: supplierInfo,
-                        //         related_import: relatedImportId,
-                        //         ImageURLS: imgUrls
-                        //     },
-                        // });
-                        // importRef.updated += 1
-                    } catch (error) {
-                        console.log(error)
-                    }
-                }
-            }
-
-            await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .deleteEntry(entry, importRef);
-
-            console.log(importRef)
-            // const importXmlFile = await strapi.entityService.findMany('plugin::import-products.importxml',
-            //     {
-            //         populate: { related_products: true },
-            //         filters: { id: entry.id },
-            //     });
-
-            // for (let product of importXmlFile[0].related_products) {
-
-            //     if (!importRef.related_entries.includes(product.id)) {
-            //         const checkProduct = await strapi.entityService.findOne('api::product.product', product.id, {
-            //             // fields: ['supplierInfo', 'name'],
-            //             populate: { supplierInfo: true },
-            //         })
-
-            //         let supplierInfo = checkProduct.supplierInfo
-
-            //         if (supplierInfo.length > 1) {
-            //             const index = supplierInfo.findIndex((o) => {
-            //                 return o.name === entry.name
-            //             })
-            //             supplierInfo.splice(index, 1)
-
-            //             await strapi.entityService.update('api::product.product', product.id, {
-            //                 data: {
-            //                     supplierInfo: supplierInfo,
-            //                 },
-            //             });
-            //             importRef.updated += 1
-            //         }
-            //         else {
-            //             await strapi.entityService.delete('api::product.product', product.id);
-            //             importRef.deleted += 1;
-            //         }
-            //     }
-            // }
-
-            // await strapi.entityService.update('plugin::import-products.importxml', entry.id,
-            //     {
-            //         data: {
-            //             report: `Created: ${importRef.created}, Updated: ${importRef.updated}, Deleted: ${importRef.deleted}`,
-            //         },
-            //     })
-
-
-            console.log("End of Import")
-            return { "message": "ok" }
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async parseGlobalsatXlsx({ entry, auth }) {
-        const importRef = {
-            created: 0,
-            updated: 0,
-            republished: 0,
-            skipped: 0,
-            deleted: 0,
-            related_entries: [],
-            related_products: []
-        }
+    async parseGlobalsat({ entry, auth }) {
+        const importRef = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .createImportRef(entry);
 
         await strapi
             .plugin('import-products')
-            .service('helpers')
+            .service('globalsatHelper')
             .scrapGlobalsat(importRef, entry, auth);
 
-        await strapi
-            .plugin('import-products')
-            .service('helpers')
-            .deleteEntry(entry, importRef);
+        // await strapi
+        //     .plugin('import-products')
+        //     .service('helpers')
+        //     .deleteEntry(entry, importRef);
 
         console.log(importRef)
 
@@ -1040,61 +672,63 @@ module.exports = ({ strapi }) => ({
                 category_1: 'product_categories.category_path._',
                 category_2: '',
                 category_3: '',
-                brandName: 'manufacturer',
                 supplierCode: 'product_id',
+                model: 'model',
+                title: 'name',
+                brandName: 'manufacturer',
                 productURL: 'url',
                 imageUrls: 'images',
-                title: 'name',
-                description: 'description',
                 partNumber: 'mpn',
                 barcode: 'barcode',
+                length: 'length',
+                width: 'width',
+                height: 'height',
+                weight: 'weight',
+                description: 'description',
                 status: 'instock',
                 price: 'price.price_original',
                 recycleTax: '',
                 suggestedPrice: ''
             }
 
+            console.log(data.products.product.length)
+
             const editData = await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .editData(await data.products.product, dataTitles);
 
-            const { newData, categoryMap, charMaps } = await editData;
-
-            const { mapCharNames, mapCharValues } = charMaps
+            const { newData, categories_map, charMaps } = await editData;
 
             console.log(editData.newData.length)
 
             for (let dt of newData) {
-
-                const parsedDataTitles = await strapi
-                    .plugin('import-products')
-                    .service('helpers')
-                    .parseDatatitles(dt, dataTitles);
-
                 // console.log(parsedDataTitles)
 
-                const { entryCheck, product } = await strapi
+                const { entryCheck, product, brandId } = await strapi
                     .plugin('import-products')
                     .service('helpers')
-                    .constructProduct(parsedDataTitles);
+                    .constructProduct(dt, dataTitles);
 
-                const imageUrls = []
+                // const imageUrls = []
+                product.ImageURLS = []
 
                 if (dt.images[0].image_url?.length > 0) {
                     for (let img of dt.images[0].image_url) {
-                        imageUrls.push(img._)
+                        product.ImageURLS.push({ url: img._ })
                     }
                 }
+
+                console.log(product, brandId)
 
                 // αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω
                 if (!entryCheck) {
                     try {
-                        const prod_chars = []
+                        product.prod_chars = []
 
                         if (dt.product_chars) {
                             dt.product_chars[0].char.forEach(ch => {
-                                prod_chars.push({
+                                product.prod_chars.push({
                                     name: ch.char_name[0].trim(),
                                     value: ch.char_value[0].trim(),
                                 })
@@ -1106,20 +740,20 @@ module.exports = ({ strapi }) => ({
 
                         product.supplierInfo = [{
                             name: entry.name,
-                            wholesale: parsedDataTitles.price,
+                            wholesale: parseFloat(parsedDataTitles.price).toFixed(2),
                             supplierProductId: parsedDataTitles.supplierCode.toString(),
                             supplierProductURL: parsedDataTitles.productURL,
                             price_progress: [{
                                 date: new Date(),
-                                price: parsedDataTitles.price,
+                                price: parseFloat(parsedDataTitles.price).toFixed(2),
                             }]
                         }]
 
                         await strapi
                             .plugin('import-products')
                             .service('helpers')
-                            .createEntry(parsedDataTitles, product, importRef,
-                                prod_chars, mapCharNames, mapCharValues, imageUrls, auth);
+                            .createEntry(parsedDataTitles, product, charMaps, categories_map,
+                                importRef, auth);
 
                     } catch (error) {
                         console.log(error)
@@ -1130,7 +764,8 @@ module.exports = ({ strapi }) => ({
                         await strapi
                             .plugin('import-products')
                             .service('helpers')
-                            .updateEntry(parsedDataTitles, entryCheck, importRef, parsedDataTitles.productUrl);
+                            .updateEntry(parsedDataTitles, entry, entryCheck, brandId,
+                                importRef, parsedDataTitles.productUrl, categories_map);
 
                     } catch (error) {
                         console.log(error)
@@ -1138,10 +773,10 @@ module.exports = ({ strapi }) => ({
                 }
             }
 
-            await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .deleteEntry(entry, importRef);
+            // await strapi
+            //     .plugin('import-products')
+            //     .service('helpers')
+            //     .deleteEntry(entry, importRef);
 
             console.log(importRef)
 
@@ -1155,32 +790,22 @@ module.exports = ({ strapi }) => ({
     async parseNovatronXml({ entry, auth }) {
         try {
 
-            let report = {
-                created: 0,
-                updated: 0,
-                republished: 0,
-                skipped: 0,
-                deleted: 0,
-                related_entries: [],
-                related_products: [],
-            }
-
-            const categoryMap = await strapi
+            const importRef = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getImportMapping(entry);
+                .createImportRef(entry);
 
             await strapi
                 .plugin('import-products')
                 .service('novatronHelper')
-                .scrapNovatronCategories(categoryMap, report, entry, auth);
+                .scrapNovatronCategories(importRef, entry, auth);
 
             await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .deleteEntry(entry, report);
+                .deleteEntry(entry, importRef);
 
-            console.log(report)
+            console.log(importRef)
 
             console.log("End of Import")
             return { "message": "ok" }
@@ -1192,32 +817,22 @@ module.exports = ({ strapi }) => ({
     async parseQuestXml({ entry, auth }) {
         try {
 
-            let report = {
-                created: 0,
-                updated: 0,
-                skipped: 0,
-                deleted: 0,
-                republished: 0,
-                related_entries: [],
-                related_products: [],
-            }
-
-            const categoryMap = await strapi
+            const importRef = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getImportMapping(entry);
+                .createImportRef(entry);
 
             await strapi
                 .plugin('import-products')
                 .service('questHelper')
-                .scrapQuest(categoryMap, report, entry, auth);
+                .scrapQuest(importRef, entry, auth);
 
             await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .deleteEntry(entry, report);
+                .deleteEntry(entry, importRef);
 
-            console.log(report)
+            console.log(importRef)
 
             console.log("End of Import")
             return { "message": "ok" }

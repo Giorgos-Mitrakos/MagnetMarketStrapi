@@ -7,6 +7,7 @@ const mapping = require('./mapping');
 const oktabitHelper = require('./oktabit-helper');
 const novatronHelper = require('./novatron-helper');
 const questHelper = require('./quest-helper');
+const globalsatHelper = require('./globalsat-helper');
 
 module.exports = {
   getFileService,
@@ -16,5 +17,6 @@ module.exports = {
   oktabitHelper,
   novatronHelper,
   questHelper,
+  globalsatHelper,
 };
 
