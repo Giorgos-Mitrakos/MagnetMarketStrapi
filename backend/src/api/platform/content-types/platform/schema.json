@@ -1,0 +1,37 @@
+{
+  "kind": "collectionType",
+  "collectionName": "platforms",
+  "info": {
+    "singularName": "platform",
+    "pluralName": "platforms",
+    "displayName": "Platform"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "entryURL": {
+      "type": "string",
+      "required": true
+    },
+    "merchantFeeCatalogue": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "files"
+      ]
+    },
+    "platformCategories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::platforms-scraper.platform-category",
+      "mappedBy": "platform"
+    }
+  }
+}

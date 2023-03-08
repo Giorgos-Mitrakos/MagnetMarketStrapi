@@ -1,0 +1,25 @@
+{
+  "name": "export-platforms-xml",
+  "version": "0.1.0",
+  "description": "Επέλεξε ποιές κατηγορίες θα προστεθούν στην εξαγωγή xml για skroutz και shopflix",
+  "strapi": {
+    "name": "Εξαγωγή XML πλατφορμών",
+    "description": "Επέλεξε ποιές κατηγορίες θα προστεθούν στην εξαγωγή xml για skroutz και shopflix",
+    "kind": "plugin",
+    "displayName": "Εξαγωγή XML πλατφορμών"
+  },
+  "dependencies": {},
+  "author": {
+    "name": "Giorgos Mitrakos"
+  },
+  "maintainers": [
+    {
+      "name": "Giorgos Mitrakos"
+    }
+  ],
+  "engines": {
+    "node": ">=14.19.1 <=18.x.x",
+    "npm": ">=6.0.0"
+  },
+  "license": "MIT"
+}

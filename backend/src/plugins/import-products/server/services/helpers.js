@@ -16,6 +16,134 @@ const { DOMParser, XMLSerializer, DOMImplementation } = require('xmldom');
 
 module.exports = ({ strapi }) => ({
 
+
+    async updateAndFilterScrapProducts(products, category, subcategory, sub2category, importRef, entry) {
+        try {
+            const newProducts = []
+            let stockLevelFilter = []
+            for (let stock of importRef.categoryMap.stock_map) {
+                stockLevelFilter.push(stock.name)
+            }
+
+            for (let product of products) {
+                // console.log(product) 
+                if (stockLevelFilter.includes(product.stockLevel) && product.wholesale) {
+
+                    const checkIfEntry = await strapi.db.query('api::product.product').findOne({
+                        where: {
+                            supplierInfo: {
+                                supplierProductId: product.supplierCode
+                            }
+                        },
+                        populate: {
+                            supplierInfo: {
+                                // where: {
+                                //     // name: product.name,
+                                //     supplierProductId: product.supplierCode
+                                // },
+                                populate: {
+                                    price_progress: true,
+                                }
+                            },
+                            brand: true,
+                            related_import: true,
+                            prod_chars: true,
+                            category: {
+                                populate: {
+                                    cat_percentage: {
+                                        populate: {
+                                            brand_perc: {
+                                                populate: {
+                                                    brand: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    });
+
+                    if (checkIfEntry) {
+                        let dbChange = ''
+                        const data = {}
+                        let supplierInfo = checkIfEntry.supplierInfo
+
+                        const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, category, subcategory, sub2category);
+
+                        data.category = categoryInfo.id
+
+                        if (!checkIfEntry.publishedAt) {
+                            data.publishedAt = new Date()
+                            data.deletedAt = null
+                            dbChange = 'republished'
+                        }
+
+                        if (!checkIfEntry.brand) {
+                            const brandId = await this.brandIdCheck(null, checkIfEntry.name)
+                            if (brandId)
+                                data.brand = brandId
+                        }
+
+                        const { updatedSupplierInfo, isUpdated } = await this.updateSupplierInfo(entry, product, supplierInfo)
+
+                        if (isUpdated) {
+                            dbChange = 'updated';
+                            data.supplierInfo = updatedSupplierInfo
+                        }
+
+                        const productPrice = await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .setPrice(checkIfEntry, supplierInfo, categoryInfo, checkIfEntry.brand?.id);
+
+                        data.price = productPrice
+                        data.model = checkIfEntry.prod_chars.find(x => x.name === "Μοντέλο")?.value;
+
+                        // if (entry.name === "Novatron" && product.short_description) {
+                        //     let result = product.short_description.match(/[0-9].[0-9]mm/g)
+                        //     if (result) {
+                        //         data.name = `${product.name}-${result[0]}`;
+                        //         data.slug = slugify(`${product.name}-${result[0]}-${product.supplierCode}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
+
+                        //         // console.log(result[0])
+                        //     }
+                        // }
+
+                        await strapi.entityService.update('api::product.product', checkIfEntry.id, {
+                            data: data,
+                        });
+
+                        switch (dbChange) {
+                            case 'republished':
+                                importRef.republished += 1
+                                console.log("Republished:", importRef.republished)
+                                break;
+                            case 'updated':
+                                importRef.updated += 1
+                                console.log("Update:", importRef.updated)
+                                break;
+                            default:
+                                importRef.skipped += 1
+                                console.log("Skipped:", importRef.skipped)
+                                break;
+                        }
+
+                        importRef.related_entries.push(checkIfEntry.id)
+                    }
+                    else {
+                        newProducts.push(product)
+                    }
+                }
+            }
+
+            return newProducts
+        } catch (error) {
+            console.log(error)
+        }
+
+    },
+
     async createImportRef(entry) {
         const importRef = {
             created: 0,
@@ -96,8 +224,6 @@ module.exports = ({ strapi }) => ({
             price_progress.wholesale = parseFloat(product.wholesale).toFixed(2)
         }
 
-        console.log(price_progress)
-
         return price_progress
 
     },
@@ -106,6 +232,7 @@ module.exports = ({ strapi }) => ({
 
         const supplierInfo = {
             name: entry.name,
+            in_stock: true,
             wholesale: parseFloat(product.wholesale).toFixed(2),
             supplierProductId: product.supplierCode,
             supplierProductURL: product.link,
@@ -150,12 +277,14 @@ module.exports = ({ strapi }) => ({
         // }
 
         let isUpdated = false;
+        let dbChange = 'skipped'
 
         let supplierInfoUpdate = supplierInfo.findIndex(o => o.name === entry.name)
 
         if (supplierInfoUpdate !== -1) {
             if (parseFloat(supplierInfo[supplierInfoUpdate].wholesale).toFixed(2) !== parseFloat(product.wholesale).toFixed(2)) {
                 // console.log(product)
+                console.log("product", product.name)
                 console.log("New wholesale:", product.wholesale, "Previous wholesale:", supplierInfo[supplierInfoUpdate].wholesale)
 
                 const price_progress = supplierInfo[supplierInfoUpdate].price_progress;
@@ -165,8 +294,10 @@ module.exports = ({ strapi }) => ({
                 price_progress.push(price_progress_data)
 
                 supplierInfo[supplierInfoUpdate] = this.createSupplierInfoData(entry, product, price_progress)
-
+                // console.log("supplierInfoUpdate", supplierInfo[supplierInfoUpdate])
                 isUpdated = true;
+                dbChange = 'updated'
+
             }
         }
         else {
@@ -177,10 +308,10 @@ module.exports = ({ strapi }) => ({
             supplierInfo.push(this.createSupplierInfoData(entry, product, price_progress_data))
 
             isUpdated = true;
-            console.log("supplierInfoUpdate:", supplierInfo)
+            dbChange = 'created'
         }
 
-        return { updatedSupplierInfo: supplierInfo, isUpdated }
+        return { updatedSupplierInfo: supplierInfo, isUpdated, dbChange }
 
     },
 
@@ -190,7 +321,7 @@ module.exports = ({ strapi }) => ({
         const doc = docParser.parseFromString(result.data, "application/xml")
 
         try {
-            if (entry.xPath !== "") {
+            if (entry.xPath && entry.xPath !== "") {
                 const allParagraphs = xpath.evaluate(
                     entry.xPath,
                     doc,
@@ -253,8 +384,10 @@ module.exports = ({ strapi }) => ({
 
                 return await xml;
             }
-            let data = Axios.get(`${entry.importedURL}`,
+            let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
+
+            // console.log(data)
 
             const xPath = await this.xPathFilter(await data, entry);
             const xml = await this.parseXml(xPath)
@@ -300,6 +433,15 @@ module.exports = ({ strapi }) => ({
 
         const newData = this.filterData(data, dataTitles, await categoryMap)
         return { newData, categories_map, charMaps }
+    },
+
+    async checkProductAndBrand(mpn, name, barcode, brand, model) {
+        const entryCheck = await this.checkIfProductExists(mpn, barcode, name, model);
+
+        const brandId = await this.brandIdCheck(brand, name);
+
+        return { entryCheck, brandId }
+
     },
 
     async brandIdCheck(brand, name) {
@@ -351,237 +493,75 @@ module.exports = ({ strapi }) => ({
     },
 
     async checkIfProductExists(mpn, barcode, name, model) {
-        const checkIfEntry = await strapi.db.query('api::product.product').findOne({
-            where: {
-                $or: [
-                    {
-                        $and: [
-                            { mpn: mpn },
-                            { barcode: barcode }
-                        ]
-                    },
-                    {
-                        $or: [
-                            { mpn: mpn },
-                            { mpn: model },
-                            { model: mpn }
-                        ]
-                    },
-                    {
-                        $and: [
-                            { barcode: barcode },
-                            { mpn: { $null: true, } }
-                        ]
-                    },
-                    {
-                        $and: [
-                            { name: name },
-                            { mpn: { $null: true, } }
-                        ]
-                    },
-                ]
-            },
-            populate: {
-                supplierInfo: {
-                    populate: {
-                        price_progress: true,
-                    }
-                },
-                related_import: true,
-                category: {
-                    populate: {
-                        cat_percentage: {
-                            populate: {
-                                brand_perc: {
-                                    populate: {
-                                        brand: true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-        });
-
-        return await checkIfEntry
-    },
-
-    async updateAndFilterScrapProducts(products, category, subcategory, sub2category, importRef, entry) {
         try {
-            const newProducts = []
-            let stockLevelFilter = []
-            for (let stock of importRef.categoryMap.stock_map) {
-                stockLevelFilter.push(stock.name)
-            }
-
-            for (let product of products) {
-                // console.log(product) 
-                if (stockLevelFilter.includes(product.stockLevel)) {
-                    // console.log(product) 
-
-                    const checkIfEntry = await strapi.db.query('api::product.product').findOne({
-                        where: {
-                            // name: product.title,
-                            supplierInfo: {
-                                supplierProductId: product.supplierCode
-                            }
+            const checkIfEntry = await strapi.db.query('api::product.product').findOne({
+                where: {
+                    $or: [
+                        {
+                            $and: [
+                                { mpn: mpn },
+                                { barcode: barcode }
+                            ]
                         },
+                        {
+                            $and: [
+                                { mpn: mpn },
+                                { mpn: { $notNull: true, } }
+                            ]
+                        },
+                        {
+                            $and: [
+                                { mpn: model },
+                                { mpn: { $notNull: true, } }
+                            ]
+                        },
+                        {
+                            $and: [
+                                { model: mpn },
+                                { model: { $notNull: true, } }
+                            ]
+                        },
+                        {
+                            $and: [
+                                { barcode: barcode },
+                                { mpn: { $null: true, } }
+                            ]
+                        },
+                        {
+                            $and: [
+                                { name: name },
+                                { mpn: { $null: true, } }
+                            ]
+                        },
+                    ]
+                },
+                populate: {
+                    supplierInfo: {
                         populate: {
-                            supplierInfo: {
-                                // where: {
-                                //     // name: product.title,
-                                //     supplierProductId: product.supplierCode
-                                // },
+                            price_progress: true,
+                        }
+                    },
+                    related_import: true,
+                    category: {
+                        populate: {
+                            cat_percentage: {
                                 populate: {
-                                    price_progress: true,
-                                }
-                            },
-                            brand: true,
-                            related_import: true,
-                            prod_chars: true,
-                            category: {
-                                populate: {
-                                    cat_percentage: {
+                                    brand_perc: {
                                         populate: {
-                                            brand_perc: {
-                                                populate: {
-                                                    brand: true
-                                                }
-                                            }
+                                            brand: true
                                         }
                                     }
                                 }
                             }
-                        },
-                    });
-
-                    // checkIfEntry && console.log("Search for:", product.title,
-                    //     "Found:", checkIfEntry.name, checkIfEntry.mpn, checkIfEntry.barcode, checkIfEntry.model)
-
-                    // console.log("checkIfEntry:", checkIfEntry)
-
-                    if (checkIfEntry) {
-                        let dbChange = ''
-                        const data = {}
-                        let supplierInfo = checkIfEntry.supplierInfo
-
-                        const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.title, category, subcategory, sub2category);
-
-                        data.category = categoryInfo.id
-
-                        if (!checkIfEntry.publishedAt) {
-                            data.publishedAt = new Date()
-                            dbChange = 'republished'
                         }
-
-                        if (!checkIfEntry.brand) {
-                            const brandId = await this.brandIdCheck(null, checkIfEntry.name)
-                            if (brandId)
-                                data.brand = brandId
-                        }
-
-                        const { updatedSupplierInfo, isUpdated } = await this.updateSupplierInfo(entry, product, supplierInfo)
-
-                        if (isUpdated) {
-                            dbChange = 'updated';
-                            data.supplierInfo = updatedSupplierInfo
-                        }
-
-                        // let supplierInfoUpdate = supplierInfo.findIndex(o => o.name === entry.name)
-
-                        // if (parseFloat(supplierInfo[supplierInfoUpdate].wholesale).toFixed(2) !== parseFloat(product.wholesale).toFixed(2)) {
-                        //     // console.log(product)
-                        //     console.log("New wholesale:", product.wholesale, "Previous wholesale:", supplierInfo[supplierInfoUpdate].wholesale)
-
-                        //     if (supplierInfoUpdate !== -1) {
-                        //         const price_progress = []// supplierInfo[supplierInfoUpdate].price_progress;
-
-                        //         const price_progress_data = await strapi
-                        //             .plugin('import-products')
-                        //             .service('helpers')
-                        //             .createPriceProgress(product)
-
-                        //         price_progress.push(price_progress_data)
-
-                        //         supplierInfo = [{
-                        //             name: entry.name,
-                        //             wholesale: parseFloat(product.wholesale).toFixed(2),
-                        //             supplierProductId: product.supplierCode,
-                        //             // price: parseFloat(salePrice).toFixed(2),
-                        //             supplierProductURL: product.link,
-                        //             in_offer: product.in_offer,
-                        //             price_progress: price_progress
-                        //         }]
-
-                        //     }
-                        //     else {
-                        //         console.log("New supplier!!!!!!!!")
-
-                        //         const price_progress_data = await strapi
-                        //             .plugin('import-products')
-                        //             .service('helpers')
-                        //             .createPriceProgress(product)
-
-                        //         supplierInfo.push({
-                        //             name: entry.name,
-                        //             wholesale: parseFloat(product.wholesale).toFixed(2),
-                        //             supplierProductId: product.supplierCode,
-                        //             // price: parseFloat(salePrice).toFixed(2),
-                        //             supplierProductURL: productLink,
-                        //             in_offer: product.in_offer,
-                        //             price_progress: [price_progress_data]
-                        //         })
-                        //     }
-
-                        //     console.log("supplierInfoUpdate:", supplierInfo[supplierInfoUpdate])
-
-                        //     data.supplierInfo = supplierInfo
-
-                        //     dbChange = 'updated'
-                        // }
-
-                        const productPrice = await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .setPrice(checkIfEntry, supplierInfo, categoryInfo, checkIfEntry.brand?.id);
-
-                        data.price = productPrice
-                        data.model = checkIfEntry.prod_chars.find(x => x.name === "Μοντέλο")?.value;
-
-                        await strapi.entityService.update('api::product.product', checkIfEntry.id, {
-                            data: data,
-                        });
-
-                        switch (dbChange) {
-                            case 'republished':
-                                importRef.republished += 1
-                                console.log("Republished:", importRef.republished)
-                                break;
-                            case 'updated':
-                                importRef.updated += 1
-                                console.log("Update:", importRef.updated)
-                                break;
-                            default:
-                                importRef.skipped += 1
-                                console.log("Skipped:", importRef.skipped)
-                                break;
-                        }
-
-                        importRef.related_entries.push(checkIfEntry.id)
                     }
-                    else {
-                        // if (product.price)
-                        newProducts.push(product)
-                    }
-                }
-            }
+                },
+            });
 
-            return newProducts
+            return await checkIfEntry
         } catch (error) {
             console.log(error)
         }
-
     },
 
     async getImportMapping(entry) {
@@ -1451,15 +1431,16 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async getAndConvertImgToWep(imageUrls, product, entryID, auth) {
+    async getAndConvertImgToWep(product, entryID, auth) {
 
         try {
+            console.log(product.ImageURLS)
             let productName = product.name.replace(/\//g, "_");
 
             let index = 0
             let mainImageID = '';
             let imgUrls = []
-            for (let imgUrl of imageUrls) {
+            for (let imgUrl of product.ImageURLS) {
                 index += 1;
                 const sharpStream = sharp({
                     failOnError: false
@@ -1469,10 +1450,10 @@ module.exports = ({ strapi }) => ({
                     let cont = false;
                     const response = await Axios({
                         method: 'get',
-                        url: imgUrl,
+                        url: imgUrl.url,
                         responseType: 'stream'
                     }).catch(err => {
-                        console.log("Axios Error:", productName, imgUrl, "Supplier Code:", product.supplierInfo[0].supplierProductId);
+                        console.log("Axios Error:", productName, imgUrl.url, "Supplier Code:", product.supplierInfo[0].supplierProductId);
                         cont = true;
                     })
 
@@ -1482,7 +1463,7 @@ module.exports = ({ strapi }) => ({
                     else {
                         await response && response !== null && response.data.pipe(sharpStream)
 
-                        imgUrls.push({ url: imgUrl })
+                        imgUrls.push(imgUrl)
 
                         await sharpStream
                             .webp({ quality: 75 })
@@ -1524,7 +1505,7 @@ module.exports = ({ strapi }) => ({
                                 }
                             })
                             .catch(err => {
-                                console.error("Error processing files, let's clean it up", err, "File:", product.title, "supplier Code:", product.supplierCode);
+                                console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
                                 try {
                                     // fs.unlinkSync(`./src/tmp/${data[" GS Description "]}_${index}.webp`);
                                 } catch (e) {
@@ -1572,14 +1553,19 @@ module.exports = ({ strapi }) => ({
             const slug = slugify(`${productName}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
             const canonicalURL = `http://localhost:3000/product/${slug}`
 
+            let metaDescription = `${productName}${product.short_description}`.length > 160 ?
+                `${productName}${product.short_description}`.substring(0, 159) :
+                `${productName}${product.short_description}`.length > 50 ?
+                    `${productName}${product.short_description}` :
+                    `${productName}${product.short_description}${productName}${product.short_description}
+            ${productName}${product.short_description}`.substring(0, 50)
+
             strapi.entityService.update('api::product.product', parseInt(entryID),
                 {
                     data: {
                         seo: [{
                             metaTitle: productName.substring(0, 59),
-                            metaDescription: `${productName}${productName}${productName}`.length > 160 ?
-                                `${productName}${productName}${productName}`.substring(0, 159) :
-                                `${productName}${productName}${productName}`,
+                            metaDescription: metaDescription,
                             metaImage: {
                                 id: imgid ? imgid.id : null
                             },
@@ -1699,52 +1685,14 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async setPriceOnCreation(price, categoryInfo, brandId) {
+    async setPrice(existedProduct, supplierInfo, categoryInfo, brandId) {
         try {
             const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
             const taxRate = process.env.GENERAL_TAX_RATE
 
-            let generalPercentage = ''
-            if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
+            const filteredSupplierInfo = supplierInfo.filter(x => x.in_stock === true)
 
-                let findPercentage = categoryInfo.cat_percentage.find(x => x.name === "general")
-
-                if (findPercentage) {
-                    if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
-                        let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === brandId)
-                        if (findBrandPercentage) {
-                            generalPercentage = findBrandPercentage.percentage
-                        }
-                        else {
-                            generalPercentage = findPercentage.percentage
-                        }
-                    }
-                    else {
-                        generalPercentage = findPercentage.percentage
-                    }
-                }
-                else {
-                    generalPercentage = generalCategoryPercentage
-                }
-            }
-            else {
-                generalPercentage = generalCategoryPercentage
-            }
-
-
-            return parseFloat(price) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
-
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
-    async setPrice(entry, supplierInfo, categoryInfo, brandId) {
-        try {
-            const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
-            const taxRate = process.env.GENERAL_TAX_RATE
-
-            let minSupplierPrice = supplierInfo?.reduce((prev, current) => {
+            let minSupplierPrice = filteredSupplierInfo?.reduce((prev, current) => {
                 return (prev.wholesale < current.wholesale) ? prev : current
             })
 
@@ -1777,7 +1725,7 @@ module.exports = ({ strapi }) => ({
 
             let minPrice = parseFloat(minSupplierPrice.wholesale) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
 
-            return entry.price > minPrice && entry.is_fixed_price ? parseFloat(entry.price).toFixed(2) : minPrice.toFixed(2)
+            return existedProduct && existedProduct.price > minPrice && existedProduct.is_fixed_price ? parseFloat(existedProduct.price).toFixed(2) : minPrice.toFixed(2)
 
         } catch (error) {
             console.log(error)
@@ -1789,13 +1737,25 @@ module.exports = ({ strapi }) => ({
             console.log(supplier)
             const entries = await strapi.db.query('plugin::import-products.importxml').findOne({
                 select: ['name'],
-                where: { name: supplier },
+                where: {
+                    name: supplier
+                },
                 populate: {
                     related_products: {
                         where: {
-                            $not: {
-                                publishedAt: null
-                            }
+                            $and: [
+                                {
+                                    $not: {
+                                        publishedAt: null
+                                    },
+                                    supplierInfo: {
+                                        $and: [
+                                            { name: supplier },
+                                            { in_stock: true }
+                                        ]
+                                    }
+                                }
+                            ]
                         },
                         populate: {
                             category: { fields: ['name', 'slug'] },
@@ -2190,174 +2150,369 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async checkProductAndBrand(mpn, name, barcode, brand, model) {
-        const entryCheck = await this.checkIfProductExists(mpn, barcode, name, model);
-
-        const brandId = await this.brandIdCheck(brand, name);
-
-        return { entryCheck, brandId }
-
-    },
-
-    async createEntry(parsedDataTitles, product,
-        charMaps, categories_map, importRef, auth) {
+    async createEntry(product, importRef, auth) {
 
         try {
+            console.log("New Product:", product.name)
+
             //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-            const categoryInfo = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .getCategory(categories_map, parsedDataTitles.title, parsedDataTitles.category_1, parsedDataTitles.category_2, parsedDataTitles.category_3);
+            const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
 
-            // console.log("categoryInfo:", categoryInfo)
-            const productPrice = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .setPrice(parsedDataTitles, product.supplierInfo, categoryInfo, product.brand.id);
+            const price_progress_data = this.createPriceProgress(product)
 
-            const { mapCharNames, mapCharValues } = charMaps
+            const supplierInfo = [this.createSupplierInfoData(product.entry, product, price_progress_data)]
 
-            //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
-            const parsedChars = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseChars(product.prod_chars, mapCharNames, mapCharValues)
+            const productPrice = await this.setPrice(null, supplierInfo, categoryInfo, product.brand.id);
 
+            // const { mapCharNames, mapCharValues } = importRef.charMaps
+
+            // //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
+            // const parsedChars = await strapi
+            //     .plugin('import-products')
+            //     .service('helpers')
+            //     .parseChars(product.prod_chars, mapCharNames, mapCharValues)
+
+            product.supplierInfo = supplierInfo
             product.category = categoryInfo.id;
             product.price = parseFloat(productPrice);
-            product.prod_chars = parsedChars;
+            // product.prod_chars = parsedChars;
 
-            // console.log(product)
+            const data = {
+                name: product.name,
+                slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
+                category: categoryInfo.id,
+                price: parseFloat(productPrice).toFixed(2),
+                publishedAt: new Date(),
+                status: product.status,
+                related_import: product.entry.id,
+                supplierInfo: supplierInfo,
+                prod_chars: product.prod_chars,
+                ImageURLS: product.imagesSrc,
+
+
+                // short_description: product.short_description,
+                // description: product.description,                        
+                // mpn: product.mpn ? product.mpn : null,                        
+                // brand: { id: brandId },                        
+            }
+
+            if (product.entry.name === "Novatron" && product.short_description) {
+                let result = product.short_description.match(/[0-9].[0-9]mm/g)
+                if (result) {
+                    data.name = `${product.name}-${result[0]}`;
+                    data.slug = slugify(`${product.name}-${result[0]}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
+
+                    // console.log(result[0])
+                }
+            }
+
+
+            if (product.mpn) {
+                data.mpn = product.mpn.trim()
+            }
+
+            if (product.barcode) {
+                data.barcode = product.barcode.trim()
+            }
+
+            if (product.model) {
+                data.model = product.model.trim()
+            }
+
+            if (product.description) {
+                data.description = product.description.trim()
+            }
+
+            if (product.short_description) {
+                data.short_description = product.short_description.trim()
+            }
+
+            if (product.brand) {
+                data.brand = product.brand
+            }
 
             const newEntry = await strapi.entityService.create('api::product.product', {
-                data: product,
+                data: data,
             });
-
-            importRef.related_entries.push(await newEntry.id)
-            importRef.created += 1;
-
-            const imageUrls = product.ImageURLS.map(x => x.url)
 
             //Κατευάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
             let responseImage = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getAndConvertImgToWep(imageUrls, product, newEntry.id, auth);
+                .getAndConvertImgToWep(data, newEntry.id, auth);
 
-            //Δημιουργώ αυτόματα το SEO για το προϊόν
-            const saveSEO = await strapi
+            //Δημιουργώ αυτόματα το SEO για το προϊόν 
+            await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .saveSEO(responseImage.mainImageID.data[0], product, newEntry.id);
 
-            await saveSEO
+            importRef.related_entries.push(newEntry.id)
+            if (product.relativeProducts && product.relativeProducts.length > 0)
+                importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
+
+            importRef.created += 1;
+            console.log("Created:", importRef.created)
         } catch (error) {
-            console.log("Error in Entry Function:", error)
+            console.log("Error in Entry Function:", error, error.details?.errors)
         }
 
     },
 
-    async updateEntry(parsedDataTitles, entry, entryCheck, brandId,
-        importRef, productUrl, categories_map) {
+    async importScrappedProduct(product, importRef, auth) {
+        try {
+            if (!product.wholesale || isNaN(product.wholesale))
+                return;
+
+            // Αν δεν είναι Διαθέσιμο τότε προχώρα στο επόμενο
+            const isAvailable = this.filterScrappedProducts(importRef.categoryMap, product);
+
+            if (!isAvailable)
+                return
+
+            const { entryCheck, brandId } = await this.checkProductAndBrand(product.mpn, product.name, product.barcode, product.brand_name, product.model);
+
+            //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
+            const { mapCharNames, mapCharValues } = importRef.charMaps
+
+            const parsedChars = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .parseChars(product.prod_chars, mapCharNames, mapCharValues)
+
+            product.brand = { id: brandId }
+            product.prod_chars = parsedChars
+
+            if (!entryCheck) {
+                try {
+                    await this.createEntry(product, importRef, auth)
+                    // console.log("New Product:", product.name)
+
+                    // //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
+                    // const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
+
+                    // const price_progress_data = this.createPriceProgress(product)
+
+                    // const supplierInfo = [this.createSupplierInfoData(product.entry, product, price_progress_data)]
+
+                    // const productPrice = await this.setPrice(null, supplierInfo, categoryInfo, brandId);
+
+                    // const data = {
+                    //     name: product.name,
+                    //     slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
+                    //     category: categoryInfo.id,
+                    //     price: parseFloat(productPrice).toFixed(2),
+                    //     publishedAt: new Date(),
+                    //     status: product.status.trim(),
+                    //     related_import: product.entry.id,
+                    //     supplierInfo: supplierInfo,
+                    //     prod_chars: product.prod_chars,
+                    //     ImageURLS: product.imagesSrc,
+
+                    //     // short_description: product.short_description,
+                    //     // description: product.description,                        
+                    //     // mpn: product.mpn ? product.mpn : null,                        
+                    //     // brand: { id: brandId },                        
+                    // }
+
+                    // if (product.entry.name === "Novatron" && product.short_description) {
+                    //     let result = product.short_description.match(/[0-9].[0-9]mm/g)
+                    //     if (result) {
+                    //         data.name = `${product.name}-${result[0]}`;
+                    //         data.slug = slugify(`${product.name}-${result[0]}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
+
+                    //         // console.log(result[0])
+                    //     }
+                    // }
+
+                    // if (product.mpn) {
+                    //     data.mpn = product.mpn.trim()
+                    // }
+
+                    // if (product.barcode) {
+                    //     data.barcode = product.barcode.trim()
+                    // }
+
+                    // if (product.model) {
+                    //     data.model = product.model.trim()
+                    // }
+
+                    // if (product.description) {
+                    //     data.description = product.description.trim()
+                    // }
+
+                    // if (product.short_description) {
+                    //     data.short_description = product.short_description.trim()
+                    // }
+
+                    // if (brandId) {
+                    //     data.brand = { id: brandId }
+                    // }
+
+                    // const newEntry = await strapi.entityService.create('api::product.product', {
+                    //     data: data,
+                    // });
+
+                    // //Κατεβάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
+                    // let responseImage = await strapi
+                    //     .plugin('import-products')
+                    //     .service('helpers')
+                    //     .getAndConvertImgToWep(data, newEntry.id, auth);
+
+                    // // //Δημιουργώ αυτόματα το SEO για το προϊόν
+                    // await strapi
+                    //     .plugin('import-products')
+                    //     .service('helpers')
+                    //     .saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
+
+                    // importRef.related_entries.push(newEntry.id)
+                    // if (product.relativeProducts && product.relativeProducts.length > 0)
+                    //     importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
+
+                    // importRef.created += 1;
+                    // console.log("Created:", importRef.created)
+                } catch (error) {
+                    console.log("entryCheck:", entryCheck, "mpn:", product.mpn, "name:", product.name,
+                        "barcode:", product.barcode, "brand_name:", product.brand_name, "model:", product.model)
+                    console.log(error, error.details?.errors)
+                }
+            }
+            else {
+                try {
+                    await this.updateEntry(entryCheck, product, importRef)
+                    // console.log("Existed Data:", product.name)
+
+                    // //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
+                    // const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
+
+                    // importRef.related_entries.push(entryCheck.id)
+
+                    // if (product.relativeProducts && product.relativeProducts.length > 0)
+                    //     importRef.related_products.push({ productID: entryCheck.id, relatedProducts: product.relativeProducts })
+
+                    // let supplierInfo = entryCheck.supplierInfo
+                    // const relatedImport = entryCheck.related_import;
+                    // const relatedImportId = relatedImport.map(x => x.id)
+
+                    // const findImport = relatedImport.findIndex(x =>
+                    //     x.id === product.entry.id)
+
+                    // if (findImport === -1) { relatedImportId.push(product.entry.id) }
+
+                    // const { updatedSupplierInfo, isUpdated } = await strapi
+                    //     .plugin('import-products')
+                    //     .service('helpers')
+                    //     .updateSupplierInfo(product.entry, product, supplierInfo)
+
+                    // if (isUpdated) {
+                    //     supplierInfo = updatedSupplierInfo
+                    // }
+
+                    // const productPrice = await strapi
+                    //     .plugin('import-products')
+                    //     .service('helpers')
+                    //     .setPrice(entryCheck, supplierInfo, categoryInfo, brandId);
+
+                    // await strapi.entityService.update('api::product.product', entryCheck.id, {
+                    //     data: {
+                    //         // name: product.productTitle,
+                    //         category: categoryInfo.id,
+                    //         model: product.model ? product.model : null,
+                    //         price: parseFloat(productPrice),
+                    //         supplierInfo: supplierInfo,
+                    //         related_import: relatedImportId,
+                    //         publishedAt: new Date()
+                    //     },
+                    // });
+                    // importRef.updated += 1
+                    // console.log("Updated:", importRef.updated)
+                } catch (error) {
+                    console.log(error)
+                }
+            }
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async updateEntry(entryCheck, product, importRef) {
+
+        console.log("Existed Data:", product.name)
+
+        //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
+        const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
+
+        let dbChange = ''
         const data = {}
 
         importRef.related_entries.push(entryCheck.id)
-        const supplierInfo = entryCheck.supplierInfo;
+
+        if (product.relativeProducts && product.relativeProducts.length > 0)
+            importRef.related_products.push({ productID: entryCheck.id, relatedProducts: product.relativeProducts })
+
+        let supplierInfo = entryCheck.supplierInfo;
         const relatedImport = entryCheck.related_import;
         const relatedImportId = relatedImport.map(x => x.id)
 
         const findImport = relatedImport.findIndex(x =>
-            x.id === entry.id)
+            x.id === product.entry.id)
 
-        if (findImport === -1) { data.related_import = [...relatedImportId, entry.id] }
+        if (findImport === -1) { data.related_import = [...relatedImportId, product.entry.id] }
 
-        const categoryInfo = await strapi
-            .plugin('import-products')
-            .service('helpers')
-            .getCategory(categories_map, parsedDataTitles.title, parsedDataTitles.category_1, parsedDataTitles.category_2, parsedDataTitles.category_3);
-
-        console.log(categoryInfo)
-        // if (categoryInfo.id === 51)
-        //     {console.log(parsedDataTitles.title, parsedDataTitles.category_1, parsedDataTitles.category_2, parsedDataTitles.category_3)}
-        if (entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
+        if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
             data.category = categoryInfo.id
             console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.category)
         }
 
-        let isSupplierInfoChanged = false;
+        const { updatedSupplierInfo, isUpdated } = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .updateSupplierInfo(product.entry, product, supplierInfo)
 
-        let searchSupplierInfoIndex = supplierInfo.findIndex(o => o.name === entry.name)
-
-        if (searchSupplierInfoIndex !== -1) {
-            const price_progress = supplierInfo[searchSupplierInfoIndex].price_progress;
-
-            if (parseFloat(supplierInfo[searchSupplierInfoIndex].wholesale).toFixed(2) !== parsedDataTitles.price || price_progress.length === 0) {
-                price_progress.push({
-                    date: new Date(),
-                    wholesale: parsedDataTitles.price
-                })
-
-                supplierInfo[searchSupplierInfoIndex] = {
-                    name: entry.name,
-                    wholesale: parseFloat(parsedDataTitles.price),
-                    recycle_tax: parsedDataTitles.recycleTax ? parseFloat(parsedDataTitles.recycleTax) : 0,
-                    supplierProductId: parsedDataTitles.supplierCode.toString(),
-                    supplierProductURL: productUrl,
-                    price: parsedDataTitles.suggestedPrice ? parseFloat(parsedDataTitles.suggestedPrice) : 0,
-                    price_progress: price_progress,
-                }
-
-                isSupplierInfoChanged = true;
-            }
-        }
-        else {
-            supplierInfo.push({
-                name: entry.name,
-                wholesale: parsedDataTitles.price,
-                recycle_tax: parsedDataTitles.recycleTax ? parseFloat(parsedDataTitles.recycleTax) : 0,
-                supplierProductId: parsedDataTitles.supplierCode.toString(),
-                supplierProductURL: productUrl,
-                price: parsedDataTitles.suggestedPrice ? parseFloat(parsedDataTitles.suggestedPrice) : 0,
-                price_progress: [{
-                    date: new Date(),
-                    wholesale: parsedDataTitles.price
-                }]
-            })
-            isSupplierInfoChanged = true;
-        }
-
-        if (isSupplierInfoChanged) {
-            console.log("New supplier!!!!!!!!")
+        if (isUpdated) {
             const productPrice = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .setPrice(entryCheck, supplierInfo, categoryInfo, brandId);
+                .setPrice(entryCheck, supplierInfo, categoryInfo, product.brand.id);
 
-            data.price = parseFloat(productPrice).toFixed(2)
-            data.supplierInfo = supplierInfo
+            data.price = parseFloat(productPrice)
+            data.supplierInfo = updatedSupplierInfo
+            data.model = product.model ? product.model : null
+            data.publishedAt = new Date()
+            data.deletedAt = null
         }
-
-
-        // return { supplierInfo, relatedImportId, productPrice }
-        // console.log("categoryInfo:", categoryInfo, "productPrice:", productPrice)
 
         if (Object.keys(data).length !== 0) {
-            console.log(data)
-            if (entryCheck.publishedAt === null) { data.publishedAt = new Date() }
+            if (entryCheck.publishedAt === null) {
+                data.publishedAt = new Date()
+                data.deletedAt = null
+            }
             await strapi.entityService.update('api::product.product', entryCheck.id, {
                 data: data
-                // {
-                //     price: parseFloat(productPrice),
-                //     publishedAt: new Date(),
-                //     // supplierInfo: supplierInfo,
-                //     related_import: relatedImportId, 
-                //     // ImageURLS:  
-                // },
             });
-            importRef.updated += 1
+            dbChange = 'updated'
         }
-        else {
-            importRef.skipped += 1
+        // else {
+        //     importRef.skipped += 1
+        // }
+
+        switch (dbChange) {
+            case 'republished':
+                importRef.republished += 1
+                console.log("Republished:", importRef.republished)
+                break;
+            case 'updated':
+                importRef.updated += 1
+                console.log("Update:", importRef.updated)
+                break;
+            case 'created':
+                importRef.created += 1
+                console.log("Created:", importRef.created)
+                break;
+            default:
+                importRef.skipped += 1
+                console.log("Skipped:", importRef.skipped)
+                break;
         }
         // const imgUrls = []
 
@@ -2367,54 +2522,74 @@ module.exports = ({ strapi }) => ({
 
     async deleteEntry(entry, importRef) {
 
-        const importXmlFile = await strapi.entityService.findMany('plugin::import-products.importxml',
+        const importXmlFile = await strapi.entityService.findOne('plugin::import-products.importxml', entry.id,
             {
                 populate: {
                     related_products: {
                         filters: {
-                            $not: {
-                                publishedAt: null
-                            }
+                            $and: [
+                                {
+                                    $not: {
+                                        publishedAt: null
+                                    }
+                                },
+                                {
+                                    supplierInfo: {
+                                        $and: [
+                                            { name: entry.name },
+                                            { in_stock: true },
+                                        ]
+                                    }
+                                },
+                            ]
                         },
                     }
                 },
-                filters: { id: entry.id },
             });
 
-        for (let product of importXmlFile[0].related_products) {
+        for (let product of importXmlFile.related_products) {
 
             if (!importRef.related_entries.includes(product.id)) {
+
+                const data = {}
                 const checkProduct = await strapi.entityService.findOne('api::product.product', product.id, {
                     // fields: ['supplierInfo', 'name'],
-                    populate: { supplierInfo: true },
+                    populate: {
+                        supplierInfo: true,
+                        related_import: true
+                    },
                 })
 
                 let supplierInfo = checkProduct.supplierInfo
 
-                if (supplierInfo.length > 1) {
-                    const index = supplierInfo.findIndex((o) => {
-                        return o.name === entry.name
-                    })
-                    supplierInfo.splice(index, 1)
+                const index = supplierInfo.findIndex((o) => {
+                    return o.name === entry.name
+                })
 
-                    await strapi.entityService.update('api::product.product', product.id, {
-                        data: {
-                            supplierInfo: supplierInfo,
-                        },
-                    });
-                    importRef.updated += 1
+                if (index === -1) {
+                    let relatedImports = checkProduct.related_import.filter(x => x.id !== entry.id)
+                    data.related_import = relatedImports
                 }
                 else {
-                    console.log("Product Deleted:", product.name)
-                    await strapi.entityService.update('api::product.product', product.id, {
-                        data: {
-                            publishedAt: null,
-                            is_fixed_price: false,
-                        },
-                    });
-                    // await strapi.entityService.delete('api::product.product', product.id)
-                    importRef.deleted += 1;
+                    // console.log(supplierInfo, index)
+                    supplierInfo[index].in_stock = false;
                 }
+
+                const isAllSuppliersOutOfStock = supplierInfo.every(supplier => supplier.in_stock === false)
+                // supplierInfo.splice(index, 1)
+                console.log("Product Deleted:", product.name)
+                if (!isAllSuppliersOutOfStock) {
+                    data.supplierInfo = supplierInfo
+
+                }
+                else {
+                    data.publishedAt = null
+                    data.deletedAt = new Date();
+                }
+                await strapi.entityService.update('api::product.product', product.id, {
+                    data: data,
+                });
+                importRef.deleted += 1;
             }
         }
 

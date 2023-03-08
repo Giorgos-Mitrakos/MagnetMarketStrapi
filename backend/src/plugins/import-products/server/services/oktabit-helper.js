@@ -41,23 +41,23 @@ module.exports = ({ strapi }) => ({
             // Φιλτράρω τα προϊόντα
             const availableProducts = this.filterData(productsPrices.prices.product, categoryMap)
 
-            
+
             console.log("Προϊόντα μετά το φιλτράρισμα:", availableProducts.length)
 
-            console.log("Ενοποίηση των xml...") 
+            console.log("Ενοποίηση των xml...")
             for (let prod of availableProducts) {
                 const product = {
                     supplierCode: prod.code[0].trim(),
-                    category_1: prod.category[0].trim(), 
-                    category_2: prod.subcategory[0].trim(),
-                    category_3: '',
-                    partNumber: prod.part_no[0].trim().toString(),
-                    title: prod.titlos[0].trim(),
-                    price: parseFloat(prod.timi[0].replace(',', '.')).toFixed(2),
-                    suggestedPrice: parseFloat(prod.lianiki[0]).toFixed(2),
-                    status: prod.availability[0].trim(),
-                    recycleTax: parseFloat(prod.anakykl[0]).toFixed(2),
-                    brandName: prod.brand[0].trim(),
+                    category: { title: prod.category[0].trim() },
+                    subcategory: { title: prod.subcategory[0].trim() },
+                    sub2category: { title: null },
+                    mpn: prod.part_no[0].trim().toString(),
+                    name: prod.titlos[0].trim(),
+                    wholesale: parseFloat(prod.timi[0].replace(',', '.')).toFixed(2),
+                    retail_price: parseFloat(prod.lianiki[0].replace(',', '.')).toFixed(2),
+                    stockLevel: prod.availability[0].trim(),
+                    recycleTax: parseFloat(prod.anakykl[0].replace(',', '.')).toFixed(2),
+                    brand_name: prod.brand[0].trim(),
                     barcode: prod.ean_code[0].trim()
                 }
                 const productDescription = productsDescriptions.perigrafes.product.filter(x => x.code[0] === prod.code[0])
@@ -97,10 +97,11 @@ module.exports = ({ strapi }) => ({
                     imageUrls.push({ url: `https://www.oktabit.gr/media/products/${product.supplierCode}/${product.supplierCode}_${j}.jpg` })
                 }
 
-                product.ImageURLS = imageUrls
+                product.imagesSrc = imageUrls
 
                 products.push(product)
             }
+            console.log("Η ενοποίηση των xml ολοκληρώθηκε...")
 
             return products
         } catch (error) {

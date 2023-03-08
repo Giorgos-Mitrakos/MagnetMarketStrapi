@@ -5,9 +5,9 @@ const xlsx = require('xlsx')
 
 module.exports = ({ strapi }) => ({
   async getPlatforms() {
-    const platforms = await strapi.db.query('plugin::platforms-scraper.platform').findMany({
+    const platforms = await strapi.db.query('api::platform.platform').findMany({
       populate: {
-        categories: true,
+        platformCategories: true,
         merchantFeeCatalogue: true
       }
     })
@@ -18,7 +18,7 @@ module.exports = ({ strapi }) => ({
     try {
       await this.updatePlatformCategories(platform)
 
-      const categoriesToScrap = platform.categories.filter(category => category.isChecked === true)
+      const categoriesToScrap = platform.platformCategories.filter(category => category.isChecked === true)
 
       // const browser = await puppeteer.launch()
       const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
@@ -43,7 +43,7 @@ module.exports = ({ strapi }) => ({
 
   async updatePlatformCategories(platform) {
     try {
-      for (let category of platform.categories) {
+      for (let category of platform.platformCategories) {
         await strapi.entityService.update('plugin::platforms-scraper.platform-category', category.id,
           {
             data: {
@@ -58,13 +58,17 @@ module.exports = ({ strapi }) => ({
 
   async updateCategoriesMerchantFee({ name }) {
     try {
-      const platform = await strapi.db.query('plugin::platforms-scraper.platform').findOne({
+      const platform = await strapi.db.query('api::platform.platform').findOne({
         where: { name: name },
         populate: {
           categories: true,
           merchantFeeCatalogue: true
         }
       })
+
+      if (!platform.merchantFeeCatalogue)
+        return
+
       const wb = xlsx.readFile(`./public${platform.merchantFeeCatalogue.url}`)
       const ws = wb.Sheets['Τιμοκατάλογος προμηθειών']
       const data = xlsx.utils.sheet_to_json(ws)

@@ -134,8 +134,9 @@ module.exports = ({ strapi }) => ({
 
                             const productBody = prod.querySelector('.product-body')
                             const productTitleAnchor = productBody.querySelector('.product-title>a')
-                            product.title = productTitleAnchor.textContent.trim()
-                            product.brand_name = product.title.split("-")[0].trim()
+                            product.name = productTitleAnchor.textContent.trim()
+                            product.short_description = productBody.querySelector('.mini-description').textContent.trim()
+                            product.brand_name = product.name.split("-")[0].trim()
                             product.wholesale = productBody.querySelector('.product-price>div>div>span').textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
                             product.supplierCode = productBody.querySelector('.product-code').textContent.trim()
                             const stockLevelWrapper = productBody.querySelector('div>p>img');
@@ -200,7 +201,7 @@ module.exports = ({ strapi }) => ({
                 const productImages = productImageWrapper.querySelectorAll("img");
                 product.imagesSrc = []
                 for (let imgSrc of productImages) {
-                    product.imagesSrc.push(`https://novatronsec.com${imgSrc.getAttribute('src')}`)
+                    product.imagesSrc.push({ url: `https://novatronsec.com${imgSrc.getAttribute('src')}` })
                 }
 
                 const inOfferImage = productDetailsSection.querySelector(".active .product-image-badge");
@@ -210,8 +211,8 @@ module.exports = ({ strapi }) => ({
                 else {
                     product.in_offer = false
                 }
-                product.title = productDetailsSection.querySelector("h1.product-title").textContent.trim();
-                product.brand_name = product.title.split("-")[0].trim()
+                product.name = productDetailsSection.querySelector("h1.product-title").textContent.trim();
+                product.brand_name = product.name.split("-")[0].trim()
                 product.short_description = productDetailsSection.querySelector("p.mini-description").textContent.trim();
                 const productPriceWrapper = productDetailsSection.querySelector("div.product-price");
                 product.wholesale = productPriceWrapper.querySelector("span").textContent.replace('€', '').replace(',', '.').trim();
@@ -227,15 +228,19 @@ module.exports = ({ strapi }) => ({
                 switch (stockLevelImg) {
                     case '3':
                         product.stockLevel = "InStock"
+                        product.status = "InStock"
                         break;
                     case '2':
                         product.stockLevel = "MediumStock"
+                        product.status = "MediumStock"
                         break;
                     case '1':
                         product.stockLevel = "LowStock"
+                        product.status = "LowStock"
                         break;
                     default:
                         product.stockLevel = "OutOfStock"
+                        product.status = "OutOfStock"
                         break;
                 }
 
@@ -298,16 +303,22 @@ module.exports = ({ strapi }) => ({
             scrapProduct.mpn = productID.toString()
             scrapProduct.supplierCode = productID.toString()
             scrapProduct.link = productUrl
+            scrapProduct.entry = entry
+            scrapProduct.category = { title: category }
+            scrapProduct.subcategory = { title: subcategory }
+            scrapProduct.sub2category = { title: null }
 
-            let importProduct = await this.importNovatronProduct(scrapProduct, `https://novatronsec.com${productLink}`, category, subcategory,
-                importRef, entry, auth)
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .importScrappedProduct(scrapProduct, importRef, entry, auth)
 
         } catch (error) {
             console.log(error)
         }
     },
 
-    async importNovatronProduct(product, productLink, category, subcategory,
+    async importNovatronProduct(product, category, subcategory,
         importRef, entry, auth) {
         try {
             // Αν δεν είναι Διαθέσιμο τότε προχώρα στο επόμενο
@@ -322,13 +333,13 @@ module.exports = ({ strapi }) => ({
             const { entryCheck, brandId } = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .checkProductAndBrand(product.mpn, product.title, product.barcode, product.brand_name, product.model);
+                .checkProductAndBrand(product.mpn, product.name, product.barcode, product.brand_name, product.model);
 
             //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
             const categoryInfo = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getCategory(importRef.categoryMap.categories_map, product.title, category, subcategory, null);
+                .getCategory(importRef.categoryMap.categories_map, product.name, category, subcategory, null);
 
             // console.log("categoryInfo:", categoryInfo)
 
@@ -361,24 +372,54 @@ module.exports = ({ strapi }) => ({
 
                     const productPrice = await strapi
                         .plugin('import-products')
-                        .service('helpers') 
+                        .service('helpers')
                         .setPrice(product.wholesale, supplierInfo, categoryInfo, brandId);
 
                     const data = {
-                        name: product.title,
-                        short_description: product.short_description,
-                        description: product.description,
+                        name: product.name,
+                        slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
                         category: categoryInfo.id,
                         price: parseFloat(productPrice).toFixed(2),
-                        mpn: product.mpn ? product.mpn : null,
-                        slug: slugify(`${product.title}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
                         publishedAt: new Date(),
                         status: product.stockLevel,
-                        brand: { id: brandId },
                         related_import: entry.id,
                         supplierInfo: supplierInfo,
                         prod_chars: parsedChars,
                         ImageURLS: imageUrls,
+
+                        // short_description: product.short_description,
+                        // description: product.description,
+
+                        // mpn: product.mpn ? product.mpn : null,
+
+
+
+                        // brand: { id: brandId },
+
+                    }
+
+                    if (product.mpn) {
+                        data.mpn = product.mpn
+                    }
+
+                    if (product.barcode) {
+                        data.barcode = product.barcode
+                    }
+
+                    if (product.model) {
+                        data.model = product.model
+                    }
+
+                    if (product.description) {
+                        data.description = product.description
+                    }
+
+                    if (product.short_description) {
+                        data.short_description = short_description.model
+                    }
+
+                    if (brandId) {
+                        data.brand = { id: brandId }
                     }
 
                     const newEntry = await strapi.entityService.create('api::product.product', {

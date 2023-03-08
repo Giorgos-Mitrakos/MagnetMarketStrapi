@@ -12,7 +12,7 @@
     },
     "pluginOptions": {
         "content-manager": {
-            "visible": true
+            "visible": false
         },
         "content-type-builder": {
             "visible": false
@@ -53,8 +53,8 @@
         "platform": {
             "type": "relation",
             "relation": "manyToOne",
-            "target": "plugin::platforms-scraper.platform",
-            "inversedBy": "categories"
+            "target": "api::platform.platform",
+            "inversedBy": "platformCategories"
         }
     }
 }

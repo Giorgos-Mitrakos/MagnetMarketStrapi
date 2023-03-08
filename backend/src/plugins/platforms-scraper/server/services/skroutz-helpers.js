@@ -83,16 +83,16 @@ module.exports = ({ strapi }) => ({
                 }
             }
 
-            const platforms = await strapi.entityService.findMany('plugin::platforms-scraper.platform', {
+            const platforms = await strapi.entityService.findMany('api::platform.platform', {
                 where: {
                     name: name
                 },
                 populate: {
-                    categories: true
+                    platformCategories: true
                 }
-            })
+            }) 
 
-            for (let category of platforms[0].categories) {
+            for (let category of platforms[0].platformCategories) {
                 if (!categoriesList.includes(category.name)) {
                     await strapi.entityService.delete('plugin::platforms-scraper.platform-category', category.id)
                 }

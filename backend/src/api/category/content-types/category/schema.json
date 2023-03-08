@@ -43,17 +43,11 @@
         "videos"
       ]
     },
-    "incl_cat_coupon": {
+    "include_platform": {
       "type": "relation",
       "relation": "manyToOne",
-      "target": "api::coupon.coupon",
-      "inversedBy": "includes_categories"
-    },
-    "excl_cat_coupon": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::coupon.coupon",
-      "inversedBy": "excluded_categories"
+      "target": "plugin::export-platforms-xml.categoriesexportmap",
+      "inversedBy": "included_categories"
     },
     "cat_percentage": {
       "type": "component",

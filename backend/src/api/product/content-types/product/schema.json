@@ -124,18 +124,6 @@
       "target": "api::tag.tag",
       "inversedBy": "products"
     },
-    "incl_prod_coupon": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::coupon.coupon",
-      "inversedBy": "included_products"
-    },
-    "excl_prod_coupon": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::coupon.coupon",
-      "inversedBy": "excluded_products"
-    },
     "seo": {
       "type": "component",
       "repeatable": true,
@@ -182,6 +170,9 @@
     },
     "model": {
       "type": "string"
+    },
+    "deletedAt": {
+      "type": "datetime"
     }
   }
 }

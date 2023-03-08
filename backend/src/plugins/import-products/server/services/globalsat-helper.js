@@ -118,7 +118,7 @@ module.exports = ({ strapi }) => ({
             await browser.close();
 
         } catch (error) {
-            console.error(error)
+            console.error(error, importRef, entry, auth)
         }
     },
 
@@ -191,7 +191,7 @@ module.exports = ({ strapi }) => ({
                     const productInfoWrapper = prod.querySelector('.product_info');
                     const productTitleAnchor = productInfoWrapper.querySelector('h2 a');
                     product.link = productTitleAnchor.getAttribute('href');
-                    product.title = productTitleAnchor.textContent.trim();
+                    product.name = productTitleAnchor.textContent.trim();
                     product.supplierCode = productInfoWrapper.querySelector('.product_code span').textContent.trim();
 
                     const productPriceWrapper = productInfoWrapper.querySelector('.price_row');
@@ -237,11 +237,11 @@ module.exports = ({ strapi }) => ({
             }
 
         } catch (error) {
-            console.error(error)
+            console.error(error, importRef, entry, auth)
         }
     },
 
-    async scrapGlobalsatProduct(page, category, subCategory, sub2Category, productLink, importRef, entry, auth) {
+    async scrapGlobalsatProduct(page, category, subcategory, sub2category, productLink, importRef, entry, auth) {
         try {
             await page.goto(productLink, { waitUntil: "networkidle0" });
 
@@ -252,7 +252,7 @@ module.exports = ({ strapi }) => ({
                 const product = {}
 
                 const productContainer = document.querySelector('div.product_container');
-                product.title = productContainer.querySelector('div.main_prod_title h1').textContent;
+                product.name = productContainer.querySelector('div.main_prod_title h1').textContent;
                 const productCodesWrapper = productContainer.querySelectorAll('div.product_code>span');
 
                 for (let code of productCodesWrapper) {
@@ -275,13 +275,24 @@ module.exports = ({ strapi }) => ({
                 product.imagesSrc = []
                 for (let productImgUrl of productImgUrlsWrapper) {
                     let imgURL = productImgUrl.getAttribute("src")
-                    product.imagesSrc.push(imgURL)
+                    product.imagesSrc.push({ url: imgURL })
                 }
 
                 const productInfo = productContainer.querySelector('div.product_info');
                 const productTag = productInfo.querySelector('div.tag_line');
-                const productAvailability = productTag.querySelector('span').textContent.trim();
-                product.stockLevel = productAvailability
+                product.stockLevel = productTag.querySelector('span').textContent.trim();
+
+                switch (product.stockLevel) {
+                    case 'Διαθέσιμο':
+                        product.status = "InStock"
+                        break;
+                    case 'Αναμένεται Σύντομα':
+                        product.status = "OutOfStock"
+                        break;
+                    default:
+                        product.status = "OutOfStock"
+                        break;
+                }
 
                 const suggestedPriceWrapper = productInfo.querySelector("div.trade");
                 const suggestedPrices = suggestedPriceWrapper.querySelectorAll("span.price");
@@ -324,8 +335,15 @@ module.exports = ({ strapi }) => ({
                 return product
             })
             scrapProduct.supplierProductURL = productLink
+            scrapProduct.entry = entry
+            scrapProduct.category = category
+            scrapProduct.subcategory = subcategory
+            scrapProduct.sub2category = sub2category
 
-            await this.importGlobalsatProduct(scrapProduct, category, subCategory, sub2Category, importRef, entry, auth)
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .importScrappedProduct(scrapProduct, importRef, entry, auth)
 
         } catch (error) {
             console.error(error)
@@ -335,7 +353,7 @@ module.exports = ({ strapi }) => ({
     async importGlobalsatProduct(product, category,
         subcategory, sub2category, importRef, entry, auth) {
         try {
-            console.log(product.title, category.title, subcategory.title, sub2category.title)
+            console.log(product.name, category.title, subcategory.title, sub2category.title)
             // Αν δεν είναι Διαθέσιμο τότε προχώρα στο επόμενο
             const isAvailable = await strapi
                 .plugin('import-products')
@@ -348,13 +366,13 @@ module.exports = ({ strapi }) => ({
             const { entryCheck, brandId } = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .checkProductAndBrand(product.mpn, product.title, product.barcode, product.brand_name, product.model);
+                .checkProductAndBrand(product.mpn, product.name, product.barcode, product.brand_name, product.model);
 
             // Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
             const categoryInfo = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getCategory(importRef.categoryMap.categories_map, product.title, category.title, subcategory.title, sub2category.title);
+                .getCategory(importRef.categoryMap.categories_map, product.name, category.title, subcategory.title, sub2category.title);
 
             if (!entryCheck) {
                 try {
@@ -387,20 +405,41 @@ module.exports = ({ strapi }) => ({
                         .setPrice(product, supplierInfo, categoryInfo, brandId);
 
                     const data = {
-                        name: product.title,
-                        description: product.description,
+                        name: product.name,
+                        slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
                         category: categoryInfo.id,
                         price: parseFloat(productPrice).toFixed(2),
-                        mpn: product.mpn ? product.mpn : null,
-                        barcode: product.barcode ? product.barcode : null,
-                        slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
                         publishedAt: new Date(),
-                        status: "InStock",
-                        // brand: { id: product.brandId },
+                        status: product.stockLevel,
                         related_import: entry.id,
                         supplierInfo: supplierInfo,
                         prod_chars: parsedChars,
                         ImageURLS: imageUrls,
+
+                        // description: product.description,
+
+                        // mpn: product.mpn ? product.mpn : null,
+                        // barcode: product.barcode ? product.barcode : null,                        
+                    }
+
+                    if (product.mpn) {
+                        data.mpn = product.mpn
+                    }
+
+                    if (product.barcode) {
+                        data.barcode = product.barcode
+                    }
+
+                    if (product.model) {
+                        data.model = product.model
+                    }
+
+                    if (product.description) {
+                        data.description = product.description
+                    }
+
+                    if (product.short_description) {
+                        data.short_description = short_description.model
                     }
 
                     if (brandId) {
@@ -429,6 +468,7 @@ module.exports = ({ strapi }) => ({
                         .saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
 
                 } catch (error) {
+                    console.error(error, importRef, entry, auth)
                     console.log(error, error.details?.errors)
                 }
             }
@@ -472,7 +512,7 @@ module.exports = ({ strapi }) => ({
                 }
             }
         } catch (error) {
-            console.log(error)
+            console.error(error, importRef, entry, auth)
         }
     },
 

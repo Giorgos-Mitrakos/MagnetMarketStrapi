@@ -35,7 +35,7 @@ const PlatformsScreen = () => {
 
         const newPlatforms = platforms.map(x => {
             if (x.name === platform.name) {
-                x.categories.map(cat => {
+                x.platformCategories.map(cat => {
                     if (cat.id === categoryID) {
                         if (cat.isChecked === null) {
                             cat.isChecked = true
@@ -77,7 +77,7 @@ const PlatformsScreen = () => {
                                     </GridItem>
                                     <GridItem col={12} paddingTop={8}>
                                         <Grid direction="column" alignItems="flex-start">
-                                            {platform.categories.map(category =>
+                                            {platform.platformCategories.map(category =>
                                                 <GridItem key={category.id} col={4}>
                                                     <Checkbox checked={category.isChecked ? category.isChecked : false} onClick={() => handleCheckBoxClick(platform, category.id)}>{category.name} ({category.numberOfProducts})</Checkbox>
                                                 </GridItem>

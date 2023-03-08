@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * coupon service.
+ * platform service
  */
 
 const { createCoreService } = require('@strapi/strapi').factories;
 
-module.exports = createCoreService('api::coupon.coupon');
+module.exports = createCoreService('api::platform.platform');

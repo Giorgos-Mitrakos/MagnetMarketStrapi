@@ -10,6 +10,11 @@ module.exports = {
       resolve: './src/plugins/platforms-scraper'
     },
 
+    'export-platforms-xml': {
+      enabled: true,
+      resolve: './src/plugins/export-platforms-xml'
+    },
+
     upload: {
       config: {
         providerOptions: {
