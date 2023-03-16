@@ -20,3 +20,19 @@ export const getPlatforms = async () => {
         return null;
     }
 };
+
+export const savePlatformExportedCategories = async (platformID, categoriesID) => {
+    try {
+        const data = await request(`/${pluginId}/saveExportedCategories`, {
+            method: "POST",
+            body: {
+                platformID,
+                categoriesID
+            }
+        });
+
+        return data;
+    } catch (error) {
+        return null;
+    }
+};

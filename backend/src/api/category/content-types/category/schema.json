@@ -43,11 +43,11 @@
         "videos"
       ]
     },
-    "include_platform": {
+    "export_to_platform": {
       "type": "relation",
       "relation": "manyToOne",
-      "target": "plugin::export-platforms-xml.categoriesexportmap",
-      "inversedBy": "included_categories"
+      "target": "api::platform.platform",
+      "inversedBy": "export_categories"
     },
     "cat_percentage": {
       "type": "component",

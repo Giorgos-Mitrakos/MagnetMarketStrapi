@@ -3,7 +3,7 @@
         "tableName": "importxml",
         "singularName": "importxml",
         "pluralName": "importxmls",
-        "displayName": "import",
+        "displayName": "Supplier",
         "description": "Import products",
         "kind": "collectionType"
     },
@@ -21,6 +21,11 @@
     "attributes": {
         "name": {
             "type": "string",
+            "required": true
+        },
+        "availability": {
+            "type": "integer",
+            "default": 1,
             "required": true
         },
         "isUpload": {

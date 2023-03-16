@@ -32,6 +32,12 @@
       "relation": "oneToMany",
       "target": "plugin::platforms-scraper.platform-category",
       "mappedBy": "platform"
+    },
+    "export_categories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::category.category",
+      "mappedBy": "export_to_platform"
     }
   }
 }

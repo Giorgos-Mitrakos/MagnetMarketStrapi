@@ -341,7 +341,7 @@ module.exports = ({ strapi }) => ({
             scrapProduct.sub2category = sub2category
 
             await strapi
-                .plugin('import-products')
+                .plugin('import-products') 
                 .service('helpers')
                 .importScrappedProduct(scrapProduct, importRef, entry, auth)
 
