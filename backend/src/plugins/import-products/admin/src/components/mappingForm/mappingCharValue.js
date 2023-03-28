@@ -8,7 +8,7 @@ import { Typography } from '@strapi/design-system/Typography';
 import { TextInput } from '@strapi/design-system/TextInput';
 import { MappingContext } from '../../pages/Mapping/mappingcontext';
 
-const MappingCharacteristics = ({ characteristic }) => {
+const MappingCharacteristics = ({ key, characteristic }) => {
     const [importMapping, setImportMapping] = useContext(MappingContext)
     const [name, setName] = useState(characteristic.name)
     const [value, setValue] = useState(characteristic.value)
@@ -38,8 +38,8 @@ const MappingCharacteristics = ({ characteristic }) => {
     }
 
     return (
-        <Tr>
-            <Td>
+        <>
+            <Td  aria-colindex={1}>
                 <TextInput
                     name={name}
                     value={name}
@@ -47,7 +47,7 @@ const MappingCharacteristics = ({ characteristic }) => {
                     onChange={(e) => setName(e.target.value)}
                 />
             </Td>
-            <Td>
+            <Td  aria-colindex={2}>
                 <TextInput
                     name={value}
                     value={value}
@@ -55,10 +55,10 @@ const MappingCharacteristics = ({ characteristic }) => {
                     onChange={(e) => setValue(e.target.value)}
                 />
             </Td>
-            <Td>
+            <Td  aria-colindex={3}>
                 <IconButton noBorder onClick={() => handleDeleteCharValue()} label="Delete" icon={<Trash />} />
             </Td>
-        </Tr >
+        </>
     )
 }
 
@@ -80,7 +80,7 @@ const MappingCharValue = ({ mapping }) => {
 
     return (
         <Box padding={4} background="neutral100">
-            <Table colCount={2} rowCount={20}
+            <Table colCount={3} rowCount={20}
                 footer={<TFooter icon={<Plus />} onClick={() => handleAddCharTitle()}>Add another field to this collection type</TFooter>}>
                 <Thead>
                     <Tr>
@@ -97,7 +97,9 @@ const MappingCharValue = ({ mapping }) => {
                 </Thead>
                 <Tbody>
                     {mapping.length > 0 && mapping.map(item =>
-                        <MappingCharacteristics key={item.id} characteristic={item} />
+                        <Tr key={item.id}>
+                            <MappingCharacteristics characteristic={item} />
+                        </Tr>
                     )}
                 </Tbody>
             </Table>

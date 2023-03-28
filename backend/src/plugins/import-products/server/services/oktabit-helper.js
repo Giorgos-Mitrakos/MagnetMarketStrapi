@@ -60,29 +60,34 @@ module.exports = ({ strapi }) => ({
                     brand_name: prod.brand[0].trim(),
                     barcode: prod.ean_code[0].trim()
                 }
-                const productDescription = productsDescriptions.perigrafes.product.filter(x => x.code[0] === prod.code[0])
+                const productDescription = productsDescriptions?.perigrafes.product.filter(x => x.code[0] === prod.code[0])
 
-                const stripContent = productDescription[0]?.perigrafi[0].replace(/(<([^>]+)>)/ig, '').trim();
+                const stripContent = productDescription && productDescription[0]?.perigrafi[0].replace(/(<([^>]+)>)/ig, '').trim();
 
                 product.description = stripContent ? stripContent : ""
 
-                const chars = []
-                const productChars = productsChars.data.chars.filter(x => x.product[0] === prod.code[0])
 
-                for (let productChar of productChars) {
-                    const char = {}
-                    char.name = productChar.atribute[0]
-                    char.value = productChar.value[0]
-                    chars.push(char)
+                const chars = [] 
+                const productChars = productsChars?.data.chars.filter(x => x.product[0] === prod.code[0])
+
+                if (productChars) {
+                    for (let productChar of productChars) {
+                        const char = {}
+                        char.name = productChar.atribute[0]
+                        char.value = productChar.value[0]
+                        chars.push(char)
+                    }
                 }
 
-                const productChars2 = productsChars2.data.chars.filter(x => x.product[0] === prod.code[0])
+                const productChars2 = productsChars2?.data.chars.filter(x => x.product[0] === prod.code[0])
 
-                for (let productChar of productChars2) {
-                    const char = {}
-                    char.name = productChar.atribute[0]
-                    char.value = productChar.value[0]
-                    chars.push(char)
+                if (productChars2) { 
+                    for (let productChar of productChars2) {
+                        const char = {}
+                        char.name = productChar.atribute[0]
+                        char.value = productChar.value[0]
+                        chars.push(char)
+                    }
                 }
 
                 const parsedChars = await strapi

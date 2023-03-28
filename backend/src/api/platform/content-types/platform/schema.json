@@ -4,7 +4,8 @@
   "info": {
     "singularName": "platform",
     "pluralName": "platforms",
-    "displayName": "Platform"
+    "displayName": "Platform",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -38,6 +39,10 @@
       "relation": "oneToMany",
       "target": "api::category.category",
       "mappedBy": "export_to_platform"
+    },
+    "order_time": {
+      "type": "time",
+      "default": "11:50"
     }
   }
 }

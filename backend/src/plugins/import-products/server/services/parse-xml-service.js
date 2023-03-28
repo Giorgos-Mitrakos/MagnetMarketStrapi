@@ -165,7 +165,6 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
 
-            let numberOfSame = 0
             for (let dt of products) {
 
                 // console.log("MPN: ", dt.partNumber, " Barcode: ", dt.barcode)
@@ -324,7 +323,131 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
 
-            console.log(data)
+
+            console.log("Προϊόντα στο xml της Westnet:", data.products.product.length)
+            // Φιλτράρω τα προϊόντα
+            const availableProducts = await strapi
+                .plugin('import-products')
+                .service('westnetHelper')
+                .filterData(data.products.product, importRef.categoryMap)
+
+
+            console.log("Προϊόντα μετά το φιλτράρισμα:", availableProducts.length)
+            // console.log(availableProducts)
+
+            // let categories = data.products.product.map(x => x.category[0])
+
+            // const unique_names = [...new Set(categories)]
+
+            // console.log(unique_names)
+
+            const { categories_map, char_name_map, char_value_map, stock_map,
+                isWhitelistSelected, whitelist_map, blacklist_map,
+                xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+            // console.log("newData:", newData.length)
+            const charMaps = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .parseCharsToMap(char_name_map, char_value_map);
+
+            const { mapCharNames, mapCharValues } = charMaps
+
+            for (let dt of availableProducts) {
+
+                const { entryCheck, brandId } = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .checkProductAndBrand(dt.partNumber[0], dt.name[0], dt.barCode[0],
+                        dt.manufacturer[0], null);
+
+                //Κατασκευάζω το URL του προϊόντος του προμηθευτή
+                let productUrl = `https://www.mywestnet.com${dt.url[0]}`
+
+                const chars = []
+                // console.log(typeof dt.specs[0].spec)
+                if (dt.specs[0].spec) {
+                    for (let productChar of dt.specs[0].spec) {
+                        // console.log(char)
+                        const char = {}
+                        char.name = productChar.name[0]
+                        char.value = productChar.value[0]
+                        chars.push(char)
+                    }
+                }
+
+                const parsedChars = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .parseChars(chars, mapCharNames, mapCharValues)
+
+                const product = {
+                    entry,
+                    name: dt.name[0],
+                    supplierCode: dt.id[0],
+                    description: dt.description[0],
+                    category: { title: dt.category[0] },
+                    subcategory: { title: null },
+                    sub2category: { title: null },
+                    mpn: dt.partNumber[0],
+                    barcode: dt.barCode[0].toString(),
+                    // slug: dt.partNumber ? 
+                    //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                    //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                    // publishedAt: new Date(),
+                    stockLevel: parseInt(dt.availability[0]),
+                    wholesale: parseFloat(dt.price[0]).toFixed(2),
+                    imagesSrc: [{ url: dt.image[0] }],
+                    brand: { id: await brandId },
+                    recycleTax: parseFloat(dt.recycle_tax[0]).toFixed(2),
+                    link: productUrl,
+                    related_import: entry.id,
+                    // supplierInfo: [{
+                    //     name: entry.name,
+                    //     in_stock: true,
+                    //     wholesale: dt.price,
+                    //     recycle_tax: dt.recycleTax,
+                    //     supplierProductId: dt.supplierCode,
+                    //     supplierProductURL: productUrl,
+                    //     retail_price: dt.suggestedPrice,
+                    //     price_progress: [{
+                    //         date: new Date(),
+                    //         wholesale: dt.price,
+                    //     }]
+                    // }],
+                    prod_chars: parsedChars
+                }
+
+                //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+
+                if (!entryCheck) {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .createEntry(product, importRef, auth);
+
+                    } catch (error) {
+                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                    }
+                }
+                else {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .updateEntry(entryCheck, product, importRef);
+                    } catch (error) {
+                        console.log(error)
+                    }
+                }
+            }
+
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .deleteEntry(entry, importRef);
 
             console.log(importRef)
 
@@ -332,6 +455,7 @@ module.exports = ({ strapi }) => ({
             return { "message": "ok" }
         }
         catch (err) {
+            console.log(err)
             return { "message": "Error" }
         }
     },

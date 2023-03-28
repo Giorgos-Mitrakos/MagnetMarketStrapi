@@ -20,7 +20,9 @@ module.exports = {
                 return (prev.wholesale < current.wholesale) ? prev : current
             })
 
-            const newPrice = parseFloat(minWholesale.wholesale) * (taxRate / 100 + 1) * (generalCategoryPercentage.percentage / 100 + 1)
+            let addToPrice = generalCategoryPercentage.add_to_price ? generalCategoryPercentage.add_to_price : 0
+
+            const newPrice = parseFloat(minWholesale.wholesale + addToPrice) * (taxRate / 100 + 1) * (generalCategoryPercentage.percentage / 100 + 1)
 
             await strapi.entityService.update('api::product.product', product.id, {
                 data: {

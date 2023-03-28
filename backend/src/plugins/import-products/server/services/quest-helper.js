@@ -14,7 +14,9 @@ module.exports = ({ strapi }) => ({
                 categories: [],
             }
             // const browser = await puppeteer.launch()
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
+            const browser = await puppeteer.launch({ headless: false, 
+                executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                args: ['--no-sandbox', '--disable-setuid-sandbox'] });
             const page = await browser.newPage();
             await page.setViewport({ width: 1400, height: 600 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
@@ -115,11 +117,11 @@ module.exports = ({ strapi }) => ({
 
             // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, importRef, entry, auth)
             await browser.close();
-        } catch (error) {
+        } catch (error) { 
             console.log(error)
         }
     },
-
+ 
     async scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
@@ -151,7 +153,7 @@ module.exports = ({ strapi }) => ({
             }
         } catch (error) {
             console.log(error)
-        }
+        } 
     },
 
     async scrapQuestSubcategories2(page, category, subcategory, filteredCategories, importRef, entry, auth) {
@@ -238,7 +240,7 @@ module.exports = ({ strapi }) => ({
                     product.wholesale = priceWrapper.querySelector('.final-price').textContent.replace('€', '').replace(',', '.').trim()
 
                     product.stockLevel = productAvailability
-                    
+
                     products.push(product)
                 }
                 return products

@@ -7,7 +7,13 @@ module.exports = ({ strapi }) => ({
       populate: {
         export_categories: {
           populate: {
-            products: true
+            products: {
+              filters: {
+                publishedAt: {
+                  $not: null,
+                },
+              }
+            },
           }
         }
       }
@@ -19,11 +25,18 @@ module.exports = ({ strapi }) => ({
     const categories = await strapi.entityService.findMany('api::category.category', {
       sort: { name: 'asc' },
       populate: {
-        products: true
+        products: {
+          filters: {
+            publishedAt: {
+              $not: null,
+            },
+          }
+        },
       }
     })
     return await categories;
   },
+
   async saveExportCategories({ platformID, categoriesID }) {
     try {
       await strapi.entityService.update('api::platform.platform', platformID, {
@@ -32,7 +45,7 @@ module.exports = ({ strapi }) => ({
         }
       })
       return { message: 'ok' };
-    } catch (error) { 
+    } catch (error) {
       return { message: 'Something was wrong' };
     }
 

@@ -8,6 +8,7 @@ const oktabitHelper = require('./oktabit-helper');
 const novatronHelper = require('./novatron-helper');
 const questHelper = require('./quest-helper');
 const globalsatHelper = require('./globalsat-helper');
+const westnetHelper = require('./westnet-helper');
 
 module.exports = {
   getFileService,
@@ -18,5 +19,6 @@ module.exports = {
   novatronHelper,
   questHelper,
   globalsatHelper,
+  westnetHelper,
 };
 

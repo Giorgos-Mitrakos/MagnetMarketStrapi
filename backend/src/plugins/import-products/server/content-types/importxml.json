@@ -107,6 +107,10 @@
             "relation": "oneToMany",
             "target": "plugin::import-products.blacklistmap",
             "mappedBy": "related_import"
+        },
+        "order_time": {
+            "type": "time",
+            "default": "11:50"
         }
     }
 }

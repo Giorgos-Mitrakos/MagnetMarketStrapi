@@ -69,7 +69,26 @@ module.exports = {
     beforeCreate(event) {
         const { data, where, select, populate } = event.params;
 
-        event.params.data.slug = slugify(`${data.name}-${data.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
- 
+        event.params.data.slug = slugify(`${data.name}-${data.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
+
     },
+    // async beforeUpdate(event) {
+    //     const { data, where, select, populate } = event.params;
+
+    //     console.log(data.supplierInfo)
+
+    //     // const entry = await strapi.entityService.findOne('api::product.product', where.id, {
+    //     //     populate: { supplierInfo: true }
+    //     // });
+
+    //     // const isAllSuppliersOutOfStock = entry.supplierInfo.every(supplier => supplier.in_stock === false)
+
+    //     // if (isAllSuppliersOutOfStock && entry.publishedAt) {
+    //     //     const entry = await strapi.entityService.update('api::product.product', where.id, {
+    //     //         data: { publishedAt: null }
+    //     //     });
+    //     // }
+
+
+    // },
 };

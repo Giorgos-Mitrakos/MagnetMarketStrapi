@@ -26,7 +26,11 @@ module.exports = ({ strapi }) => ({
             }
 
             for (let product of products) {
-                // console.log(product) 
+                product.entry = entry
+                product.category = { title: category }
+                product.sub2category = { title: sub2category }
+                product.subcategory = { title: subcategory }
+                // console.log(product)
                 if (stockLevelFilter.includes(product.stockLevel) && product.wholesale) {
 
                     const checkIfEntry = await strapi.db.query('api::product.product').findOne({
@@ -65,71 +69,78 @@ module.exports = ({ strapi }) => ({
                     });
 
                     if (checkIfEntry) {
-                        let dbChange = ''
-                        const data = {}
-                        let supplierInfo = checkIfEntry.supplierInfo
+                        await this.updateEntry(checkIfEntry, product, importRef)
+                        // let dbChange = ''
+                        // const data = {}
 
-                        const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, category, subcategory, sub2category);
+                        // importRef.related_entries.push(checkIfEntry.id)
 
-                        data.category = categoryInfo.id
+                        // if (product.relativeProducts && product.relativeProducts.length > 0)
+                        //     importRef.related_products.push({ productID: checkIfEntry.id, relatedProducts: product.relativeProducts })
 
-                        if (!checkIfEntry.publishedAt) {
-                            data.publishedAt = new Date()
-                            data.deletedAt = null
-                            dbChange = 'republished'
-                        }
+                        // let supplierInfo = checkIfEntry.supplierInfo
 
-                        if (!checkIfEntry.brand) {
-                            const brandId = await this.brandIdCheck(null, checkIfEntry.name)
-                            if (brandId)
-                                data.brand = brandId
-                        }
+                        // const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, category, subcategory, sub2category);
 
-                        const { updatedSupplierInfo, isUpdated } = await this.updateSupplierInfo(entry, product, supplierInfo)
+                        // data.category = categoryInfo.id
 
-                        if (isUpdated) {
-                            dbChange = 'updated';
-                            data.supplierInfo = updatedSupplierInfo
-                        }
-
-                        const productPrice = await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .setPrice(checkIfEntry, supplierInfo, categoryInfo, checkIfEntry.brand?.id);
-
-                        data.price = productPrice
-                        data.model = checkIfEntry.prod_chars.find(x => x.name === "Μοντέλο")?.value;
-
-                        // if (entry.name === "Novatron" && product.short_description) {
-                        //     let result = product.short_description.match(/[0-9].[0-9]mm/g)
-                        //     if (result) {
-                        //         data.name = `${product.name}-${result[0]}`;
-                        //         data.slug = slugify(`${product.name}-${result[0]}-${product.supplierCode}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
-
-                        //         // console.log(result[0])
-                        //     }
+                        // if (!checkIfEntry.publishedAt) {
+                        //     data.publishedAt = new Date()
+                        //     data.deletedAt = null
+                        //     dbChange = 'republished'
                         // }
 
-                        await strapi.entityService.update('api::product.product', checkIfEntry.id, {
-                            data: data,
-                        });
+                        // if (!checkIfEntry.brand) {
+                        //     const brandId = await this.brandIdCheck(null, checkIfEntry.name)
+                        //     if (brandId)
+                        //         data.brand = brandId
+                        // }
 
-                        switch (dbChange) {
-                            case 'republished':
-                                importRef.republished += 1
-                                console.log("Republished:", importRef.republished)
-                                break;
-                            case 'updated':
-                                importRef.updated += 1
-                                console.log("Update:", importRef.updated)
-                                break;
-                            default:
-                                importRef.skipped += 1
-                                console.log("Skipped:", importRef.skipped)
-                                break;
-                        }
+                        // const { updatedSupplierInfo, isUpdated } = await this.updateSupplierInfo(entry, product, supplierInfo)
 
-                        importRef.related_entries.push(checkIfEntry.id)
+                        // if (isUpdated) {
+                        //     dbChange = 'updated';
+                        //     data.supplierInfo = updatedSupplierInfo
+                        // }
+
+                        // const productPrice = await strapi
+                        //     .plugin('import-products')
+                        //     .service('helpers')
+                        //     .setPrice(checkIfEntry, supplierInfo, categoryInfo, checkIfEntry.brand?.id);
+
+                        // data.price = productPrice
+                        // data.model = checkIfEntry.prod_chars.find(x => x.name === "Μοντέλο")?.value;
+
+                        // // if (entry.name === "Novatron" && product.short_description) {
+                        // //     let result = product.short_description.match(/[0-9].[0-9]mm/g)
+                        // //     if (result) {
+                        // //         data.name = `${product.name}-${result[0]}`;
+                        // //         data.slug = slugify(`${product.name}-${result[0]}-${product.supplierCode}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
+
+                        // //         // console.log(result[0])
+                        // //     }
+                        // // }
+
+                        // await strapi.entityService.update('api::product.product', checkIfEntry.id, {
+                        //     data: data,
+                        // });
+
+                        // switch (dbChange) {
+                        //     case 'republished':
+                        //         importRef.republished += 1
+                        //         console.log("Republished:", importRef.republished)
+                        //         break;
+                        //     case 'updated':
+                        //         importRef.updated += 1
+                        //         console.log("Update:", importRef.updated)
+                        //         break;
+                        //     default:
+                        //         importRef.skipped += 1
+                        //         console.log("Skipped:", importRef.skipped)
+                        //         break;
+                        // }
+
+
                     }
                     else {
                         newProducts.push(product)
@@ -297,7 +308,12 @@ module.exports = ({ strapi }) => ({
                 // console.log("supplierInfoUpdate", supplierInfo[supplierInfoUpdate])
                 isUpdated = true;
                 dbChange = 'updated'
+            }
 
+            if (supplierInfo[supplierInfoUpdate].in_stock === false) {
+                supplierInfo[supplierInfoUpdate].in_stock = true
+                isUpdated = true;
+                dbChange = 'updated'
             }
         }
         else {
@@ -384,8 +400,17 @@ module.exports = ({ strapi }) => ({
 
                 return await xml;
             }
+            // else if (entry.name === "Westnet") {
+            //     return await strapi
+            //         .plugin('import-products')
+            //         .service('westnetHelper')
+            //         .getWestnetData(entry, categoryMap)
+            // }
+            console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
+
+            console.log("Το downloading ολοκληρώθηκε.")
 
             // console.log(data)
 
@@ -1697,11 +1722,13 @@ module.exports = ({ strapi }) => ({
             })
 
             let generalPercentage = ''
+            let addToPrice = 0
             if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
 
                 let findPercentage = categoryInfo.cat_percentage.find(x => x.name === "general")
 
                 if (findPercentage) {
+                    addToPrice = findPercentage.add_to_price ? findPercentage.add_to_price : 0;
                     if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
                         let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === brandId)
                         if (findBrandPercentage) {
@@ -1723,7 +1750,7 @@ module.exports = ({ strapi }) => ({
                 generalPercentage = generalCategoryPercentage
             }
 
-            let minPrice = parseFloat(minSupplierPrice.wholesale) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
+            let minPrice = parseFloat(minSupplierPrice.wholesale + addToPrice) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
 
             return existedProduct && existedProduct.price > minPrice && existedProduct.is_fixed_price ? parseFloat(existedProduct.price).toFixed(2) : minPrice.toFixed(2)
 
@@ -1737,9 +1764,7 @@ module.exports = ({ strapi }) => ({
             console.log(supplier)
             const entries = await strapi.db.query('plugin::import-products.importxml').findOne({
                 select: ['name'],
-                where: {
-                    name: supplier
-                },
+                where: { name: supplier },
                 populate: {
                     related_products: {
                         where: {
@@ -1762,7 +1787,8 @@ module.exports = ({ strapi }) => ({
                             brand: { fields: ['name'] },
                             prod_chars: { fields: ['name', 'value'] },
                             ImageURLS: { fields: ['url'] },
-                            related_with: true
+                            related_with: true,
+                            supplierInfo: true
                         }
                     }
                 },
@@ -2179,7 +2205,7 @@ module.exports = ({ strapi }) => ({
 
             const data = {
                 name: product.name,
-                slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
+                slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g }),
                 category: categoryInfo.id,
                 price: parseFloat(productPrice).toFixed(2),
                 publishedAt: new Date(),
@@ -2440,7 +2466,8 @@ module.exports = ({ strapi }) => ({
         console.log("Existed Data:", product.name)
 
         //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-        const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
+        const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map,
+            product.name, product.category.title, product.subcategory?.title, product.sub2category?.title);
 
         let dbChange = ''
         const data = {}
@@ -2452,15 +2479,16 @@ module.exports = ({ strapi }) => ({
 
         let supplierInfo = entryCheck.supplierInfo;
         const relatedImport = entryCheck.related_import;
-        const relatedImportId = relatedImport.map(x => x.id)
+        const relatedImportIds = relatedImport.map(x => x.id)
 
         const findImport = relatedImport.findIndex(x =>
             x.id === product.entry.id)
 
-        if (findImport === -1) { data.related_import = [...relatedImportId, product.entry.id] }
+        if (findImport === -1) { data.related_import = [...relatedImportIds, product.entry.id] }
 
         if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
             data.category = categoryInfo.id
+            dbChange = 'updated'
             console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.category)
         }
 
@@ -2473,28 +2501,28 @@ module.exports = ({ strapi }) => ({
             const productPrice = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .setPrice(entryCheck, supplierInfo, categoryInfo, product.brand.id);
+                .setPrice(entryCheck, supplierInfo, categoryInfo, product.brand?.id);
 
             data.price = parseFloat(productPrice)
             data.supplierInfo = updatedSupplierInfo
             data.model = product.model ? product.model : null
+            dbChange = 'updated'
+        }
+
+        if (entryCheck.publishedAt === null) {
             data.publishedAt = new Date()
             data.deletedAt = null
+            dbChange = 'republished'
         }
 
         if (Object.keys(data).length !== 0) {
-            if (entryCheck.publishedAt === null) {
-                data.publishedAt = new Date()
-                data.deletedAt = null
-            }
+
+            // console.log(data)
             await strapi.entityService.update('api::product.product', entryCheck.id, {
-                data: data
+                data
             });
-            dbChange = 'updated'
+
         }
-        // else {
-        //     importRef.skipped += 1
-        // }
 
         switch (dbChange) {
             case 'republished':
@@ -2547,6 +2575,7 @@ module.exports = ({ strapi }) => ({
                 },
             });
 
+
         for (let product of importXmlFile.related_products) {
 
             if (!importRef.related_entries.includes(product.id)) {
@@ -2580,7 +2609,6 @@ module.exports = ({ strapi }) => ({
                 console.log("Product Deleted:", product.name)
                 if (!isAllSuppliersOutOfStock) {
                     data.supplierInfo = supplierInfo
-
                 }
                 else {
                     data.publishedAt = null
