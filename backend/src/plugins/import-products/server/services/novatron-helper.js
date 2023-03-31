@@ -10,8 +10,8 @@ module.exports = ({ strapi }) => ({
 
     async scrapNovatronCategories(importRef, entry, auth) {
         try {
-            // const browser = await puppeteer.launch()
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
+            const browser = await puppeteer.launch()
+            // const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
             const page = await browser.newPage();
             await page.setViewport({ width: 1200, height: 500 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
@@ -171,6 +171,10 @@ module.exports = ({ strapi }) => ({
                     // console.log(products)
 
                     for (let prod of products) {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers').
+                            delay(2000);
                         await this.scrapNovatronProduct(prod.link, page, cat.title, sub.title, importRef, entry, auth)
                     }
                 }

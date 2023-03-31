@@ -13,10 +13,12 @@ module.exports = ({ strapi }) => ({
             let filteredCategories = {
                 categories: [],
             }
-            // const browser = await puppeteer.launch()
-            const browser = await puppeteer.launch({ headless: false, 
-                executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-                args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+            const browser = await puppeteer.launch()
+            // const browser = await puppeteer.launch({
+            //     headless: false,
+            //     executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            //     args: ['--no-sandbox', '--disable-setuid-sandbox']
+            // });
             const page = await browser.newPage();
             await page.setViewport({ width: 1400, height: 600 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
@@ -108,8 +110,14 @@ module.exports = ({ strapi }) => ({
 
             filteredCategories.categories = newCategories
             // console.log(newCategories)
-
+           
             for (let category of newCategories) {
+                
+                await strapi
+                .plugin('import-products')
+                .service('helpers').
+                delay(2000);
+
                 await this.scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth);
                 // filteredCategories.categories = await this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
             }
@@ -117,11 +125,11 @@ module.exports = ({ strapi }) => ({
 
             // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, importRef, entry, auth)
             await browser.close();
-        } catch (error) { 
+        } catch (error) {
             console.log(error)
         }
     },
- 
+
     async scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
@@ -149,11 +157,16 @@ module.exports = ({ strapi }) => ({
                 .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
             for (let sub of filteredCategories.categories[catIndex].subCategories) {
+                await strapi
+                .plugin('import-products')
+                .service('helpers').
+                delay(2000);
+
                 await this.scrapQuestSubcategories2(page, category.title, sub, filteredCategories, importRef, entry, auth)
             }
         } catch (error) {
             console.log(error)
-        } 
+        }
     },
 
     async scrapQuestSubcategories2(page, category, subcategory, filteredCategories, importRef, entry, auth) {
@@ -194,6 +207,11 @@ module.exports = ({ strapi }) => ({
                 }
             }
             else {
+                await strapi
+                .plugin('import-products')
+                .service('helpers').
+                delay(2000);
+
                 await this.scrapQuestCategory(page, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
             }
 
@@ -253,8 +271,10 @@ module.exports = ({ strapi }) => ({
 
             // console.dir(products)
             for (let product of products) {
-                // if (stockLevelFilter.includes(product.stockLevel)) {
-                //     console.log(product)
+                await strapi
+                .plugin('import-products')
+                .service('helpers').
+                delay(2000);
                 await this.scrapQuestProduct(page, product.link, category, subcategory, sub2category, importRef, entry, auth)
                 // }
             }

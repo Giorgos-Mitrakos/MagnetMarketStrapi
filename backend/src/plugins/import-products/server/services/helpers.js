@@ -16,6 +16,7 @@ const { DOMParser, XMLSerializer, DOMImplementation } = require('xmldom');
 
 module.exports = ({ strapi }) => ({
 
+    async delay(milliseconds) { new Promise((resolve) => setTimeout(resolve, milliseconds)) },
 
     async updateAndFilterScrapProducts(products, category, subcategory, sub2category, importRef, entry) {
         try {
@@ -1486,6 +1487,11 @@ module.exports = ({ strapi }) => ({
                         break;
                     }
                     else {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers').
+                            delay(1000);
+
                         await response && response !== null && response.data.pipe(sharpStream)
 
                         imgUrls.push(imgUrl)

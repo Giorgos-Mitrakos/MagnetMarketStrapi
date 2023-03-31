@@ -248,7 +248,7 @@ module.exports = ({ strapi }) => ({
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
                 if (!entryCheck) {
-                    try {
+                    try { 
                         await strapi
                             .plugin('import-products')
                             .service('helpers')

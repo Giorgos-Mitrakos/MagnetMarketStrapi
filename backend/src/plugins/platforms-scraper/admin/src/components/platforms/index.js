@@ -6,17 +6,20 @@ import { Grid, GridItem } from '@strapi/design-system/Grid';
 import { Flex } from '@strapi/design-system/Flex';
 import { Button } from '@strapi/design-system/Button';
 import { Checkbox } from '@strapi/design-system/Checkbox';
+import { Loader } from '@strapi/design-system/Loader';
 import { getPlatformCategories, getPlatforms, scrapPlatformCategories } from "../../utils/api";
 
 const PlatformsScreen = () => {
 
     const [isLoading, setIsLoading] = useState(true);
+    const [isGettingCategories, setIsGettingCategories] = useState(false);
     const [platforms, setPlatforms] = useState({});
 
     const fetchPlatforms = async () => {
         setPlatforms(await getPlatforms()); // Here
 
         setIsLoading(false);
+        setIsGettingCategories(false);
     };
 
     useEffect(async () => {
@@ -24,7 +27,9 @@ const PlatformsScreen = () => {
     }, []);
 
     const handleGetCategoriesClick = async (platform) => {
+        setIsGettingCategories(true);
         await getPlatformCategories(platform)
+        await fetchPlatforms()
     }
 
     const handleScrapCategories = async (platform) => {
@@ -68,7 +73,11 @@ const PlatformsScreen = () => {
                                     <GridItem col={12}>
                                         <Flex paddingTop={4} justifyContent="space-between">
                                             <Button variant='secondary' label="ScrapCategories"
-                                                onClick={() => handleGetCategoriesClick(platform)}>Βρες τις κατηγορίες</Button>
+                                                onClick={() => handleGetCategoriesClick(platform)}>
+                                                <Flex>
+                                                    Βρες τις κατηγορίες {isGettingCategories && <Loader small>Loading content...</Loader>}
+                                                </Flex>
+                                            </Button>
                                             <Button variant='secondary' label="Details">Αναλυτικά</Button>
                                             <Button size="L" label="Scrap"
                                                 onClick={() => handleScrapCategories(platform)}>
