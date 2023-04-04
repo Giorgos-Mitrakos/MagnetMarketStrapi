@@ -13,6 +13,7 @@ const xml2js = require('xml2js');
 const xlsx = require('xlsx')
 const xpath = require('xpath')
 const { DOMParser, XMLSerializer, DOMImplementation } = require('xmldom');
+const { setTimeout } = require("timers/promises");
 
 module.exports = ({ strapi }) => ({
 
@@ -1466,7 +1467,15 @@ module.exports = ({ strapi }) => ({
             let index = 0
             let mainImageID = '';
             let imgUrls = []
-            for (let imgUrl of product.ImageURLS) {
+
+            const reduceApiEndpoints = async (previous, endpoint) => {
+                await previous;
+                return apiCall(endpoint);
+            };
+
+            const sequential = product.ImageURLS.reduce(reduceApiEndpoints, Promise.resolve());
+
+            const apiCall = async (imgUrl) => {
                 index += 1;
                 const sharpStream = sharp({
                     failOnError: false
@@ -1484,67 +1493,79 @@ module.exports = ({ strapi }) => ({
                     })
 
                     if (cont) {
-                        break;
+                        return;
                     }
-                    else {
-                        await strapi
-                            .plugin('import-products')
-                            .service('helpers').
-                            delay(1000);
 
-                        await response && response !== null && response.data.pipe(sharpStream)
+                    await response && response !== null && response.data.pipe(sharpStream)
 
-                        imgUrls.push(imgUrl)
+                    imgUrls.push(imgUrl)
 
-                        await sharpStream
-                            .webp({ quality: 75 })
-                            .resize({ width: 1000 })
-                            .toBuffer({ resolveWithObject: true })
-                            .then(({ data }) => {
-                                const formData = new FormData();
-                                formData.append("files", data,
-                                    {
-                                        filename: `${productName}_${index}.webp`,
-                                    },
+                    await sharpStream
+                        .webp({ quality: 75 })
+                        .resize({ width: 1000 })
+                        .toBuffer({ resolveWithObject: true })
+                        .then(({ data }) => {
+                            const formData = new FormData();
+                            formData.append("files", data,
+                                {
+                                    filename: `${productName}_${index}.webp`,
+                                },
 
-                                );
-                                formData.append('fileInfo', JSON.stringify({
-                                    alternativeText: `${productName}_${index}`,
-                                    caption: `${productName}_${index}`
-                                }));
-                                formData.append("refId", entryID);
-                                formData.append("ref", "api::product.product");
-                                if (index === 1) {
-                                    formData.append("field", "image");
-                                }
-                                else {
-                                    formData.append("field", "additionalImages");
-                                }
-                                return formData
-                            })
-                            .then(async (formData) => {
-                                try {
-                                    const imgid = Axios.post(`${process.env.PUBLIC_API_URL}/upload`, formData, {
-                                        headers: {
-                                            ...formData.getHeaders(),
-                                            Authorization: `Bearer ${process.env.STRAPI_TOKEN}`,
-                                        }
-                                    })
-                                    if (index === 1) { mainImageID = await imgid }
-                                } catch (error) {
-                                    console.log("Axios Error:", error.response?.data)
-                                }
-                            })
-                            .catch(err => {
-                                console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
-                                try {
-                                    // fs.unlinkSync(`./src/tmp/${data[" GS Description "]}_${index}.webp`);
-                                } catch (e) {
-                                    console.log(e)
-                                    return
-                                }
-                            });
-                    }
+                            );
+                            formData.append('fileInfo', JSON.stringify({
+                                alternativeText: `${productName}_${index}`,
+                                caption: `${productName}_${index}`
+                            }));
+                            formData.append("refId", entryID);
+                            formData.append("ref", "api::product.product");
+                            if (index === 1) {
+                                formData.append("field", "image");
+                            }
+                            else {
+                                formData.append("field", "additionalImages");
+                            }
+                            return formData
+                        })
+                        .then(async (formData) => {
+                            try {
+                                const imgid = await Axios.post(`${process.env.PUBLIC_API_URL}/upload`, formData, {
+                                    headers: {
+                                        ...formData.getHeaders(),
+                                        Authorization: `Bearer ${process.env.STRAPI_TOKEN}`,
+                                    }
+                                })
+                                // if (index === 1) {
+                                //     //Δημιουργώ αυτόματα το SEO για το προϊόν 
+                                //     await strapi
+                                //         .plugin('import-products')
+                                //         .service('helpers')
+                                //         .saveSEO(await imgid, product, entryID);
+                                // mainImageID = await imgid
+                                return await imgid.data[0]
+                                // }
+                            } catch (error) {
+                                console.log("Axios Error:", error.response?.data)
+                            }
+                        })
+                        .then(async (imgid) => {
+                            if (index === 1) {
+                                //Δημιουργώ αυτόματα το SEO για το προϊόν 
+                                await strapi
+                                    .plugin('import-products')
+                                    .service('helpers')
+                                    .saveSEO(imgid, product, entryID);
+                            }
+                        })
+                        .catch(err => {
+                            console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
+                            try {
+                                // fs.unlinkSync(`./src/tmp/${data[" GS Description "]}_${index}.webp`);
+                            } catch (e) {
+                                console.log(e)
+                                return
+                            }
+                        })
+
                 } catch (error) {
                     console.log("Axios Error:", error)
                 }
@@ -1573,7 +1594,7 @@ module.exports = ({ strapi }) => ({
     },
 
     async saveSEO(imgid, product, entryID) {
-        try {
+        try { 
             let brand
             if (product.brand)
                 brand = await strapi.entityService.findOne('api::brand.brand', parseInt(product.brand.id), {
@@ -2269,15 +2290,16 @@ module.exports = ({ strapi }) => ({
 
             //Κατευάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
             let responseImage = await strapi
-                .plugin('import-products')
+                .plugin('import-products') 
                 .service('helpers')
                 .getAndConvertImgToWep(data, newEntry.id, auth);
 
+            await responseImage
             //Δημιουργώ αυτόματα το SEO για το προϊόν 
-            await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .saveSEO(responseImage.mainImageID.data[0], product, newEntry.id);
+            // await strapi
+            //     .plugin('import-products')
+            //     .service('helpers')
+            //     .saveSEO(await responseImage.mainImageID.data[0], product, newEntry.id);
 
             importRef.related_entries.push(newEntry.id)
             if (product.relativeProducts && product.relativeProducts.length > 0)

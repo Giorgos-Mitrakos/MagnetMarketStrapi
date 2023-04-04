@@ -70,12 +70,12 @@ module.exports = {
         const { data, where, select, populate } = event.params;
 
         event.params.data.slug = slugify(`${data.name}-${data.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
-
+ 
     },
     // async beforeUpdate(event) {
     //     const { data, where, select, populate } = event.params;
 
-    //     console.log(data.supplierInfo)
+    //     console.log(data)
 
     //     // const entry = await strapi.entityService.findOne('api::product.product', where.id, {
     //     //     populate: { supplierInfo: true }

@@ -165,10 +165,10 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
 
-            for (let dt of products) {
+            const apiCall = async (dt) => {
 
                 // console.log("MPN: ", dt.partNumber, " Barcode: ", dt.barcode)
-
+ 
                 const { entryCheck, brandId } = await strapi
                     .plugin('import-products')
                     .service('helpers')
@@ -248,11 +248,17 @@ module.exports = ({ strapi }) => ({
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
                 if (!entryCheck) {
-                    try { 
-                        await strapi
+                    try {
+                        var startTime = performance.now()
+                        const response = await strapi
                             .plugin('import-products')
                             .service('helpers')
                             .createEntry(product, importRef, auth);
+
+                        var endTime = performance.now()
+
+                        console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
+
 
                     } catch (error) {
                         console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
@@ -271,6 +277,14 @@ module.exports = ({ strapi }) => ({
                     }
                 }
             }
+            
+            const reduceApiEndpoints = async (previous, endpoint) => {
+                await previous;
+                return apiCall(endpoint); 
+            };
+
+            const sequential = await products.reduce(reduceApiEndpoints, Promise.resolve());
+
 
             // console.log("Ίδια προιόντα:", numberOfSame)
 
@@ -1028,61 +1042,70 @@ module.exports = ({ strapi }) => ({
     },
 
     async parseShopflixXml({ entry, auth }) {
-        try {
-            // const importXmlFile = await strapi.entityService.findOne('plugin::import-products.importxml', 3,
-            //     {
-            //         populate: {
-            //             related_products: {
-            //                 filters: {
-            //                     $and: [
-            //                         {
-            //                             $not: {
-            //                                 publishedAt: null
-            //                             }
-            //                         },
-            //                         {
-            //                             supplierInfo: {
-            //                                 $and: [
-            //                                     { name: "Quest" },
-            //                                     { in_stock: true },
-            //                                 ]
-            //                             }
-            //                         },
-            //                     ]
-            //                 },
-            //                 populate: {
-
-            //                 },
-            //             }
-            //         },
-            //     });
-
-            // const data = await strapi
-            //     .plugin('import-products')
-            //     .service('helpers')
-            //     .checkProductAndBrand('TL-SG1218MPE ', ' Switch TP-Link TL-SG1218MPE', '6935364086923 ', "TP-Link", null);
-
-            // console.log(data)
-
-            // console.log(importXmlFile.related_products.length)
-            const data = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .getData(entry);
-
-            console.log("Προϊόντα στο XML του Shopflix:", await data.MPITEMS.products[0].product.length)
-
-            await strapi.entityService.update('plugin::import-products.importxml', entry.id,
-                {
-                    data: {
-                        report: `Προϊόντα στο XML του Shopflix: ${await data.MPITEMS.products[0].product.length}`,
-                    },
-                })
-            return { "message": "ok" }
-
+        for (let i = 0; i < 10; i++) {
+            task(i);
         }
-        catch (err) {
-            return { "message": "Error" }
+
+        function task(i) {
+            setTimeout(function () {
+                console.log(i);
+            }, 2000 * i);
         }
+        // try {
+        //     // const importXmlFile = await strapi.entityService.findOne('plugin::import-products.importxml', 3,
+        //     //     {
+        //     //         populate: {
+        //     //             related_products: {
+        //     //                 filters: {
+        //     //                     $and: [
+        //     //                         {
+        //     //                             $not: {
+        //     //                                 publishedAt: null
+        //     //                             }
+        //     //                         },
+        //     //                         {
+        //     //                             supplierInfo: {
+        //     //                                 $and: [
+        //     //                                     { name: "Quest" },
+        //     //                                     { in_stock: true },
+        //     //                                 ]
+        //     //                             }
+        //     //                         },
+        //     //                     ]
+        //     //                 },
+        //     //                 populate: {
+
+        //     //                 },
+        //     //             }
+        //     //         },
+        //     //     });
+
+        //     // const data = await strapi
+        //     //     .plugin('import-products')
+        //     //     .service('helpers')
+        //     //     .checkProductAndBrand('TL-SG1218MPE ', ' Switch TP-Link TL-SG1218MPE', '6935364086923 ', "TP-Link", null);
+
+        //     // console.log(data)
+
+        //     // console.log(importXmlFile.related_products.length)
+        //     const data = await strapi
+        //         .plugin('import-products')
+        //         .service('helpers')
+        //         .getData(entry);
+
+        //     console.log("Προϊόντα στο XML του Shopflix:", await data.MPITEMS.products[0].product.length)
+
+        //     await strapi.entityService.update('plugin::import-products.importxml', entry.id,
+        //         {
+        //             data: {
+        //                 report: `Προϊόντα στο XML του Shopflix: ${await data.MPITEMS.products[0].product.length}`,
+        //             },
+        //         })
+        //     return { "message": "ok" }
+
+        // }
+        // catch (err) {
+        //     return { "message": "Error" }
+        // }
     },
 });
