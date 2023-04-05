@@ -2490,7 +2490,7 @@ module.exports = ({ strapi }) => ({
 
     async updateEntry(entryCheck, product, importRef) {
 
-        console.log("Existed Data:", product.name)
+        // console.log("Existed Data:", product.name)
 
         //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
         const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map,

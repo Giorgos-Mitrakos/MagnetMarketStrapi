@@ -110,7 +110,7 @@ module.exports = ({ strapi }) => ({
         try {
             for (let cat of novatronCategories) {
                 for (let sub of cat.subCategories) {
-                    await page.waitForTimeout(200)
+                    await page.waitForTimeout(5000)
                     await Promise.all(
                         [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
                         page.waitForNavigation()]);

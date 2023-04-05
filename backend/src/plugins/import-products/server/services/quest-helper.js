@@ -113,10 +113,7 @@ module.exports = ({ strapi }) => ({
            
             for (let category of newCategories) {
                 
-                await strapi
-                .plugin('import-products')
-                .service('helpers').
-                delay(2000);
+                await page.waitForTimeout(5000)
 
                 await this.scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth);
                 // filteredCategories.categories = await this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
@@ -157,10 +154,7 @@ module.exports = ({ strapi }) => ({
                 .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
             for (let sub of filteredCategories.categories[catIndex].subCategories) {
-                await strapi
-                .plugin('import-products')
-                .service('helpers').
-                delay(2000);
+                await page.waitForTimeout(5000)
 
                 await this.scrapQuestSubcategories2(page, category.title, sub, filteredCategories, importRef, entry, auth)
             }
@@ -207,11 +201,7 @@ module.exports = ({ strapi }) => ({
                 }
             }
             else {
-                await strapi
-                .plugin('import-products')
-                .service('helpers').
-                delay(2000);
-
+                await page.waitForTimeout(5000)
                 await this.scrapQuestCategory(page, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
             }
 
@@ -271,10 +261,7 @@ module.exports = ({ strapi }) => ({
 
             // console.dir(products)
             for (let product of products) {
-                await strapi
-                .plugin('import-products')
-                .service('helpers').
-                delay(2000);
+                await page.waitForTimeout(5000)
                 await this.scrapQuestProduct(page, product.link, category, subcategory, sub2category, importRef, entry, auth)
                 // }
             }
