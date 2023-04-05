@@ -101,7 +101,7 @@ module.exports = ({ strapi }) => ({
             await browser.close();
         } catch (error) {
             console.log(error)
-            await browser.close();
+            // await browser.close();
         }
     },
 

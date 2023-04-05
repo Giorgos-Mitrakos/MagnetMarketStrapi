@@ -168,7 +168,7 @@ module.exports = ({ strapi }) => ({
             const apiCall = async (dt) => {
 
                 // console.log("MPN: ", dt.partNumber, " Barcode: ", dt.barcode)
- 
+
                 const { entryCheck, brandId } = await strapi
                     .plugin('import-products')
                     .service('helpers')
@@ -249,7 +249,7 @@ module.exports = ({ strapi }) => ({
 
                 if (!entryCheck) {
                     try {
-                        var startTime = performance.now()
+                        // var startTime = performance.now()
                         const response = await strapi
                             .plugin('import-products')
                             .service('helpers')
@@ -277,7 +277,7 @@ module.exports = ({ strapi }) => ({
                     }
                 }
             }
-            
+
             const reduceApiEndpoints = async (previous, endpoint) => {
                 await previous;
                 return apiCall(endpoint); 

@@ -1461,7 +1461,6 @@ module.exports = ({ strapi }) => ({
     async getAndConvertImgToWep(product, entryID, auth) {
 
         try {
-            console.log(product.ImageURLS)
             let productName = product.name.replace(/\//g, "_");
 
             let index = 0
@@ -2206,7 +2205,7 @@ module.exports = ({ strapi }) => ({
     async createEntry(product, importRef, auth) {
 
         try {
-            console.log("New Product:", product.name)
+            // console.log("New Product:", product.name)
 
             //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
             const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
@@ -2517,7 +2516,7 @@ module.exports = ({ strapi }) => ({
         if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
             data.category = categoryInfo.id
             dbChange = 'updated'
-            console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.category)
+            // console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.category)
         }
 
         const { updatedSupplierInfo, isUpdated } = await strapi
@@ -2634,11 +2633,12 @@ module.exports = ({ strapi }) => ({
 
                 const isAllSuppliersOutOfStock = supplierInfo.every(supplier => supplier.in_stock === false)
                 // supplierInfo.splice(index, 1)
-                console.log("Product Deleted:", product.name)
+                // console.log("Product Deleted:", product.name)
                 if (!isAllSuppliersOutOfStock) {
                     data.supplierInfo = supplierInfo
                 }
                 else {
+                    data.supplierInfo = supplierInfo
                     data.publishedAt = null
                     data.deletedAt = new Date();
                 }
