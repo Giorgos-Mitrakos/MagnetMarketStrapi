@@ -1485,7 +1485,7 @@ module.exports = ({ strapi }) => ({
 
             // const sequential = product.ImageURLS.reduce(reduceApiEndpoints, Promise.resolve());
 
-            for (let imgUrl of product.ImageURLS) {
+            for (let imgUrl of product.ImageURLS) { 
                 index += 1;
                 const sharpStream = sharp({
                     failOnError: false
@@ -1579,10 +1579,11 @@ module.exports = ({ strapi }) => ({
                             return image
                         })
                         .then((image) => {
-                            console.log("ImageID:", image.id, "Index:", index)
+                            // console.log("ImageID:", image.id, "Index:", index)
                             index === 1 ? imageIDS.mainImage.push(image.id)
                                 : imageIDS.additionalImages.push(image.id)
                         })
+                        .then(async () => { return await this.delay(3000) })
                         // εδώ τελιώνει
                         .catch(err => {
                             console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
@@ -1611,7 +1612,7 @@ module.exports = ({ strapi }) => ({
 
             // await this.saveImageURLS(imgUrls, entryID)
 
-            console.log("imageIDS:", imageIDS)
+            // console.log("imageIDS:", imageIDS)
             return imageIDS
             // if (mainImageID) {
             //     return { mainImageID } 
@@ -2315,7 +2316,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .getAndConvertImgToWep(data, null, auth);
 
-            console.log("ResponseImage:", await responseImage)
+            // console.log("ResponseImage:", await responseImage)
 
             data.image = await responseImage?.mainImage[0]
             data.additionalImages = await responseImage?.additionalImages
