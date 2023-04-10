@@ -255,9 +255,9 @@ module.exports = ({ strapi }) => ({
                             .service('helpers')
                             .createEntry(product, importRef, auth);
 
-                        var endTime = performance.now()
+                        // var endTime = performance.now()
 
-                        console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
+                        // console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
 
 
                     } catch (error) {

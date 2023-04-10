@@ -9,8 +9,14 @@ const { env } = require("process");
 module.exports = ({ strapi }) => ({
 
     async scrapNovatronCategories(importRef, entry, auth) {
+        // const browser = await puppeteer.launch()
+        const browser = await puppeteer.launch(
+            { headless: false, 
+                executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+
         try {
-            const browser = await puppeteer.launch()
+            // const browser = await puppeteer.launch()
             // const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
             const page = await browser.newPage();
             await page.setViewport({ width: 1200, height: 500 })
@@ -101,7 +107,7 @@ module.exports = ({ strapi }) => ({
             await browser.close();
         } catch (error) {
             console.log(error)
-            // await browser.close();
+            await browser.close();
         }
     },
 
@@ -110,7 +116,11 @@ module.exports = ({ strapi }) => ({
         try {
             for (let cat of novatronCategories) {
                 for (let sub of cat.subCategories) {
-                    await page.waitForTimeout(5000)
+                    await page.waitForTimeout(
+                        strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .randomWait(5000, 10000))
                     await Promise.all(
                         [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
                         page.waitForNavigation()]);
@@ -172,10 +182,11 @@ module.exports = ({ strapi }) => ({
                     // console.log(products)
 
                     for (let prod of products) {
-                        await strapi
-                            .plugin('import-products')
-                            .service('helpers').
-                            delay(2000);
+                        await page.waitForTimeout(
+                            strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .randomWait(5000, 10000))
                         await this.scrapNovatronProduct(prod.link, page, cat.title, sub.title, importRef, entry, auth)
                     }
                 }

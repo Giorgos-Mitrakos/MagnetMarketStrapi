@@ -8,17 +8,21 @@ const { env } = require("process");
 module.exports = ({ strapi }) => ({
 
     async scrapQuest(importRef, entry, auth) {
+        // const browser = await puppeteer.launch({
+        //     headless: false,
+        //     args: ['--no-sandbox', '--disable-setuid-sandbox']
+        // })
+        const browser = await puppeteer.launch({
+            headless: false,
+            executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
         try {
 
             let filteredCategories = {
                 categories: [],
             }
-            const browser = await puppeteer.launch()
-            // const browser = await puppeteer.launch({
-            //     headless: false,
-            //     executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-            //     args: ['--no-sandbox', '--disable-setuid-sandbox']
-            // });
+
             const page = await browser.newPage();
             await page.setViewport({ width: 1400, height: 600 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
@@ -110,9 +114,9 @@ module.exports = ({ strapi }) => ({
 
             filteredCategories.categories = newCategories
             // console.log(newCategories)
-           
+
             for (let category of newCategories) {
-                
+
                 await page.waitForTimeout(5000)
 
                 await this.scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth);
@@ -124,6 +128,7 @@ module.exports = ({ strapi }) => ({
             await browser.close();
         } catch (error) {
             console.log(error)
+            await browser.close();
         }
     },
 

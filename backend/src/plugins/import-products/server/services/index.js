@@ -9,6 +9,7 @@ const novatronHelper = require('./novatron-helper');
 const questHelper = require('./quest-helper');
 const globalsatHelper = require('./globalsat-helper');
 const westnetHelper = require('./westnet-helper');
+const imageHelper = require('./image-helper');
 
 module.exports = {
   getFileService,
@@ -20,5 +21,6 @@ module.exports = {
   questHelper,
   globalsatHelper,
   westnetHelper,
+  imageHelper,
 };
 

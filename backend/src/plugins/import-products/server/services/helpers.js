@@ -14,8 +14,17 @@ const xlsx = require('xlsx')
 const xpath = require('xpath')
 const { DOMParser, XMLSerializer, DOMImplementation } = require('xmldom');
 const { setTimeout } = require("timers/promises");
+const _ = require('lodash');
+const path = require("path");
+const process = require('process');
+const promisify = require('util').promisify;
+const stream = require('stream');
 
 module.exports = ({ strapi }) => ({
+
+    randomWait(min, max) {
+        return Math.random() * (max - min) + min
+    },
 
     async delay(milliseconds) { new Promise((resolve) => setTimeout(resolve, milliseconds)) },
 
@@ -1465,16 +1474,18 @@ module.exports = ({ strapi }) => ({
 
             let index = 0
             let mainImageID = '';
-            let imgUrls = []
+            const imageIDS = { mainImage: [], additionalImages: [], imgUrls: [] }
 
-            const reduceApiEndpoints = async (previous, endpoint) => {
-                await previous;
-                return apiCall(endpoint);
-            };
+            // const reduceApiEndpoints = async (previous, endpoint) => {
+            //     await previous;
+            //     index === 1 ? imageIDS.mainImage.push(previous)
+            //         : imageIDS.additionalImages.push(previous)
+            //     return apiCall(endpoint);
+            // };
 
-            const sequential = product.ImageURLS.reduce(reduceApiEndpoints, Promise.resolve());
+            // const sequential = product.ImageURLS.reduce(reduceApiEndpoints, Promise.resolve());
 
-            const apiCall = async (imgUrl) => {
+            for (let imgUrl of product.ImageURLS) {
                 index += 1;
                 const sharpStream = sharp({
                     failOnError: false
@@ -1487,113 +1498,133 @@ module.exports = ({ strapi }) => ({
                         url: imgUrl.url,
                         responseType: 'stream'
                     }).catch(err => {
-                        console.log("Axios Error:", productName, imgUrl.url, "Supplier Code:", product.supplierInfo[0].supplierProductId);
+                        // console.log("Axios Error:", productName, imgUrl.url, "Supplier Code:", product.supplierInfo[0].supplierProductId);
                         cont = true;
                     })
 
                     if (cont) {
-                        return;
+                        break;
                     }
 
                     await response && response !== null && response.data.pipe(sharpStream)
 
-                    imgUrls.push(imgUrl)
+                    imageIDS.imgUrls.push(imgUrl)
 
-                    await sharpStream
+                    const imgID = await sharpStream
                         .webp({ quality: 75 })
                         .resize({ width: 1000 })
-                        .toBuffer({ resolveWithObject: true })
-                        .then(({ data }) => {
-                            const formData = new FormData();
-                            formData.append("files", data,
-                                {
-                                    filename: `${productName}_${index}.webp`,
-                                },
+                        // .toBuffer({ resolveWithObject: true })                        
+                        // .then(({ data }) => {
+                        //     const formData = new FormData();
+                        //     formData.append("files", data,
+                        //         {
+                        //             filename: `${productName}_${index}.webp`,
+                        //         },
 
-                            );
-                            formData.append('fileInfo', JSON.stringify({
-                                alternativeText: `${productName}_${index}`,
-                                caption: `${productName}_${index}`
-                            }));
-                            formData.append("refId", entryID);
-                            formData.append("ref", "api::product.product");
-                            if (index === 1) {
-                                formData.append("field", "image");
-                            }
-                            else {
-                                formData.append("field", "additionalImages");
-                            }
-                            return formData
+                        //     );
+                        //     formData.append('fileInfo', JSON.stringify({
+                        //         alternativeText: `${productName}_${index}`,
+                        //         caption: `${productName}_${index}`
+                        //     }));
+                        //     formData.append("refId", entryID);
+                        //     formData.append("ref", "api::product.product");
+                        //     if (index === 1) {
+                        //         formData.append("field", "image");
+                        //     }
+                        //     else {
+                        //         formData.append("field", "additionalImages");
+                        //     }
+                        //     return formData
+                        // })
+                        // .then(async (formData) => {
+                        //     try {
+                        //         await strapi.plugins.upload.services.upload.upload({
+
+                        //         })
+                        //         // const imgid = await Axios.post(`${process.env.PUBLIC_API_URL}/upload`, formData, {
+                        //         //     headers: {
+                        //         //         ...formData.getHeaders(),
+                        //         //         Authorization: `Bearer ${process.env.STRAPI_TOKEN}`,
+                        //         //     }
+                        //         // })
+                        //         // if (index === 1) {
+                        //         //     //Δημιουργώ αυτόματα το SEO για το προϊόν 
+                        //         //     await strapi
+                        //         //         .plugin('import-products')
+                        //         //         .service('helpers')
+                        //         //         .saveSEO(await imgid, product, entryID);
+                        //         // mainImageID = await imgid
+                        //         return await imgid.data[0]
+                        //         // }
+                        //     } catch (error) {
+                        //         console.log("Axios Error:", error.response?.data)
+                        //     }
+                        // })
+                        // .then(async (imgid) => {
+                        //     if (index === 1) {
+                        //         //Δημιουργώ αυτόματα το SEO για το προϊόν 
+                        //         await strapi
+                        //             .plugin('import-products')
+                        //             .service('helpers')
+                        //             .saveSEO(imgid, product, entryID);
+                        //     }
+                        // })
+                        // απο εδώ ξεκινά η προσπάθεια
+                        .toFile(`./public/tmp/${productName}_${index}.webp`)
+                        .then(async () => {
+                            const image = await strapi
+                                .plugin('import-products')
+                                .service('imageHelper')
+                                .upload(`./public/tmp/${productName}_${index}.webp`, 'uploads');
+                            return image
                         })
-                        .then(async (formData) => {
-                            try {
-                                const imgid = await Axios.post(`${process.env.PUBLIC_API_URL}/upload`, formData, {
-                                    headers: {
-                                        ...formData.getHeaders(),
-                                        Authorization: `Bearer ${process.env.STRAPI_TOKEN}`,
-                                    }
-                                })
-                                // if (index === 1) {
-                                //     //Δημιουργώ αυτόματα το SEO για το προϊόν 
-                                //     await strapi
-                                //         .plugin('import-products')
-                                //         .service('helpers')
-                                //         .saveSEO(await imgid, product, entryID);
-                                // mainImageID = await imgid
-                                return await imgid.data[0]
-                                // }
-                            } catch (error) {
-                                console.log("Axios Error:", error.response?.data)
-                            }
+                        .then((image) => {
+                            console.log("ImageID:", image.id, "Index:", index)
+                            index === 1 ? imageIDS.mainImage.push(image.id)
+                                : imageIDS.additionalImages.push(image.id)
                         })
-                        .then(async (imgid) => {
-                            if (index === 1) {
-                                //Δημιουργώ αυτόματα το SEO για το προϊόν 
-                                await strapi
-                                    .plugin('import-products')
-                                    .service('helpers')
-                                    .saveSEO(imgid, product, entryID);
-                            }
-                        })
+                        // εδώ τελιώνει
                         .catch(err => {
                             console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
                             try {
-                                // fs.unlinkSync(`./src/tmp/${data[" GS Description "]}_${index}.webp`);
+                                fs.unlinkSync(`./public/tmp/${productName}_${index}.webp`);
                             } catch (e) {
                                 console.log(e)
                                 return
                             }
                         })
 
+                    // const image = await strapi
+                    //     .plugin('import-products')
+                    //     .service('imageHelper')
+                    //     .upload(`./public/tmp/${productName}_${index}.webp`, 'uploads');
+
+                    // console.log(image)
+                    // return image;
+
                 } catch (error) {
                     console.log("Axios Error:", error)
                 }
             }
 
-            if (imgUrls.length === 0) { return }
+            if (imageIDS.imgUrls.length === 0) { return }
 
-            await this.saveImageURLS(imgUrls, entryID)
+            // await this.saveImageURLS(imgUrls, entryID)
 
-            if (mainImageID) {
-                return { mainImageID }
-            } else {
-                return null
-            }
+            console.log("imageIDS:", imageIDS)
+            return imageIDS
+            // if (mainImageID) {
+            //     return { mainImageID } 
+            // } else {
+            //     return null
+            // }
         } catch (error) {
             console.log("Error in converting Image:", error)
         }
     },
 
-    async saveImageURLS(imgUrls, entryID) {
-        await strapi.entityService.update('api::product.product', entryID, {
-            data: {
-                ImageURLS: imgUrls,
-            },
-        });
-    },
-
-    async saveSEO(imgid, product, entryID) {
-        try { 
+    async saveSEO(imgid, product) {
+        try {
             let brand
             if (product.brand)
                 brand = await strapi.entityService.findOne('api::brand.brand', parseInt(product.brand.id), {
@@ -1611,39 +1642,35 @@ module.exports = ({ strapi }) => ({
                     `${productName}${product.short_description}${productName}${product.short_description}
             ${productName}${product.short_description}`.substring(0, 50)
 
-            strapi.entityService.update('api::product.product', parseInt(entryID),
-                {
-                    data: {
-                        seo: [{
-                            metaTitle: productName.substring(0, 59),
-                            metaDescription: metaDescription,
-                            metaImage: {
-                                id: imgid ? imgid.id : null
-                            },
-                            keywords: `${brand?.name},${product.mpn},${product.barcode}`,
-                            canonicalURL: canonicalURL,
-                            metaViewport: "width=device-width, initial-scale=1",
-                            metaSocial: [
-                                {
-                                    socialNetwork: "Facebook",
-                                    title: productName.substring(0, 59),
-                                    description: `${productName}`.substring(0, 64),
-                                    image: {
-                                        id: imgid ? imgid.id : null
-                                    },
-                                },
-                                {
-                                    socialNetwork: "Twitter",
-                                    title: productName.substring(0, 59),
-                                    description: `${productName}`.substring(0, 64),
-                                    image: {
-                                        id: imgid ? imgid.id : null
-                                    },
-                                }
-                            ]
-                        }]
+            return [{
+                metaTitle: productName.substring(0, 59),
+                metaDescription: metaDescription,
+                metaImage: {
+                    id: imgid
+                },
+                keywords: `${brand?.name},${product.mpn},${product.barcode}`,
+                canonicalURL: canonicalURL,
+                metaViewport: "width=device-width, initial-scale=1",
+                metaSocial: [
+                    {
+                        socialNetwork: "Facebook",
+                        title: productName.substring(0, 59),
+                        description: `${productName}`.substring(0, 64),
+                        image: {
+                            id: imgid
+                        },
                     },
-                });
+                    {
+                        socialNetwork: "Twitter",
+                        title: productName.substring(0, 59),
+                        description: `${productName}`.substring(0, 64),
+                        image: {
+                            id: imgid
+                        },
+                    }
+                ]
+            }]
+
         } catch (error) {
             console.error(error)
         }
@@ -2258,7 +2285,6 @@ module.exports = ({ strapi }) => ({
                 }
             }
 
-
             if (product.mpn) {
                 data.mpn = product.mpn.trim()
             }
@@ -2283,26 +2309,33 @@ module.exports = ({ strapi }) => ({
                 data.brand = product.brand
             }
 
+            //Κατευάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
+            let responseImage = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .getAndConvertImgToWep(data, null, auth);
+
+            console.log("ResponseImage:", await responseImage)
+
+            data.image = await responseImage?.mainImage[0]
+            data.additionalImages = await responseImage?.additionalImages
+            data.ImageURLS = await responseImage?.imgUrls
+
+            data.seo = await this.saveSEO(data.image, product)
+
             const newEntry = await strapi.entityService.create('api::product.product', {
                 data: data,
             });
 
-            //Κατευάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
-            let responseImage = await strapi
-                .plugin('import-products') 
-                .service('helpers')
-                .getAndConvertImgToWep(data, newEntry.id, auth);
-
-            await responseImage
             //Δημιουργώ αυτόματα το SEO για το προϊόν 
             // await strapi
             //     .plugin('import-products')
             //     .service('helpers')
             //     .saveSEO(await responseImage.mainImageID.data[0], product, newEntry.id);
 
-            importRef.related_entries.push(newEntry.id)
-            if (product.relativeProducts && product.relativeProducts.length > 0)
-                importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
+            // importRef.related_entries.push(newEntry.id)
+            // if (product.relativeProducts && product.relativeProducts.length > 0)
+            //     importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
 
             importRef.created += 1;
             console.log("Created:", importRef.created)
