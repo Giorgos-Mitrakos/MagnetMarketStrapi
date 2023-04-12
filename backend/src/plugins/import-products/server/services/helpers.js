@@ -306,8 +306,8 @@ module.exports = ({ strapi }) => ({
         if (supplierInfoUpdate !== -1) {
             if (parseFloat(supplierInfo[supplierInfoUpdate].wholesale).toFixed(2) !== parseFloat(product.wholesale).toFixed(2)) {
                 // console.log(product)
-                console.log("product", product.name)
-                console.log("New wholesale:", product.wholesale, "Previous wholesale:", supplierInfo[supplierInfoUpdate].wholesale)
+                // console.log("product", product.name)
+                // console.log("New wholesale:", product.wholesale, "Previous wholesale:", supplierInfo[supplierInfoUpdate].wholesale)
 
                 const price_progress = supplierInfo[supplierInfoUpdate].price_progress;
 
@@ -328,7 +328,7 @@ module.exports = ({ strapi }) => ({
             }
         }
         else {
-            console.log("New supplier!!!!!!!!")
+            // console.log("New supplier!!!!!!!!")
 
             const price_progress_data = this.createPriceProgress(product)
 
@@ -417,11 +417,11 @@ module.exports = ({ strapi }) => ({
             //         .service('westnetHelper')
             //         .getWestnetData(entry, categoryMap)
             // }
-            console.log("Ξεκινάω να κατεβάζω τα xml...")
+            // console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
 
-            console.log("Το downloading ολοκληρώθηκε.")
+            // console.log("Το downloading ολοκληρώθηκε.")
 
             // console.log(data)
 
@@ -1364,7 +1364,7 @@ module.exports = ({ strapi }) => ({
                 if (err)
                     console.log(err);
                 else {
-                    console.log("File written successfully\n");
+                    // console.log("File written successfully\n");
                 }
             });
 
@@ -1392,7 +1392,7 @@ module.exports = ({ strapi }) => ({
                 else {
                     const cookies = JSON.parse(data);
                     await page.setCookie(...cookies);
-                    console.log("File readen successfully\n");
+                    // console.log("File readen successfully\n");
                 }
             })
 
@@ -1855,7 +1855,7 @@ module.exports = ({ strapi }) => ({
             delete entries.id;
             delete entries.name;
 
-            console.log(entries.related_products.length)
+            // console.log(entries.related_products.length)
 
             for (let entry of entries.related_products) {
                 let newEntry = {
@@ -2351,7 +2351,7 @@ module.exports = ({ strapi }) => ({
             //     importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
 
             importRef.created += 1;
-            console.log("Created:", importRef.created)
+            // console.log("Created:", importRef.created)
         } catch (error) {
             console.log("Error in Entry Function:", error, error.details?.errors)
         }
@@ -2600,19 +2600,19 @@ module.exports = ({ strapi }) => ({
         switch (dbChange) {
             case 'republished':
                 importRef.republished += 1
-                console.log("Republished:", importRef.republished)
+                // console.log("Republished:", importRef.republished)
                 break;
             case 'updated':
                 importRef.updated += 1
-                console.log("Update:", importRef.updated)
+                // console.log("Update:", importRef.updated)
                 break;
             case 'created':
                 importRef.created += 1
-                console.log("Created:", importRef.created)
+                // console.log("Created:", importRef.created)
                 break;
             default:
                 importRef.skipped += 1
-                console.log("Skipped:", importRef.skipped)
+                // console.log("Skipped:", importRef.skipped)
                 break;
         }
         // const imgUrls = []
