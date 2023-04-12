@@ -27,6 +27,14 @@ module.exports = ({ strapi }) => ({
             await page.setViewport({ width: 1400, height: 600 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
+            await page.setRequestInterception(true)
+
+            page.on('request', (request) => {
+                if (request.resourceType() === 'image') request.abort()
+                else request.continue()
+            })
+
+
             if (fs.existsSync('./public/QuestCookies.json')) {
                 fs.readFile('./public/QuestCookies.json', async (err, data) => {
                     if (err)
@@ -82,8 +90,6 @@ module.exports = ({ strapi }) => ({
                     .catch((error) => console.log(error))
             }
 
-            const bodyHandle = await page.$('body');
-            const navListWrapper = await page.$("div.nav-2-wrapper")
             let scrapCategories = await page.$eval('div.nav-2-wrapper', (element) => {
                 const navList = element.querySelectorAll(".nav-2")
                 // let liElements = navList.length
@@ -117,9 +123,12 @@ module.exports = ({ strapi }) => ({
 
             for (let category of newCategories) {
 
-                await page.waitForTimeout(5000)
+                await page.waitForTimeout(strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .randomWait(5000, 10000))
 
-                await this.scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth);
+                await this.scrapQuestSubcategories(browser, page, category, filteredCategories, importRef, entry, auth);
                 // filteredCategories.categories = await this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
             }
 
@@ -132,7 +141,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestSubcategories(page, category, filteredCategories, importRef, entry, auth) {
+    async scrapQuestSubcategories(browser, page, category, filteredCategories, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
             const scrapSub = await page.$eval('.side-menu', (element) => {
@@ -159,16 +168,19 @@ module.exports = ({ strapi }) => ({
                 .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
             for (let sub of filteredCategories.categories[catIndex].subCategories) {
-                await page.waitForTimeout(5000)
+                await page.waitForTimeout(strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .randomWait(5000, 10000))
 
-                await this.scrapQuestSubcategories2(page, category.title, sub, filteredCategories, importRef, entry, auth)
+                await this.scrapQuestSubcategories2(browser, page, category.title, sub, filteredCategories, importRef, entry, auth)
             }
         } catch (error) {
             console.log(error)
         }
     },
 
-    async scrapQuestSubcategories2(page, category, subcategory, filteredCategories, importRef, entry, auth) {
+    async scrapQuestSubcategories2(browser, page, category, subcategory, filteredCategories, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
             const sideMenu = await page.$('.side-menu')
@@ -201,13 +213,16 @@ module.exports = ({ strapi }) => ({
                     .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
                 for (let sub2 of filteredCategories.categories[catIndex].subCategories[subIndex].subCategories) {
-                    await this.scrapQuestCategory(page, sub2.link, category, subcategory.title, sub2.title, importRef, entry, auth)
+                    await this.scrapQuestCategory(browser, page, sub2.link, category, subcategory.title, sub2.title, importRef, entry, auth)
                     await page.waitForTimeout(1000);
                 }
             }
             else {
-                await page.waitForTimeout(5000)
-                await this.scrapQuestCategory(page, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
+                await page.waitForTimeout(strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .randomWait(5000, 10000))
+                await this.scrapQuestCategory(browser, page, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
             }
 
         } catch (error) {
@@ -215,7 +230,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestCategory(page, link, category, subcategory, sub2category, importRef, entry, auth) {
+    async scrapQuestCategory(browser, page, link, category, subcategory, sub2category, importRef, entry, auth) {
         try {
             await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
 
@@ -266,8 +281,11 @@ module.exports = ({ strapi }) => ({
 
             // console.dir(products)
             for (let product of products) {
-                await page.waitForTimeout(5000)
-                await this.scrapQuestProduct(page, product.link, category, subcategory, sub2category, importRef, entry, auth)
+                await page.waitForTimeout(strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .randomWait(5000, 10000))
+                await this.scrapQuestProduct(browser, page, product.link, category, subcategory, sub2category, importRef, entry, auth)
                 // }
             }
 
@@ -276,11 +294,23 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestProduct(page, productLink, category, subcategory, sub2category, importRef, entry, auth) {
-        try {
-            await page.goto(productLink, { waitUntil: "networkidle0" });
+    async scrapQuestProduct(browser, page, productLink, category, subcategory, sub2category, importRef, entry, auth) {
+        const newPage = await browser.newPage();
+        await newPage.setViewport({ width: 1400, height: 600 })
+        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
-            const scrapProduct = await page.$eval('.details-page', (scrap) => {
+
+        try {
+
+
+            await newPage.goto(productLink, { waitUntil: "networkidle0" });
+
+            await newPage.waitForTimeout(strapi
+                .plugin('import-products')
+                .service('helpers')
+                .randomWait(1000, 3000))
+
+            const scrapProduct = await newPage.$eval('.details-page', (scrap) => {
                 const product = {}
 
                 const element = scrap.querySelector('div.content-container div.region-area-two')
@@ -363,6 +393,9 @@ module.exports = ({ strapi }) => ({
 
         } catch (error) {
             console.log(error)
+        }
+        finally {
+            newPage.close()
         }
     },
 

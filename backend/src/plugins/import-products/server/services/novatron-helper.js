@@ -11,9 +11,11 @@ module.exports = ({ strapi }) => ({
     async scrapNovatronCategories(importRef, entry, auth) {
         // const browser = await puppeteer.launch()
         const browser = await puppeteer.launch(
-            { headless: false, 
+            {
+                headless: false,
                 executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-                args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
 
         try {
             // const browser = await puppeteer.launch()
@@ -21,6 +23,13 @@ module.exports = ({ strapi }) => ({
             const page = await browser.newPage();
             await page.setViewport({ width: 1200, height: 500 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
+            await page.setRequestInterception(true)
+
+            page.on('request', (request) => {
+                if (request.resourceType() === 'image') request.abort()
+                else request.continue()
+            })
 
             if (fs.existsSync('./public/NovatronCookies.json')) {
                 fs.readFile('./public/NovatronCookies.json', async (err, data) => {
@@ -103,7 +112,7 @@ module.exports = ({ strapi }) => ({
                 .filterCategories(scrapProduct, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
 
-            await this.scrapNovatronCategory(newCategories, page, importRef, entry, auth)
+            await this.scrapNovatronCategory(browser, newCategories, page, importRef, entry, auth)
             await browser.close();
         } catch (error) {
             console.log(error)
@@ -111,7 +120,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapNovatronCategory(novatronCategories, page,
+    async scrapNovatronCategory(browser, novatronCategories, page,
         importRef, entry, auth) {
         try {
             for (let cat of novatronCategories) {
@@ -187,7 +196,7 @@ module.exports = ({ strapi }) => ({
                                 .plugin('import-products')
                                 .service('helpers')
                                 .randomWait(5000, 10000))
-                        await this.scrapNovatronProduct(prod.link, page, cat.title, sub.title, importRef, entry, auth)
+                        await this.scrapNovatronProduct(browser, prod.link, page, cat.title, sub.title, importRef, entry, auth)
                     }
                 }
             }
@@ -196,18 +205,23 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapNovatronProduct(productLink, page, category, subcategory,
+    async scrapNovatronProduct(browser, productLink, page, category, subcategory,
         importRef, entry, auth) {
+
+        const newPage = await browser.newPage();
+        await newPage.setViewport({ width: 1400, height: 600 })
+        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
         try {
 
-            await Promise.all([page.goto(productLink, { waitUntil: "networkidle0" }),
-            page.waitForNavigation()])
+            await Promise.all([newPage.goto(productLink, { waitUntil: "networkidle0" }),
+            newPage.waitForNavigation()])
 
-            let productUrl = page.url();
+            let productUrl = newPage.url();
             const urlArray = productUrl.split("/")
             const productID = urlArray[urlArray.length - 1].split("?")[0]
 
-            const bodyHandle = await page.$("body");
+            const bodyHandle = await newPage.$("body");
 
             let scrapProduct = await bodyHandle.evaluate(() => {
                 const product = {}
@@ -331,6 +345,9 @@ module.exports = ({ strapi }) => ({
 
         } catch (error) {
             console.log(error)
+        }
+        finally {
+            newPage.close()
         }
     },
 

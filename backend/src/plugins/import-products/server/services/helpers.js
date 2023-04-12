@@ -1485,7 +1485,7 @@ module.exports = ({ strapi }) => ({
 
             // const sequential = product.ImageURLS.reduce(reduceApiEndpoints, Promise.resolve());
 
-            for (let imgUrl of product.ImageURLS) { 
+            for (let imgUrl of product.ImageURLS) {
                 index += 1;
                 const sharpStream = sharp({
                     failOnError: false
@@ -1841,6 +1841,8 @@ module.exports = ({ strapi }) => ({
                             brand: { fields: ['name'] },
                             prod_chars: { fields: ['name', 'value'] },
                             ImageURLS: { fields: ['url'] },
+                            image: { fields: ['url'] },
+                            additionalImages: true,
                             related_with: true,
                             supplierInfo: true
                         }
@@ -1863,6 +1865,7 @@ module.exports = ({ strapi }) => ({
                     sku: entry.sku,
                     mpn: entry.mpn,
                     status: entry.status,
+                    image: entry.image?.url,
                     short_description: entry.short_description,
                     barcode: entry.barcode,
                     category: entry.category.name,
@@ -1890,9 +1893,18 @@ module.exports = ({ strapi }) => ({
                     }
                 }
 
+                let additionalImages = []
+
+                if (entry.additionalImages && entry.additionalImages.length > 0) {
+                    for (let addImage of entry.additionalImages) {
+                        additionalImages.push(addImage.url)
+                    }
+                }
+
                 newEntry.related_products = [relProds];
                 newEntry.chars = { char: chars1 };
                 newEntry.imageURLS = { url: imageURL };
+                newEntry.additionalImages = { url: additionalImages };
 
                 finalEntries.push({ product: newEntry })
             }
@@ -2686,7 +2698,7 @@ module.exports = ({ strapi }) => ({
         await strapi.entityService.update('plugin::import-products.importxml', entry.id,
             {
                 data: {
-                    report: `Created: ${importRef.created}, Updated: ${importRef.updated}, Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted}`,
+                    report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted}`,
                 },
             })
     },
