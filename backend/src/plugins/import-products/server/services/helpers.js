@@ -22,11 +22,24 @@ const stream = require('stream');
 
 module.exports = ({ strapi }) => ({
 
+    async retry(promiseFactory, retryCount, isRetry) {
+
+        try {
+            console.log(retryCount)
+            return await promiseFactory();
+        } catch (error) {
+            if (retryCount <= 0) {
+                throw error;
+            }
+            return await this.retry(promiseFactory, retryCount - 1,true);
+        }
+    },
+
     randomWait(min, max) {
         return Math.random() * (max - min) + min
     },
 
-    async delay(milliseconds) { new Promise((resolve) => setTimeout(resolve, milliseconds)) },
+    async delay(milliseconds) { return new Promise((resolve) => setTimeout(resolve, milliseconds)) },
 
     async updateAndFilterScrapProducts(products, category, subcategory, sub2category, importRef, entry) {
         try {
@@ -1583,7 +1596,7 @@ module.exports = ({ strapi }) => ({
                             index === 1 ? imageIDS.mainImage.push(image.id)
                                 : imageIDS.additionalImages.push(image.id)
                         })
-                        .then(async () => { return await this.delay(3000) })
+                        // .then(async () => { return await this.delay(3000) })
                         // εδώ τελιώνει
                         .catch(err => {
                             console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
@@ -1643,13 +1656,15 @@ module.exports = ({ strapi }) => ({
                     `${productName}${product.short_description}${productName}${product.short_description}
             ${productName}${product.short_description}`.substring(0, 50)
 
+            let keywords = `${brand?.name},${product.mpn},${product.barcode}`
+
             return [{
                 metaTitle: productName.substring(0, 59),
                 metaDescription: metaDescription,
                 metaImage: {
                     id: imgid
                 },
-                keywords: `${brand?.name},${product.mpn},${product.barcode}`,
+                keywords: `${keywords}`,
                 canonicalURL: canonicalURL,
                 metaViewport: "width=device-width, initial-scale=1",
                 metaSocial: [
@@ -2379,7 +2394,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .parseChars(product.prod_chars, mapCharNames, mapCharValues)
 
-            product.brand = { id: brandId }
+            if (brandId) { product.brand = { id: brandId } }
             product.prod_chars = parsedChars
 
             if (!entryCheck) {

@@ -47,7 +47,16 @@ module.exports = ({ strapi }) => ({
                 })
             }
 
-            await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" }),
+                    5, // retry this 5 times,
+                    false
+                );
+
+            // await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
             const pageUrl = page.url();
             await page.waitForTimeout(1500)
 
@@ -134,16 +143,26 @@ module.exports = ({ strapi }) => ({
 
 
             // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, importRef, entry, auth)
-            await browser.close();
+            // await browser.close();
         } catch (error) {
             console.log(error)
+            // await browser.close();
+        }
+        finally {
             await browser.close();
         }
     },
 
     async scrapQuestSubcategories(browser, page, category, filteredCategories, importRef, entry, auth) {
         try {
-            await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" }),
+                    5 // retry this 5 times
+                );
+            // await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
             const scrapSub = await page.$eval('.side-menu', (element) => {
                 const subList = element.querySelector('ul')
                 const subcategoriesList = subList.querySelectorAll('li')
@@ -182,7 +201,14 @@ module.exports = ({ strapi }) => ({
 
     async scrapQuestSubcategories2(browser, page, category, subcategory, filteredCategories, importRef, entry, auth) {
         try {
-            await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" }),
+                    5 // retry this 5 times
+                );
+            // await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
             const sideMenu = await page.$('.side-menu')
 
             const catIndex = filteredCategories.categories.findIndex(x => x.title === category)
@@ -227,12 +253,19 @@ module.exports = ({ strapi }) => ({
 
         } catch (error) {
             console.log(error)
-        }
+        } 
     },
 
     async scrapQuestCategory(browser, page, link, category, subcategory, sub2category, importRef, entry, auth) {
         try {
-            await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" }),
+                    5 // retry this 5 times
+                );
+            // await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
 
             const scrapProducts = await page.$eval('div.region-area-three>div.inner-area.inner-area-three', (element) => {
                 const productListWrapper = element.querySelector('div.box>ul.product-list')
@@ -301,9 +334,15 @@ module.exports = ({ strapi }) => ({
 
 
         try {
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => newPage.goto(productLink, { waitUntil: "networkidle0" }),
+                    5 // retry this 5 times
+                );
 
-
-            await newPage.goto(productLink, { waitUntil: "networkidle0" });
+            // await newPage.goto(productLink, { waitUntil: "networkidle0" });
 
             await newPage.waitForTimeout(strapi
                 .plugin('import-products')
@@ -314,7 +353,8 @@ module.exports = ({ strapi }) => ({
                 const product = {}
 
                 const element = scrap.querySelector('div.content-container div.region-area-two')
-                const titleWrapper = element.querySelector('div.content-container div.region-area-two .inner-area-one .title')
+                // Αφαίρεσα div.content-container div.region-area-two 
+                const titleWrapper = element.querySelector('.inner-area-one .title')
                 product.name = titleWrapper.textContent.trim();
                 const supplierCodeWrapper = element.querySelector('#SkuNumber')
                 product.supplierCode = supplierCodeWrapper.textContent.split('.')[1].trim();
@@ -358,17 +398,19 @@ module.exports = ({ strapi }) => ({
 
                 const tabsWrapper = scrap.querySelector('.tabs-content .technical-charact')
 
-                const liWrappers = tabsWrapper.querySelectorAll('li')
+                if (tabsWrapper) {
+                    const liWrappers = tabsWrapper.querySelectorAll('li')
 
-                const prod_chars = []
-                for (let i = 0; i < liWrappers.length; i += 2) {
-                    prod_chars.push({
-                        name: liWrappers[i].querySelector('span').textContent.trim(),
-                        value: liWrappers[i + 1].querySelector('span').textContent.trim(),
-                    })
+                    const prod_chars = []
+                    for (let i = 0; i < liWrappers.length; i += 2) {
+                        prod_chars.push({
+                            name: liWrappers[i].querySelector('span').textContent.trim(),
+                            value: liWrappers[i + 1].querySelector('span').textContent.trim(),
+                        })
+                    }
+
+                    product.prod_chars = prod_chars
                 }
-
-                product.prod_chars = prod_chars
 
                 return product
             })
@@ -565,4 +607,4 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-});
+}); 

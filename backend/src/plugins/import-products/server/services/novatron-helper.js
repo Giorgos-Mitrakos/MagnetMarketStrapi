@@ -43,7 +43,16 @@ module.exports = ({ strapi }) => ({
                 })
             }
 
-            await page.goto('https://novatronsec.com/', { waitUntil: "networkidle0" });
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto('https://novatronsec.com/', { waitUntil: "networkidle0" }),
+                    5, // retry this 5 times,
+                    false
+                );
+
+            // await page.goto('https://novatronsec.com/', { waitUntil: "networkidle0" });
             const pageUrl = page.url();
 
             if (pageUrl === "https://novatronsec.com/Account/Login?ReturnUrl=%2F") {
@@ -130,9 +139,20 @@ module.exports = ({ strapi }) => ({
                             .plugin('import-products')
                             .service('helpers')
                             .randomWait(5000, 10000))
-                    await Promise.all(
-                        [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
-                        page.waitForNavigation()]);
+
+                    await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .retry(
+                            () => Promise.all(
+                                [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
+                                page.waitForNavigation()]),
+                            5, // retry this 5 times,
+                            false
+                        );
+                    // await Promise.all(
+                    //     [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
+                    //     page.waitForNavigation()]);
 
                     const bodyHandle = await page.$("body");
 
@@ -197,7 +217,7 @@ module.exports = ({ strapi }) => ({
                                 .service('helpers')
                                 .randomWait(5000, 10000))
                         await this.scrapNovatronProduct(browser, prod.link, page, cat.title, sub.title, importRef, entry, auth)
-                    }
+                    } 
                 }
             }
         } catch (error) {
@@ -214,8 +234,18 @@ module.exports = ({ strapi }) => ({
 
         try {
 
-            await Promise.all([newPage.goto(productLink, { waitUntil: "networkidle0" }),
-            newPage.waitForNavigation()])
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => newPage.goto(productLink, { waitUntil: "networkidle0" }),
+                    
+                    5, // retry this 5 times,
+                    false
+                );
+
+            // await Promise.all([newPage.goto(productLink, { waitUntil: "networkidle0" }),
+            // newPage.waitForNavigation()])
 
             let productUrl = newPage.url();
             const urlArray = productUrl.split("/")
