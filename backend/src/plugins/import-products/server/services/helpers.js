@@ -25,7 +25,6 @@ module.exports = ({ strapi }) => ({
     async retry(promiseFactory, retryCount, isRetry) {
 
         try {
-            console.log(retryCount)
             return await promiseFactory();
         } catch (error) {
             if (retryCount <= 0) {
