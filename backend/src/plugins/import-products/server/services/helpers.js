@@ -2268,7 +2268,7 @@ module.exports = ({ strapi }) => ({
 
             const supplierInfo = [this.createSupplierInfoData(product.entry, product, price_progress_data)]
 
-            const productPrice = await this.setPrice(null, supplierInfo, categoryInfo, product.brand.id);
+            const productPrice = await this.setPrice(null, supplierInfo, categoryInfo, product.brand?.id);
 
             // const { mapCharNames, mapCharValues } = importRef.charMaps
 

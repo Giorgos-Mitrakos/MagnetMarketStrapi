@@ -14,7 +14,7 @@ import instance from "../../utils/axiosInstance";
 import { exportToXML, getImportedFile, ImportedFileSuccess, postParseToJson, saveURL } from '../../utils/api';
 import { Loader } from '@strapi/design-system/Loader';
 import { ProgressBar } from '@strapi/design-system/ProgressBar';
-import { auth } from '@strapi/helper-plugin/build/helper-plugin.production';
+import { auth, useFetchClient } from '@strapi/helper-plugin';
 
 const UploadFileForm = () => {
 
@@ -28,6 +28,7 @@ const UploadFileForm = () => {
     const inputRefs = useRef([]);
     const ROW_COUNT = 6;
     const COL_COUNT = 10;
+    const client = useFetchClient();
 
     const fetchImport = async () => {
         setImportedFiles(await getImportedFile()); // Here
@@ -40,10 +41,10 @@ const UploadFileForm = () => {
     }, []);
 
     const importFile = async (event, entry) => {
-        try {
+        try { 
             console.log(entry)
             if (entry.importedFile !== null && entry.importedFile !== undefined) {
-                await instance.delete(`/upload/files/${entry.importedFile.id}`)
+                await client.del(`/upload/files/${entry.importedFile.id}`)
             }
             const data = new FormData();
             data.append('files', event.target.files[0]);
@@ -51,7 +52,7 @@ const UploadFileForm = () => {
             data.append('refId', entry.id);
             data.append('field', 'importedFile');
 
-            const upload_res = await instance.post(`/upload`, data)
+            const upload_res = await client.post(`/upload`, data)
             setLoadingValue(66);
         }
         catch (error) {

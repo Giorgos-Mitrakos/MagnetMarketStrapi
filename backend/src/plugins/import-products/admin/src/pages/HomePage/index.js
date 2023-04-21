@@ -15,9 +15,6 @@ import UploadFileForm from '../../components/UploadFileForm';
 
 
 const HomePage = () => {
-
-  
-
   return (
     <>
       <Box background="neutral100">

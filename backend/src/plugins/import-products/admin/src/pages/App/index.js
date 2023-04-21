@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { Switch, Route } from 'react-router-dom';
-import { NotFound } from '@strapi/helper-plugin';
+import { AnErrorOccurred } from '@strapi/helper-plugin';
 import pluginId from '../../pluginId';
 import HomePage from '../HomePage';
 import Mapping from '../Mapping';
@@ -18,7 +18,7 @@ const App = () => {
       <Switch>
         <Route path={`/plugins/${pluginId}`} component={HomePage} exact />
         <Route path={`/plugins/${pluginId}/mapping/:id`} component={Mapping} exact />
-        <Route component={NotFound} />
+        <Route component={AnErrorOccurred} />
       </Switch>
     </div>
   );
