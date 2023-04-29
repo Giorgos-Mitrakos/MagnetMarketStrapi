@@ -165,125 +165,134 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
 
-            const apiCall = async (dt) => {
+            let index = 0
+            for (let dt of products) {
+                index++
 
-                // console.log("MPN: ", dt.partNumber, " Barcode: ", dt.barcode)
 
-                const { entryCheck, brandId } = await strapi
-                    .plugin('import-products')
-                    .service('helpers')
-                    .checkProductAndBrand(dt.mpn, dt.name, dt.barcode, dt.brand_name, null);
+                setTimeout(async () => {
 
-                //Κατασκευάζω το URL του προϊόντος του προμηθευτή
-                let productUrl = `http://www.oktabit.gr/product_details.asp?productid=${dt.supplierCode}`
 
-                // const productPrevius = {
-                //     name: dt.title,
-                //     description: dt.description,
-                //     // category: categoryInfo.id,
-                //     mpn: dt.partNumber.toString(),
-                //     barcode: dt.barcode.toString(),
-                //     slug: dt.partNumber ?
-                //         slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
-                //         slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
-                //     publishedAt: new Date(),
-                //     status: 'InStock',
-                //     ImageURLS: dt.ImageURLS,
-                //     brand: { id: await brandId },
-                //     related_import: entry.id,
-                //     supplierInfo: [{
-                //         name: entry.name,
-                //         in_stock: true,
-                //         wholesale: dt.price,
-                //         recycle_tax: dt.recycleTax,
-                //         supplierProductId: dt.supplierCode,
-                //         supplierProductURL: productUrl,
-                //         retail_price: dt.suggestedPrice,
-                //         price_progress: [{
-                //             date: new Date(),
-                //             wholesale: dt.price,
-                //         }]
-                //     }],
-                //     prod_chars: dt.prod_chars
-                // }
+                    console.log("delay:", `${5000 * index}`, "MPN: ", dt.mpn, " Barcode: ", dt.barcode)
 
-                const product = {
-                    entry,
-                    name: dt.name,
-                    supplierCode: dt.supplierCode,
-                    description: dt.description,
-                    category: { title: dt.category.title },
-                    subcategory: { title: dt.subcategory.title },
-                    sub2category: { title: dt.sub2category.title },
-                    mpn: dt.mpn.toString(),
-                    barcode: dt.barcode.toString(),
-                    // slug: dt.partNumber ? 
-                    //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
-                    //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
-                    // publishedAt: new Date(),
-                    stockLevel: dt.stockLevel,
-                    wholesale: dt.wholesale,
-                    imagesSrc: dt.imagesSrc,
-                    brand: { id: await brandId },
-                    retail_price: dt.retail_price,
-                    recycleTax: dt.recycleTax,
-                    link: productUrl,
-                    related_import: entry.id,
-                    // supplierInfo: [{
-                    //     name: entry.name,
-                    //     in_stock: true,
-                    //     wholesale: dt.price,
-                    //     recycle_tax: dt.recycleTax,
-                    //     supplierProductId: dt.supplierCode,
-                    //     supplierProductURL: productUrl,
-                    //     retail_price: dt.suggestedPrice,
-                    //     price_progress: [{
-                    //         date: new Date(),
+                    const { entryCheck, brandId } = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .checkProductAndBrand(dt.mpn, dt.name, dt.barcode, dt.brand_name, null);
+
+                    //Κατασκευάζω το URL του προϊόντος του προμηθευτή
+                    let productUrl = `http://www.oktabit.gr/product_details.asp?productid=${dt.supplierCode}`
+
+                    // const productPrevius = {
+                    //     name: dt.title,
+                    //     description: dt.description,
+                    //     // category: categoryInfo.id,
+                    //     mpn: dt.partNumber.toString(),
+                    //     barcode: dt.barcode.toString(),
+                    //     slug: dt.partNumber ?
+                    //         slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                    //         slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                    //     publishedAt: new Date(),
+                    //     status: 'InStock',
+                    //     ImageURLS: dt.ImageURLS,
+                    //     brand: { id: await brandId },
+                    //     related_import: entry.id,
+                    //     supplierInfo: [{
+                    //         name: entry.name,
+                    //         in_stock: true,
                     //         wholesale: dt.price,
-                    //     }]
-                    // }],
-                    prod_chars: dt.prod_chars
-                }
+                    //         recycle_tax: dt.recycleTax,
+                    //         supplierProductId: dt.supplierCode,
+                    //         supplierProductURL: productUrl,
+                    //         retail_price: dt.suggestedPrice,
+                    //         price_progress: [{
+                    //             date: new Date(),
+                    //             wholesale: dt.price,
+                    //         }]
+                    //     }],
+                    //     prod_chars: dt.prod_chars
+                    // }
 
-                //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
-
-                if (!entryCheck) {
-                    try {
-                        // var startTime = performance.now()
-                        const response = await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .createEntry(product, importRef, auth);
-
-                        // var endTime = performance.now()
-
-                        // console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
-
-
-                    } catch (error) {
-                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                    const product = {
+                        entry,
+                        name: dt.name,
+                        supplierCode: dt.supplierCode,
+                        description: dt.description,
+                        category: { title: dt.category.title },
+                        subcategory: { title: dt.subcategory.title },
+                        sub2category: { title: dt.sub2category.title },
+                        mpn: dt.mpn.toString(),
+                        barcode: dt.barcode.toString(),
+                        // slug: dt.partNumber ? 
+                        //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                        //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                        // publishedAt: new Date(),
+                        stockLevel: dt.stockLevel,
+                        wholesale: dt.wholesale,
+                        imagesSrc: dt.imagesSrc,
+                        brand: { id: await brandId },
+                        retail_price: dt.retail_price,
+                        recycleTax: dt.recycleTax,
+                        link: productUrl,
+                        related_import: entry.id,
+                        // supplierInfo: [{
+                        //     name: entry.name,
+                        //     in_stock: true,
+                        //     wholesale: dt.price,
+                        //     recycle_tax: dt.recycleTax,
+                        //     supplierProductId: dt.supplierCode,
+                        //     supplierProductURL: productUrl,
+                        //     retail_price: dt.suggestedPrice,
+                        //     price_progress: [{
+                        //         date: new Date(),
+                        //         wholesale: dt.price,
+                        //     }]
+                        // }],
+                        prod_chars: dt.prod_chars
                     }
-                }
-                else {
-                    try {
-                        await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .updateEntry(entryCheck, product, importRef);
 
-                        // console.log("Updated")
-                    } catch (error) {
-                        console.log(error)
+                    //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+                    if (!entryCheck) {
+                        
+                        try {
+                            // var startTime = performance.now()
+                            // setTimeout(async () => {
+                            const response = await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .createEntry(product, importRef, auth);
+                            // var endTime = performance.now()
+
+                            await response
+                            //     console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
+                            // }, 3000 * index);
+                        } catch (error) {
+                            console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                        }
                     }
-                }
+                    else {
+                        try {
+                            await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .updateEntry(entryCheck, product, importRef);
+
+                            // console.log("Updated")
+                        } catch (error) {
+                            console.log(error)
+                        }
+                    }
+                }, 10000 * index);
+
             }
 
-            const reduceApiEndpoints = async (previous, endpoint) => {
-                await previous;
-                return apiCall(endpoint); 
-            };
+            // const reduceApiEndpoints = async (previous, endpoint) => {
+            //     await previous;
+            //     return apiCall(endpoint);
+            // };
 
-            const sequential = await products.reduce(reduceApiEndpoints, Promise.resolve());
+            // const sequential = await products.reduce(reduceApiEndpoints, Promise.resolve());
 
 
             // console.log("Ίδια προιόντα:", numberOfSame)

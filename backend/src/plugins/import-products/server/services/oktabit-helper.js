@@ -52,7 +52,7 @@ module.exports = ({ strapi }) => ({
                     subcategory: { title: prod.subcategory[0].trim() },
                     sub2category: { title: null },
                     mpn: prod.part_no[0].trim().toString(),
-                    name: prod.titlos[0].trim(),
+                    name: prod.titlos[0].replace(/[^\x00-\x7F]/g, "").trim(),
                     wholesale: parseFloat(prod.timi[0].replace(',', '.')).toFixed(2),
                     retail_price: parseFloat(prod.lianiki[0].replace(',', '.')).toFixed(2),
                     stockLevel: prod.availability[0].trim(),

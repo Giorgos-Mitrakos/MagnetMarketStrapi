@@ -30,7 +30,7 @@ module.exports = ({ strapi }) => ({
             if (retryCount <= 0) {
                 throw error;
             }
-            return await this.retry(promiseFactory, retryCount - 1,true);
+            return await this.retry(promiseFactory, retryCount - 1, true);
         }
     },
 
@@ -1798,7 +1798,7 @@ module.exports = ({ strapi }) => ({
                 if (findPercentage) {
                     addToPrice = findPercentage.add_to_price ? findPercentage.add_to_price : 0;
                     if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
-                        let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === brandId)
+                        let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand?.id === brandId)
                         if (findBrandPercentage) {
                             generalPercentage = findBrandPercentage.percentage
                         }
@@ -2360,14 +2360,14 @@ module.exports = ({ strapi }) => ({
             //     .service('helpers')
             //     .saveSEO(await responseImage.mainImageID.data[0], product, newEntry.id);
 
-            // importRef.related_entries.push(newEntry.id)
+            importRef.related_entries.push(newEntry.id)
             // if (product.relativeProducts && product.relativeProducts.length > 0)
             //     importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
 
             importRef.created += 1;
             // console.log("Created:", importRef.created)
         } catch (error) {
-            console.log("Error in Entry Function:", error, error.details?.errors)
+            console.log("Error in Entry Function:", error, error.details?.errors, product.name)
         }
 
     },

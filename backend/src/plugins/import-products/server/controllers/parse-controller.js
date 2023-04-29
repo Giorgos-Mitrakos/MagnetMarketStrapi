@@ -12,7 +12,7 @@ module.exports = {
     else if (ctx.request.body.entry.name === 'Oktabit') {
       ctx.body = await strapi
         .plugin('import-products')
-        .service('parseService')
+        .service('parseService') 
         .parseOktabitXml(ctx.request.body);
     }
     else if (ctx.request.body.entry.name === 'Globalsat') {
