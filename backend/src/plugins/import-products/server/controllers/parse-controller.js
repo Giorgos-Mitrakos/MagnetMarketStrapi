@@ -27,7 +27,7 @@ module.exports = {
         .service('parseService')
         .parseWestnetXml(ctx.request.body);
     }
-    else if (ctx.request.body.entry.name === 'GERASIS') {
+    else if (ctx.request.body.entry.name === 'Gerasis') {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')

@@ -34,7 +34,6 @@ module.exports = ({ strapi }) => ({
                 else request.continue()
             })
 
-
             if (fs.existsSync('./public/QuestCookies.json')) {
                 fs.readFile('./public/QuestCookies.json', async (err, data) => {
                     if (err)
@@ -137,33 +136,38 @@ module.exports = ({ strapi }) => ({
                     .service('helpers')
                     .randomWait(5000, 10000))
 
-                await this.scrapQuestSubcategories(browser, page, category, filteredCategories, importRef, entry, auth);
-                // filteredCategories.categories = await this.filterCategories(filteredCategories.categories, categoryMap.isWhitelistSelected, categoryMap.whitelist_map, categoryMap.blacklist_map)
-            }
-
-
-            // let scrapCategory = await this.scrapNovatronCategory(newCategories, page, categoryMap, charMaps, importRef, entry, auth)
-            // await browser.close();
+                await this.scrapQuestSubcategories(browser, category, filteredCategories, importRef, entry, auth);
+                }
         } catch (error) {
-            console.log(error)
-            // await browser.close();
+            return { "message": "error" }
         }
         finally {
             await browser.close();
         }
     },
 
-    async scrapQuestSubcategories(browser, page, category, filteredCategories, importRef, entry, auth) {
+    async scrapQuestSubcategories(browser, category, filteredCategories, importRef, entry, auth) {
+        const newPage = await browser.newPage();
+        await newPage.setViewport({ width: 1400, height: 600 })
+        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
+        await newPage.setRequestInterception(true)
+
+        newPage.on('request', (request) => {
+            if (request.resourceType() === 'image') request.abort()
+            else request.continue()
+        })
+
         try {
             await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .retry(
-                    () => page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" }),
+                    () => newPage.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" }),
                     5 // retry this 5 times
                 );
             // await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
-            const scrapSub = await page.$eval('.side-menu', (element) => {
+            const scrapSub = await newPage.$eval('.side-menu', (element) => {
                 const subList = element.querySelector('ul')
                 const subcategoriesList = subList.querySelectorAll('li')
 
@@ -187,35 +191,49 @@ module.exports = ({ strapi }) => ({
                 .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
             for (let sub of filteredCategories.categories[catIndex].subCategories) {
-                await page.waitForTimeout(strapi
+                await newPage.waitForTimeout(strapi
                     .plugin('import-products')
                     .service('helpers')
                     .randomWait(5000, 10000))
 
-                await this.scrapQuestSubcategories2(browser, page, category.title, sub, filteredCategories, importRef, entry, auth)
+                await this.scrapQuestSubcategories2(browser, category.title, sub, filteredCategories, importRef, entry, auth)
             }
         } catch (error) {
             console.log(error)
         }
+        finally {
+            newPage.close()
+        }
     },
 
-    async scrapQuestSubcategories2(browser, page, category, subcategory, filteredCategories, importRef, entry, auth) {
+    async scrapQuestSubcategories2(browser, category, subcategory, filteredCategories, importRef, entry, auth) {
+        const newPage = await browser.newPage();
+        await newPage.setViewport({ width: 1400, height: 600 })
+        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
+        await newPage.setRequestInterception(true)
+
+        newPage.on('request', (request) => {
+            if (request.resourceType() === 'image') request.abort()
+            else request.continue()
+        })
+
         try {
             await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .retry(
-                    () => page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" }),
+                    () => newPage.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" }),
                     5 // retry this 5 times
                 );
             // await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
-            const sideMenu = await page.$('.side-menu')
+            const sideMenu = await newPage.$('.side-menu')
 
             const catIndex = filteredCategories.categories.findIndex(x => x.title === category)
             const subIndex = filteredCategories.categories[catIndex].subCategories.findIndex(x => x.title === subcategory.title)
 
             if (sideMenu) {
-                const scrapSub = await page.$eval('.side-menu', (element) => {
+                const scrapSub = await newPage.$eval('.side-menu', (element) => {
                     const subList = element.querySelector('ul')
                     const subcategoriesList = subList.querySelectorAll('li')
 
@@ -239,35 +257,49 @@ module.exports = ({ strapi }) => ({
                     .filterCategories(filteredCategories.categories, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
                 for (let sub2 of filteredCategories.categories[catIndex].subCategories[subIndex].subCategories) {
-                    await this.scrapQuestCategory(browser, page, sub2.link, category, subcategory.title, sub2.title, importRef, entry, auth)
-                    await page.waitForTimeout(1000);
+                    await this.scrapQuestCategory(browser, sub2.link, category, subcategory.title, sub2.title, importRef, entry, auth)
+                    await newPage.waitForTimeout(1000);
                 }
             }
             else {
-                await page.waitForTimeout(strapi
+                await newPage.waitForTimeout(strapi
                     .plugin('import-products')
                     .service('helpers')
                     .randomWait(5000, 10000))
-                await this.scrapQuestCategory(browser, page, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
+                await this.scrapQuestCategory(browser, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
             }
 
         } catch (error) {
             console.log(error)
-        } 
+        }
+        finally {
+            newPage.close()
+        }
     },
 
-    async scrapQuestCategory(browser, page, link, category, subcategory, sub2category, importRef, entry, auth) {
+    async scrapQuestCategory(browser, link, category, subcategory, sub2category, importRef, entry, auth) {
+        const newPage = await browser.newPage();
+        await newPage.setViewport({ width: 1400, height: 600 })
+        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
+        await newPage.setRequestInterception(true)
+
+        newPage.on('request', (request) => {
+            if (request.resourceType() === 'image') request.abort()
+            else request.continue()
+        })
+
         try {
             await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .retry(
-                    () => page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" }),
+                    () => newPage.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" }),
                     5 // retry this 5 times
                 );
             // await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
 
-            const scrapProducts = await page.$eval('div.region-area-three>div.inner-area.inner-area-three', (element) => {
+            const scrapProducts = await newPage.$eval('div.region-area-three>div.inner-area.inner-area-three', (element) => {
                 const productListWrapper = element.querySelector('div.box>ul.product-list')
                 const productList = productListWrapper.querySelectorAll('li>article>div.description-container')
 
@@ -314,20 +346,23 @@ module.exports = ({ strapi }) => ({
 
             // console.dir(products)
             for (let product of products) {
-                await page.waitForTimeout(strapi
+                await newPage.waitForTimeout(strapi
                     .plugin('import-products')
                     .service('helpers')
                     .randomWait(5000, 10000))
-                await this.scrapQuestProduct(browser, page, product.link, category, subcategory, sub2category, importRef, entry, auth)
+                await this.scrapQuestProduct(browser, product.link, category, subcategory, sub2category, importRef, entry, auth)
                 // }
             }
 
         } catch (error) {
             console.log(error)
         }
+        finally {
+            newPage.close()
+        }
     },
 
-    async scrapQuestProduct(browser, page, productLink, category, subcategory, sub2category, importRef, entry, auth) {
+    async scrapQuestProduct(browser, productLink, category, subcategory, sub2category, importRef, entry, auth) {
         const newPage = await browser.newPage();
         await newPage.setViewport({ width: 1400, height: 600 })
         await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");

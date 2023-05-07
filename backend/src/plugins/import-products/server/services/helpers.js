@@ -417,6 +417,12 @@ module.exports = ({ strapi }) => ({
                     .service('oktabitHelper')
                     .getOktabitData(entry, categoryMap)
             }
+            else if (entry.name === "Gerasis") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('gerasisHelper')
+                    .getGerasisData(entry, categoryMap)
+            }
             else if (entry.name === "Shopflix") {
                 let { data } = await Axios.get(`${entry.importedURL}`)
                 const xml = await this.parseXml(await data)
@@ -472,10 +478,6 @@ module.exports = ({ strapi }) => ({
         const { categories_map, char_name_map, char_value_map, stock_map,
             isWhitelistSelected, whitelist_map, blacklist_map,
             xPath, minimumPrice, maximumPrice } = await categoryMap
-
-        // const { categories_map, char_name_map, char_value_map, stock_map,
-        //     isWhitelistSelected, whitelist_map, blacklist_map,
-        //     xPath, minimumPrice, maximumPrice } = await categoryMap
 
         const charMaps = await this.parseCharsToMap(char_name_map, char_value_map);
 
@@ -2361,8 +2363,8 @@ module.exports = ({ strapi }) => ({
             //     .saveSEO(await responseImage.mainImageID.data[0], product, newEntry.id);
 
             importRef.related_entries.push(newEntry.id)
-            // if (product.relativeProducts && product.relativeProducts.length > 0)
-            //     importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
+            if (product.relativeProducts && product.relativeProducts.length > 0)
+                importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
 
             importRef.created += 1;
             // console.log("Created:", importRef.created)
@@ -2549,9 +2551,6 @@ module.exports = ({ strapi }) => ({
     },
 
     async updateEntry(entryCheck, product, importRef) {
-
-        // console.log("Existed Data:", product.name)
-
         //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
         const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map,
             product.name, product.category.title, product.subcategory?.title, product.sub2category?.title);
@@ -2603,8 +2602,6 @@ module.exports = ({ strapi }) => ({
         }
 
         if (Object.keys(data).length !== 0) {
-
-            // console.log(data)
             await strapi.entityService.update('api::product.product', entryCheck.id, {
                 data
             });
@@ -2662,6 +2659,9 @@ module.exports = ({ strapi }) => ({
                 },
             });
 
+        console.log("related_products:", importXmlFile.related_products.length,
+            "importRef.related_entries:", importRef.related_entries.length)
+
 
         for (let product of importXmlFile.related_products) {
 
@@ -2712,6 +2712,7 @@ module.exports = ({ strapi }) => ({
         await strapi.entityService.update('plugin::import-products.importxml', entry.id,
             {
                 data: {
+                    lastRun: new Date(),
                     report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted}`,
                 },
             })

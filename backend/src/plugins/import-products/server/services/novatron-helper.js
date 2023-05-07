@@ -17,20 +17,18 @@ module.exports = ({ strapi }) => ({
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
 
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1200, height: 500 })
+        await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
+        await page.setRequestInterception(true)
+
+        page.on('request', (request) => {
+            if (request.resourceType() === 'image') request.abort()
+            else request.continue()
+        })
+
         try {
-            // const browser = await puppeteer.launch()
-            // const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
-            const page = await browser.newPage();
-            await page.setViewport({ width: 1200, height: 500 })
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
-
-            await page.setRequestInterception(true)
-
-            page.on('request', (request) => {
-                if (request.resourceType() === 'image') request.abort()
-                else request.continue()
-            })
-
             if (fs.existsSync('./public/NovatronCookies.json')) {
                 fs.readFile('./public/NovatronCookies.json', async (err, data) => {
                     if (err)
@@ -52,8 +50,7 @@ module.exports = ({ strapi }) => ({
                     false
                 );
 
-            // await page.goto('https://novatronsec.com/', { waitUntil: "networkidle0" });
-            const pageUrl = page.url();
+                const pageUrl = page.url();
 
             if (pageUrl === "https://novatronsec.com/Account/Login?ReturnUrl=%2F") {
                 const bodyHandle = await page.$('body');
@@ -120,8 +117,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .filterCategories(scrapProduct, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
-
-            await this.scrapNovatronCategory(browser, newCategories, page, importRef, entry, auth)
+            await this.scrapNovatronCategory(browser, newCategories, importRef, entry, auth)
             await browser.close();
         } catch (error) {
             console.log(error)
@@ -129,12 +125,21 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapNovatronCategory(browser, novatronCategories, page,
-        importRef, entry, auth) {
+    async scrapNovatronCategory(browser, novatronCategories, importRef, entry, auth) {
+        const newPage = await browser.newPage();
+        await newPage.setViewport({ width: 1400, height: 600 })
+        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+
+        await newPage.setRequestInterception(true)
+
+        newPage.on('request', (request) => {
+            if (request.resourceType() === 'image') request.abort()
+            else request.continue()
+        })
         try {
             for (let cat of novatronCategories) {
                 for (let sub of cat.subCategories) {
-                    await page.waitForTimeout(
+                    await newPage.waitForTimeout(
                         strapi
                             .plugin('import-products')
                             .service('helpers')
@@ -145,16 +150,13 @@ module.exports = ({ strapi }) => ({
                         .service('helpers')
                         .retry(
                             () => Promise.all(
-                                [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
-                                page.waitForNavigation()]),
+                                [newPage.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
+                                newPage.waitForNavigation()]),
                             5, // retry this 5 times,
                             false
                         );
-                    // await Promise.all(
-                    //     [page.goto(`https://novatronsec.com${sub.link}?top=all&stock=1`, { waitUntil: "networkidle0" }),
-                    //     page.waitForNavigation()]);
-
-                    const bodyHandle = await page.$("body");
+                        
+                    const bodyHandle = await newPage.$("body");
 
                     let scrap = await bodyHandle.evaluate(() => {
                         const productsGrid = document.querySelector(".products-grid");
@@ -207,25 +209,26 @@ module.exports = ({ strapi }) => ({
                         .plugin('import-products')
                         .service('helpers')
                         .updateAndFilterScrapProducts(scrap, cat.title, sub.title, null, importRef, entry)
-
-                    // console.log(products)
-
+                        
                     for (let prod of products) {
                         await page.waitForTimeout(
                             strapi
                                 .plugin('import-products')
                                 .service('helpers')
                                 .randomWait(5000, 10000))
-                        await this.scrapNovatronProduct(browser, prod.link, page, cat.title, sub.title, importRef, entry, auth)
-                    } 
+                        await this.scrapNovatronProduct(browser, prod.link, cat.title, sub.title, importRef, entry, auth)
+                    }
                 }
             }
         } catch (error) {
             console.log(error)
         }
+        finally {
+            newPage.close()
+        }
     },
 
-    async scrapNovatronProduct(browser, productLink, page, category, subcategory,
+    async scrapNovatronProduct(browser, productLink, category, subcategory,
         importRef, entry, auth) {
 
         const newPage = await browser.newPage();
@@ -233,19 +236,15 @@ module.exports = ({ strapi }) => ({
         await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
         try {
-
             await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .retry(
                     () => newPage.goto(productLink, { waitUntil: "networkidle0" }),
-                    
+
                     5, // retry this 5 times,
                     false
                 );
-
-            // await Promise.all([newPage.goto(productLink, { waitUntil: "networkidle0" }),
-            // newPage.waitForNavigation()])
 
             let productUrl = newPage.url();
             const urlArray = productUrl.split("/")

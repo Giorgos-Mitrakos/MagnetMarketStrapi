@@ -24,6 +24,9 @@ module.exports = ({ strapi }) => ({
             console.log("Ξεκινάω να κατεβάζω τα xml...")
             console.log("Downloading products...")
             const productsPrices = await this.getOktabitProductsXml(entry, 'prices_xml.asp?')
+            if (productsPrices.message) {
+                return { message: "Error" }
+            }
 
             console.log("Downloading περιγραφές...")
             const productsDescriptions = await this.getOktabitProductsXml(entry, 'perigrafes_xml.asp?')
@@ -60,42 +63,59 @@ module.exports = ({ strapi }) => ({
                     brand_name: prod.brand[0].trim(),
                     barcode: prod.ean_code[0].trim()
                 }
-                const productDescription = productsDescriptions?.perigrafes.product.filter(x => x.code[0] === prod.code[0])
 
-                const stripContent = productDescription && productDescription[0]?.perigrafi[0].replace(/(<([^>]+)>)/ig, '').trim();
+                if (productsDescriptions.message) {
+                    return { message: "Error" }
+                }
+                else {
+                    const productDescription = productsDescriptions?.perigrafes.product.filter(x => x.code[0] === prod.code[0])
 
-                product.description = stripContent ? stripContent : ""
+                    const stripContent = productDescription && productDescription[0]?.perigrafi[0].replace(/(<([^>]+)>)/ig, '').trim();
 
+                    product.description = stripContent ? stripContent : ""
+                }
 
-                const chars = [] 
-                const productChars = productsChars?.data.chars.filter(x => x.product[0] === prod.code[0])
+                const chars = []
+                if (productsChars.message) {
+                    return { message: "Error" }
+                }
+                else {
+                    const productChars = productsChars?.data.chars.filter(x => x.product[0] === prod.code[0])
 
-                if (productChars) {
-                    for (let productChar of productChars) {
-                        const char = {}
-                        char.name = productChar.atribute[0]
-                        char.value = productChar.value[0]
-                        chars.push(char)
+                    if (productChars) {
+                        for (let productChar of productChars) {
+                            const char = {}
+                            char.name = productChar.atribute[0]
+                            char.value = productChar.value[0]
+                            chars.push(char)
+                        }
                     }
                 }
 
-                const productChars2 = productsChars2?.data.chars.filter(x => x.product[0] === prod.code[0])
+                if (productsChars2.message) {
+                    return { message: "Error" }
+                }
+                else {
+                    const productChars2 = productsChars2?.data.chars.filter(x => x.product[0] === prod.code[0])
 
-                if (productChars2) { 
-                    for (let productChar of productChars2) {
-                        const char = {}
-                        char.name = productChar.atribute[0]
-                        char.value = productChar.value[0]
-                        chars.push(char)
+                    if (productChars2) {
+                        for (let productChar of productChars2) {
+                            const char = {}
+                            char.name = productChar.atribute[0]
+                            char.value = productChar.value[0]
+                            chars.push(char)
+                        }
                     }
                 }
 
-                const parsedChars = await strapi
-                    .plugin('import-products')
-                    .service('helpers')
-                    .parseChars(chars, mapCharNames, mapCharValues)
+                if (chars.length > 0) {
+                    const parsedChars = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .parseChars(chars, mapCharNames, mapCharValues)
 
-                product.prod_chars = parsedChars
+                    product.prod_chars = parsedChars
+                }
 
                 const imageUrls = [{ url: `https://www.oktabit.gr/media/products/heroes/${product.supplierCode}/${product.supplierCode}.jpg` }]
                 for (let j = 1; j < 5; j++) {
@@ -133,7 +153,7 @@ module.exports = ({ strapi }) => ({
 
             return xml
         } catch (error) {
-            console.log(error)
+            return { message: "Error" }
         }
     },
 

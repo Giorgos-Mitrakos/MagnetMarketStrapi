@@ -5,6 +5,7 @@ const parseService = require('./parse-xml-service');
 const helpers = require('./helpers');
 const mapping = require('./mapping');
 const oktabitHelper = require('./oktabit-helper');
+const gerasisHelper = require('./gerasis-helper');
 const novatronHelper = require('./novatron-helper');
 const questHelper = require('./quest-helper');
 const globalsatHelper = require('./globalsat-helper');
@@ -17,6 +18,7 @@ module.exports = {
   helpers, 
   mapping,
   oktabitHelper,
+  gerasisHelper,
   novatronHelper,
   questHelper,
   globalsatHelper,
