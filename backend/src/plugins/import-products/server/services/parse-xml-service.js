@@ -16,6 +16,116 @@ const { DOMParser, XMLSerializer, DOMImplementation } = require('xmldom');
 
 
 module.exports = ({ strapi }) => ({
+    async updateAll() {
+
+        await scrapNOVATRON()
+            .then(async () => { return updateZEGETRON() })
+            .then(async () => { return updateGERASIS() })
+            .then(async () => { return updateOKTABIT() })
+            .then(async () => { return scrapQUEST() }) 
+
+        async function scrapNOVATRON() {
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Novatron" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseNovatronXml({ entry, auth });
+        }
+
+        async function updateZEGETRON() {
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Zegetron" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseZegetronXml({ entry, auth });
+        }
+
+        async function updateGERASIS() {
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Gerasis" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseGerasisXml({ entry, auth });
+        }
+
+        async function updateOKTABIT() {
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Oktabit" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseOktabitXml({ entry, auth });
+        }
+
+        async function scrapQUEST() {
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "QUEST" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseQuestXml({ entry, auth });
+        }
+
+    },
+
     async parseLogicomXml({ entry, auth }) {
         try {
             // const parser = new xml2js.Parser();
@@ -318,6 +428,178 @@ module.exports = ({ strapi }) => ({
         }
     },
 
+    async parseZegetronXml({ entry, auth }) {
+        try {
+
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            const products = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .getData(entry, importRef.categoryMap);
+
+            console.log(products.length)
+
+            if (products.length === 0)
+                return { "message": "xml is empty" }
+
+            const { categories_map, char_name_map, char_value_map, stock_map,
+                isWhitelistSelected, whitelist_map, blacklist_map,
+                xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+            // console.log("newData:", newData.length)
+            const charMaps = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .parseCharsToMap(char_name_map, char_value_map);
+
+            const { mapCharNames, mapCharValues } = charMaps
+            // console.log(products)
+
+            // let index = 0;
+            for (let dt of products) {
+                // index++
+
+
+                // setTimeout(async () => {
+
+
+                // console.log("delay:", `${5000 * index}`, "MPN: ", dt.mpn, " Barcode: ", dt.barcode)
+
+                let mpn = dt.part_number[0].trim().toString()
+                let name = dt.title[0].trim()
+                let barcode = dt.barcode ? dt.barcode[0].trim() : null
+                let brand_name = dt.manufacturer[0].trim()
+
+                const { entryCheck, brandId } = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                const product = {
+                    entry,
+                    name,
+                    supplierCode: dt.product_id[0].trim(),
+                    // description: dt.description, 
+                    category: { title: dt.category[0].trim() },
+                    subcategory: { title: null },
+                    sub2category: { title: null },
+                    mpn,
+                    barcode,
+                    // slug: dt.partNumber ? 
+                    //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                    //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                    // publishedAt: new Date(),
+                    quantity: parseInt(dt.stock[0]),
+                    wholesale: parseFloat(dt.price[0].replace(',', '.')).toFixed(2),
+                    // imagesSrc: dt.imagesSrc,
+                    brand: { id: await brandId },
+                    retail_price: parseFloat(dt.suggested_retail_price[0].replace(',', '.')).toFixed(2),
+                    recycleTax: parseFloat(dt.recycling_fee[0].replace(',', '.')).toFixed(2),
+                    // link: dt.url[0].trim(),
+                    related_import: entry.id,
+                    // prod_chars: dt.prod_chars
+                }
+
+                const stripContent = dt.description[0]?.replace(/(<([^>]+)>)/ig, '').trim();
+
+                product.description = stripContent ? stripContent : ""
+
+                // const chars = []
+
+                // if (dt.product_chars) {
+                //     for (let productChar of dt.product_chars[0].char) {
+                //         const char = {}
+                //         char.name = productChar.char_name[0]
+                //         char.value = productChar.char_value[0]
+                //         chars.push(char)
+                //     }
+
+                //     const parsedChars = await strapi
+                //         .plugin('import-products')
+                //         .service('helpers')
+                //         .parseChars(chars, mapCharNames, mapCharValues)
+
+                //     product.prod_chars = parsedChars
+                // }
+
+
+                const imageUrls = []
+                if (dt.images[0].image && dt.images[0].image.length > 0) {
+                    for (let image of dt.images[0].image) {
+                        if (imageUrls.length >= 5)
+                            break;
+                        imageUrls.push({ url: image })
+                    }
+
+                    product.imagesSrc = imageUrls
+                }
+                // console.log(product)
+                //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+                if (!entryCheck) {
+
+                    try {
+                        // var startTime = performance.now()
+                        // setTimeout(async () => {
+                        const response = await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .createEntry(product, importRef, auth);
+                        // var endTime = performance.now()
+
+                        await response
+                        //     console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
+                        // }, 3000 * index);
+                    } catch (error) {
+                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                    }
+                }
+                else {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .updateEntry(entryCheck, product, importRef);
+
+                        // console.log("Updated")
+                    } catch (error) {
+                        console.log(error)
+                    }
+                }
+                // }, 10000 * index);
+
+            }
+            // }
+
+            // const reduceApiEndpoints = async (previous, endpoint) => {
+            //     await previous;
+            //     return apiCall(endpoint);
+            // };
+
+            // const sequential = await products.reduce(reduceApiEndpoints, Promise.resolve());
+
+
+            // console.log("Ίδια προιόντα:", numberOfSame)
+
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .deleteEntry(entry, importRef);
+
+            console.log(importRef)
+
+            console.log("End of Import")
+            return { "message": "ok" }
+        }
+        catch (err) {
+            console.log(err);
+        }
+    },
+
     async parseGlobalsat({ entry, auth }) {
         const importRef = await strapi
             .plugin('import-products')
@@ -521,7 +803,7 @@ module.exports = ({ strapi }) => ({
             const { mapCharNames, mapCharValues } = charMaps
             // console.log(products)
 
-            let index = 0;
+            // let index = 0;
             for (let dt of products) {
                 // index++
 

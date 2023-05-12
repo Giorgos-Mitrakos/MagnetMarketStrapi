@@ -15,6 +15,12 @@ module.exports = {
         .service('parseService') 
         .parseOktabitXml(ctx.request.body);
     }
+    else if (ctx.request.body.entry.name === 'Zegetron') {
+      ctx.body = await strapi
+        .plugin('import-products')
+        .service('parseService') 
+        .parseZegetronXml(ctx.request.body);
+    }
     else if (ctx.request.body.entry.name === 'Globalsat') {
       ctx.body = await strapi
         .plugin('import-products')

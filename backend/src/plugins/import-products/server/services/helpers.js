@@ -279,7 +279,7 @@ module.exports = ({ strapi }) => ({
             supplierInfo.price_progress = [price_progress]
         }
 
-        if (supplierInfo.in_offer) {
+        if (product.in_offer) {
             supplierInfo.in_offer = product.in_offer
         }
 
@@ -289,10 +289,14 @@ module.exports = ({ strapi }) => ({
 
         if (product.retail_price) {
             supplierInfo.retail_price = parseFloat(product.retail_price).toFixed(2)
-        }
+        } 
 
         if (product.recycle_tax) {
             supplierInfo.recycle_tax = parseFloat(product.recycle_tax).toFixed(2)
+        }
+
+        if (product.quantity) {
+            supplierInfo.quantity = parseInt(product.quantity)
         }
 
         return supplierInfo
@@ -422,6 +426,12 @@ module.exports = ({ strapi }) => ({
                     .plugin('import-products')
                     .service('gerasisHelper')
                     .getGerasisData(entry, categoryMap)
+            }
+            else if (entry.name === "Zegetron") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('zegetronHelper')
+                    .getZegetronData(entry, categoryMap)
             }
             else if (entry.name === "Shopflix") {
                 let { data } = await Axios.get(`${entry.importedURL}`)

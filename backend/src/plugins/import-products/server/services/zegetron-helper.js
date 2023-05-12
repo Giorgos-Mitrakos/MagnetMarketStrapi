@@ -5,7 +5,7 @@ const Iconv = require('iconv').Iconv;
 
 module.exports = ({ strapi }) => ({
 
-    async getGerasisData(entry, categoryMap) {
+    async getZegetronData(entry, categoryMap) {
         try {
             const { categories_map, char_name_map, char_value_map, stock_map,
                 isWhitelistSelected, whitelist_map, blacklist_map,
@@ -24,21 +24,24 @@ module.exports = ({ strapi }) => ({
             const data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
 
-            const xPathFilter = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .xPathFilter(await data, entry);
+            // const xPathFilter = await strapi
+            //     .plugin('import-products')
+            //     .service('helpers')
+            //     .xPathFilter(await data, entry);
 
             const xml = await strapi
                 .plugin('import-products')
-                .service('helpers').parseXml(xPathFilter)
+                .service('helpers').parseXml(await data.data)
+
+            console.log(xml.mywebstore.products[0].product.length)
 
             const unique_product = {
                 mpn: []
             }
-            
-            const availableProducts = this.filterData(xml.products.product, categoryMap, unique_product)
 
+            const availableProducts = this.filterData(xml.mywebstore.products[0].product, categoryMap, unique_product)
+
+            console.log(availableProducts.length)
             return availableProducts
         } catch (error) {
             console.log(error)
@@ -48,26 +51,27 @@ module.exports = ({ strapi }) => ({
     filterData(data, categoryMap, unique_product) {
 
         const newData = data
-            .filter(filterUnique)
-            .filter(filterStock) 
+            // .filter(filterUnique)
+            .filter(filterStock)
             .filter(filterPriceRange)
             .filter(filterCategories)
             .filter(filterImages)
 
         function filterUnique(unique) {
-            if (unique_product.mpn.includes(unique.mpn[0].trim().toString())) {
+            if (unique_product.mpn.includes(unique.part_number[0].trim().toString())) {
                 return false
             }
             else {
-                unique_product.mpn.push(unique.mpn[0].trim().toString())
-                return true
+                unique_product.mpn.push(unique.part_number[0].trim().toString())
+                return true 
             }
         }
 
         function filterStock(stockName) {
+            // console.log(categoryMap.stock_map[0])
             if (categoryMap.stock_map.length > 0) {
-                let catIndex = categoryMap.stock_map.findIndex(x => x.name.trim() === stockName.instock[0].trim())
-                if (catIndex !== -1) {
+                // let catIndex = categoryMap.stock_map[0].findIndex(x => x.name.trim() === stockName.stock[0].trim())
+                if (parseInt(categoryMap.stock_map[0].name) <= parseInt(stockName.stock[0])) {
                     return true
                 }
                 else {
@@ -80,9 +84,9 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterCategories(cat) {
-            let category = cat.product_categories[0].category_path[0]._.split("->")[0].trim()
-            let subcategory = cat.product_categories[0].category_path[0]._.split("->")[1] ? cat.product_categories[0].category_path[0]._.split("->")[1].trim() : null
-            let sub2category = cat.product_categories[0].category_path[0]._.split("->")[2] ? cat.product_categories[0].category_path[0]._.split("->")[2].trim() : null
+            let category = cat.category[0].trim()
+            let subcategory = null
+            let sub2category = null
 
             if (categoryMap.isWhitelistSelected) {
                 if (categoryMap.whitelist_map.length > 0) {
@@ -161,7 +165,7 @@ module.exports = ({ strapi }) => ({
                 maxPrice = 100000;
             }
 
-            const productPrice = priceRange.price[0].price_original[0].replace(",", ".")
+            const productPrice = priceRange.price[0].replace(",", ".")
 
             if (productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
@@ -172,8 +176,8 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterImages(image) {
-            if (image.images[0].image_url) {
-                return true
+            if (image.images[0].image && image.images[0].image.length > 0) {
+                return true 
             }
             else {
                 return false
@@ -182,6 +186,6 @@ module.exports = ({ strapi }) => ({
 
         return newData
 
-    }, 
+    },
 
 });
