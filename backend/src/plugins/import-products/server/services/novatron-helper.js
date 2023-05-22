@@ -10,12 +10,10 @@ module.exports = ({ strapi }) => ({
 
     async scrapNovatronCategories(importRef, entry, auth) {
         // const browser = await puppeteer.launch()
-        const browser = await puppeteer.launch(
-            {
-                headless: false,
-                executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
+        const browser = await strapi
+        .plugin('import-products')
+        .service('helpers')
+        .createBrowser()
 
         const page = await browser.newPage();
         await page.setViewport({ width: 1200, height: 500 })
@@ -211,7 +209,7 @@ module.exports = ({ strapi }) => ({
                         .updateAndFilterScrapProducts(scrap, cat.title, sub.title, null, importRef, entry)
                         
                     for (let prod of products) {
-                        await page.waitForTimeout(
+                        await newPage.waitForTimeout(
                             strapi
                                 .plugin('import-products')
                                 .service('helpers')

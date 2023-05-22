@@ -22,7 +22,7 @@ module.exports = ({ strapi }) => ({
             .then(async () => { return updateZEGETRON() })
             .then(async () => { return updateGERASIS() })
             .then(async () => { return updateOKTABIT() })
-            .then(async () => { return scrapQUEST() }) 
+            .then(async () => { return scrapQUEST() })
 
         async function scrapNOVATRON() {
             const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
@@ -129,130 +129,147 @@ module.exports = ({ strapi }) => ({
     async parseLogicomXml({ entry, auth }) {
         try {
             // const parser = new xml2js.Parser();
-            const importRef = {
-                created: 0,
-                updated: 0,
-                republished: 0,
-                deleted: 0,
-                related_entries: []
-            }
-
-            const data = await strapi
+            const importRef = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getData(entry);
+                .createImportRef(entry);
 
-            // console.log(data.Pricelist.Items[0].Item.length)
+            const products = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .getData(entry, importRef.categoryMap);
 
-            if (data.Pricelist.Items[0].Item.length === 0)
+            // console.log(products)
+
+            if (products.length === 0)
                 return { "message": "xml is empty" }
 
-            const dataTitles = {
-                entry,
-                category_1: 'Cat1_Desc',
-                category_2: 'Cat2_Desc',
-                category_3: 'Cat3_Desc',
-                brandName: 'Brand',
-                supplierCode: 'ItemCode',
-                productURL: '',
-                imageUrls: 'PictureURL',
-                title: 'ItemTitle',
-                description: '',
-                partNumber: 'ItemCode',
-                barcode: 'EANBarcode',
-                status: 'StockLevel',
-                price: 'NetPrice',
-                recycleTax: 'RecycleTax',
-                suggestedPrice: ''
-            }
+            const { categories_map, char_name_map, char_value_map, stock_map,
+                isWhitelistSelected, whitelist_map, blacklist_map,
+                xPath, minimumPrice, maximumPrice } = importRef.categoryMap
 
-            const editData = await strapi
+            // console.log("newData:", newData.length)
+            const charMaps = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .editData(await data.Pricelist.Items[0].Item, dataTitles);
-
-            const { newData, categoryMap, charMaps } = await editData;
-
-            console.log(newData.length)
+                .parseCharsToMap(char_name_map, char_value_map);
 
             const { mapCharNames, mapCharValues } = charMaps
 
-            for (let dt of newData) {
-
-                const parsedDataTitles = await strapi
+            const { browser, page } =
+                await strapi
                     .plugin('import-products')
-                    .service('helpers')
-                    .parseDatatitles(dt, dataTitles);
+                    .service('logicomHelper')
+                    .scrapLogicom();
+            try {
+                for (let dt of products) {
+                    let mpn = dt.ItemCode[0].trim().toString()
+                    let name = dt.ItemTitle[0].trim()
+                    let barcode = dt.EANBarcode ? dt.EANBarcode[0].trim() : null
+                    let brand_name = dt.Brand[0].trim()
 
-                // console.log(parsedDataTitles)
+                    const { entryCheck, brandId } = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .checkProductAndBrand(mpn, name, barcode, brand_name, null);
 
-                const { entryCheck, product } = await strapi
-                    .plugin('import-products')
-                    .service('helpers')
-                    .constructProduct(parsedDataTitles);
+                    const product = {
+                        entry,
+                        name,
+                        // supplierCode: dt.product_id[0].trim(),
+                        // description: dt.description, 
+                        category: { title: dt.Cat1_Desc[0].trim() },
+                        subcategory: dt.Cat2_Desc[0] ? { title: dt.Cat2_Desc[0].trim() } : { title: null },
+                        sub2category: dt.Cat3_Desc[0] ? { title: dt.Cat3_Desc[0].trim() } : { title: null },
+                        mpn,
+                        barcode,
+                        // slug: dt.partNumber ? 
+                        //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                        //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                        // publishedAt: new Date(),
+                        stockLevel: dt.StockLevel[0].trim(),
+                        wholesale: parseFloat(dt.NetPrice[0].replace(',', '.')).toFixed(2),
+                        // imagesSrc: dt.imagesSrc,
+                        brand: { id: await brandId },
+                        // retail_price: dt.retail_price,
+                        recycleTax: parseFloat(dt.RecycleTax[0].replace(',', '.')).toFixed(2),
+                        // link: dt.url[0].trim(),
+                        // related_import: entry.id,
+                        // prod_chars: dt.prod_chars
+                    }
 
-                console.log(product)
+                    //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
-                //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
-                if (!entryCheck) {
-                    try {
-                        const { scrap, productUrl } =
-                            await strapi
-                                .plugin('import-products')
-                                .service('helpers')
-                                .scrapLogicom(product.mpn);
+                    if (!entryCheck) {
+                        try {
+                            const { scrap, productUrl } =
+                                await strapi
+                                    .plugin('import-products')
+                                    .service('logicomHelper')
+                                    .scrapLogicomProduct(page, mpn);
 
-                        const { prod_chars, imagesSrc } = await scrap
+                            const { prod_chars, imagesSrc } = await scrap
 
-                        // Προσθέτω τις πληροφορίες που πήρα από scrapping
-                        product.prod_chars = prod_chars;
-                        // product.barcode = EAN ? EAN : null;
-                        // product.brand = { id: brandId };
-                        product.supplierInfo = [{
-                            name: entry.name,
-                            wholesale: parsedDataTitles.price,
-                            recycle_tax: parsedDataTitles.recycleTax,
-                            supplierProductId: parsedDataTitles.supplierCode.toString(),
-                            supplierProductURL: productUrl,
-                            price_progress: [{
-                                date: new Date(),
-                                price: parsedDataTitles.price,
+                            // Προσθέτω τις πληροφορίες που πήρα από scrapping
+                            product.prod_chars = await prod_chars;
+                            // product.barcode = EAN ? EAN : null;
+                            // product.brand = { id: brandId };
+                            product.supplierInfo = [{
+                                name: entry.name,
+                                wholesale: product.wholesale,
+                                recycle_tax: product.recycleTax,
+                                supplierProductId: dt.ItemCode[0].trim().toString(),
+                                supplierProductURL: productUrl,
+                                price_progress: [{
+                                    date: new Date(),
+                                    price: product.wholesale,
+                                }]
                             }]
-                        }]
 
-                        await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .createEntry(parsedDataTitles, product, importRef,
-                                prod_chars, mapCharNames, mapCharValues, imagesSrc, auth);
+                            product.imagesSrc = dt.PictureURL[0] !== "" ? dt.PictureURL[0] : imagesSrc;
 
-                    } catch (error) {
-                        console.log(error)
+                            // console.log({ name: product.name, xmlImage: dt.PictureURL[0], imagesSrc })
+                            console.log({ Product: product })
+
+                            // await strapi
+                            //     .plugin('import-products')
+                            //     .service('helpers')
+                            //     .createEntry(parsedDataTitles, product, importRef,
+                            //         prod_chars, mapCharNames, mapCharValues, imagesSrc, auth);
+
+                        } catch (error) {
+                            console.log(error)
+                        }
+                    }
+                    else {
+                        try {
+                            const { scrap, productUrl } =
+                                await strapi
+                                    .plugin('import-products')
+                                    .service('logicomHelper')
+                                    .scrapLogicom(product.mpn);
+
+                            // await strapi
+                            //     .plugin('import-products')
+                            //     .service('helpers')
+                            //     .updateEntry(parsedDataTitles, entryCheck, importRef, productUrl);
+
+                        } catch (error) {
+                            console.log(error)
+                        }
                     }
                 }
-                else {
-                    try {
-                        const { scrap, productUrl } =
-                            await strapi
-                                .plugin('import-products')
-                                .service('helpers')
-                                .scrapLogicom(product.mpn);
-
-                        await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .updateEntry(parsedDataTitles, entryCheck, importRef, productUrl);
-
-                    } catch (error) {
-                        console.log(error)
-                    }
-                }
+            } catch (error) {
+                await browser.close()
+            }
+            finally {
+                await browser.close()
             }
 
-            await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .deleteEntry(entry, importRef);
+            // await strapi
+            //     .plugin('import-products')
+            //     .service('helpers')
+            //     .deleteEntry(entry, importRef);
 
             console.log(importRef)
             console.log("End of Import")
@@ -441,8 +458,6 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
 
-            console.log(products.length)
-
             if (products.length === 0)
                 return { "message": "xml is empty" }
 
@@ -537,7 +552,7 @@ module.exports = ({ strapi }) => ({
 
                     product.imagesSrc = imageUrls
                 }
-                // console.log(product)
+                // console.log(product) 
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
                 if (!entryCheck) {
@@ -573,17 +588,6 @@ module.exports = ({ strapi }) => ({
                 // }, 10000 * index);
 
             }
-            // }
-
-            // const reduceApiEndpoints = async (previous, endpoint) => {
-            //     await previous;
-            //     return apiCall(endpoint);
-            // };
-
-            // const sequential = await products.reduce(reduceApiEndpoints, Promise.resolve());
-
-
-            // console.log("Ίδια προιόντα:", numberOfSame)
 
             await strapi
                 .plugin('import-products')
@@ -630,28 +634,10 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .createImportRef(entry);
 
-            const data = await strapi
+            const products = await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
-
-
-            console.log("Προϊόντα στο xml της Westnet:", data.products.product.length)
-            // Φιλτράρω τα προϊόντα
-            const availableProducts = await strapi
-                .plugin('import-products')
-                .service('westnetHelper')
-                .filterData(data.products.product, importRef.categoryMap)
-
-
-            console.log("Προϊόντα μετά το φιλτράρισμα:", availableProducts.length)
-            // console.log(availableProducts)
-
-            // let categories = data.products.product.map(x => x.category[0])
-
-            // const unique_names = [...new Set(categories)]
-
-            // console.log(unique_names)
 
             const { categories_map, char_name_map, char_value_map, stock_map,
                 isWhitelistSelected, whitelist_map, blacklist_map,
@@ -665,16 +651,20 @@ module.exports = ({ strapi }) => ({
 
             const { mapCharNames, mapCharValues } = charMaps
 
-            for (let dt of availableProducts) {
+            for (let dt of products) {
+
+                let mpn = dt.partNumber[0].trim().toString()
+                let name = dt.name[0].trim()
+                let barcode = dt.barCode ? dt.barCode[0].trim() : null
+                let brand_name = dt.manufacturer[0].trim()
 
                 const { entryCheck, brandId } = await strapi
                     .plugin('import-products')
                     .service('helpers')
-                    .checkProductAndBrand(dt.partNumber[0], dt.name[0], dt.barCode[0],
-                        dt.manufacturer[0], null);
+                    .checkProductAndBrand(mpn, name, barcode, brand_name, null);
 
                 //Κατασκευάζω το URL του προϊόντος του προμηθευτή
-                let productUrl = `https://www.mywestnet.com${dt.url[0]}`
+                let productUrl = `https://www.mywestnet.com/el${dt.url[0]}`
 
                 const chars = []
                 // console.log(typeof dt.specs[0].spec)
@@ -695,14 +685,14 @@ module.exports = ({ strapi }) => ({
 
                 const product = {
                     entry,
-                    name: dt.name[0],
+                    name,
                     supplierCode: dt.id[0],
                     description: dt.description[0],
                     category: { title: dt.category[0] },
                     subcategory: { title: null },
                     sub2category: { title: null },
-                    mpn: dt.partNumber[0],
-                    barcode: dt.barCode[0].toString(),
+                    mpn,
+                    barcode,
                     // slug: dt.partNumber ? 
                     //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
                     //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
@@ -729,6 +719,8 @@ module.exports = ({ strapi }) => ({
                     // }],
                     prod_chars: parsedChars
                 }
+
+                console.log(product)
 
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 

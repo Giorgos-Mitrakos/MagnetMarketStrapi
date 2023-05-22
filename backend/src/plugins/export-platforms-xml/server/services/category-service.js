@@ -36,7 +36,7 @@ module.exports = ({ strapi }) => ({
     })
     return await categories;
   },
-
+ 
   async saveExportCategories({ platformID, categoriesID }) {
     try {
       await strapi.entityService.update('api::platform.platform', platformID, {

@@ -59,6 +59,7 @@ module.exports = ({ strapi }) => ({
             .filter(filterStock)
             .filter(filterPriceRange)
             .filter(filterCategories)
+            .filter(filterImages)
 
         function filterStock(stockName) {
             if (categoryMap.stock_map.length > 0) {
@@ -140,6 +141,15 @@ module.exports = ({ strapi }) => ({
 
             if (productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
+            }
+            else {
+                return false
+            }
+        }
+
+        function filterImages(image) {
+            if (image.image && image.image!=="") {
+                return true 
             }
             else {
                 return false

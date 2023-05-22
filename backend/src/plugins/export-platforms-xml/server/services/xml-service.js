@@ -2,6 +2,7 @@
 
 const xml2js = require('xml2js');
 const slugify = require("slugify");
+const fs = require('fs');
 
 module.exports = ({ strapi }) => ({
     async createXml(platform) {
@@ -46,30 +47,29 @@ module.exports = ({ strapi }) => ({
                 case "skroutz":
                     finalEntries = await this.createSkroutzXML(entries, suppliers)
                     break;
+                case "shopflix":
+                    finalEntries = await this.createShopflixXML(entries, suppliers)
+                    break;
 
                 default:
                     break;
             }
 
-            var builder = new xml2js.Builder();
-            let date = new Date()
-            let createdAt = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
-            var xml = builder.buildObject({ webstore: { created_at: createdAt, products: [finalEntries] } });
 
-            return xml;
+            // return xml;
         } catch (error) {
             console.log(error)
         }
     },
 
     async createSkroutzXML(entries, suppliers) {
-        try {  
+        try {
             let finalEntries = []
             for (let category of entries.export_categories) {
                 let categoryPath = await this.createCategoryPath(category)
                 for (let product of category.products) {
                     let { availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
-                    let newEntry = { 
+                    let newEntry = {
                         uniqueID: product.id,
                         name: product.name,
                         link: `https://magnetmarket.gr/product/${slugify(`${product.name.replaceAll("/", "-").replaceAll("|", "")}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g })}`,
@@ -89,7 +89,66 @@ module.exports = ({ strapi }) => ({
                 }
 
             }
-            return finalEntries
+
+            var builder = new xml2js.Builder();
+            let date = new Date()
+            let createdAt = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
+            var xml = builder.buildObject({ webstore: { created_at: createdAt, products: [finalEntries] } });
+
+            fs.writeFile('./public/feeds/Skroutz.xml', xml, (err) => {
+                if (err)
+                    console.log(err);
+            })
+            console.log(finalEntries.length);
+            // return finalEntries
+        } catch (error) {
+            console.log(error)
+        }
+    },
+
+    async createShopflixXML(entries, suppliers) {
+        try {
+            let finalEntries = []
+            for (let category of entries.export_categories) {
+                for (let product of category.products) {
+                    let { availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
+                    let newEntry = {
+                        SKU: product.id,
+                        name: product.name,
+                        EAN: product.barcode ? product.barcode : `magnetmarket-${product.id}`,
+                        MPN: product.mpn,
+                        manufacturer: product.brand?.name,
+                        description: product.description,
+                        url: `https://magnetmarket.gr/product/${slugify(`${product.name.replaceAll("/", "-").replaceAll("|", "")}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g })}`,
+                        image: product.image ? `https://api.magnetmarket.eu/${product.image.url}` : "",
+                        // additional_image: product.additionalImages ? `https://api.magnetmarket.eu/${product.additionalImages[0]}` : "",
+                        category: category.name,
+                        price,
+                        list_price: '',
+                        quantity: 2,
+                        offer_from: '',
+                        offer_to: '',
+                        offer_price: '',
+                        offer_quantity: '',
+                        shipping_lead_time: availability,
+                    }
+
+                    finalEntries.push({ product: newEntry })
+                }
+
+            }
+            // console.log(finalEntries)
+            var builder = new xml2js.Builder();
+            let date = new Date()
+            let createdAt = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
+            var xml = builder.buildObject({ MPITEMS: { created_at: createdAt, products: [finalEntries] } });
+
+            fs.writeFile('./public/feeds/Shopflix.xml', xml, (err) => {
+                if (err)
+                    console.log(err);
+            })
+            console.log(finalEntries.length);
+            // return finalEntries
         } catch (error) {
             console.log(error)
         }
@@ -162,15 +221,19 @@ module.exports = ({ strapi }) => ({
 
         let price = this.createPrice(fasterAvailability, platform, product, category)
 
-        console.log(price)
         return { availability, price }
     },
 
     createAvailability(fasterAvailability, platform, product) {
+        const platformName = platform.name.toLowerCase()
         let availability = ""
 
-        if (product.inventory && product.inventory > 0)
-            availability = "Διαθέσιμο από 1-3 ημέρες"
+        if (product.inventory && product.inventory > 0) {
+            if (platform.name === "skroutz") { availability = "Διαθέσιμο από 1-3 ημέρες" }
+            else {
+                availability = 0
+            }
+        }
 
         var minutesOfDay = function (m) {
             return m.getMinutes() + m.getHours() * 60;
@@ -188,17 +251,29 @@ module.exports = ({ strapi }) => ({
 
         if (fasterAvailability.availability < 2) {
             if (minutesOfDay(orderTime) > minutesOfDay(date) || minutesOfDay(platformTime) < minutesOfDay(date)) {
-                availability = "Διαθέσιμο από 1-3 ημέρες"
+                if (platformName === "skroutz") { availability = "Διαθέσιμο από 1-3 ημέρες" }
+                else {
+                    availability = fasterAvailability.availability
+                }
             }
             else {
-                availability = "Διαθέσιμο από 4-10 ημέρες"
+                if (platformName === "skroutz") { availability = "Διαθέσιμο από 4-10 ημέρες" }
+                else {
+                    availability = fasterAvailability.availability + 1
+                }
             }
         }
         else if (fasterAvailability.availability < 5) {
-            availability = "Διαθέσιμο από 4-10 ημέρες"
+            if (platformName === "skroutz") { availability = "Διαθέσιμο από 4-10 ημέρες" }
+            else {
+                availability = fasterAvailability.availability + 1
+            }
         }
         else {
-            availability = "Διαθέσιμο από 10 έως 30 ημέρες"
+            if (platformName === "skroutz") { availability = "Διαθέσιμο από 10 έως 30 ημέρες" }
+            else {
+                availability = fasterAvailability.availability + 1
+            }
         }
         return availability
     },

@@ -12,11 +12,11 @@ module.exports = ({ strapi }) => ({
         //     headless: false,
         //     args: ['--no-sandbox', '--disable-setuid-sandbox']
         // })
-        const browser = await puppeteer.launch({
-            headless: false,
-            executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        const browser = await strapi
+        .plugin('import-products')
+        .service('helpers')
+        .createBrowser()
+
         try {
 
             let filteredCategories = {
@@ -46,14 +46,16 @@ module.exports = ({ strapi }) => ({
                 })
             }
 
-            await strapi
+            const response = await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .retry(
                     () => page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" }),
-                    5, // retry this 5 times,
+                    10, // retry this 10 times,
                     false
                 );
+
+            console.log(response)
 
             // await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
             const pageUrl = page.url();
@@ -137,7 +139,7 @@ module.exports = ({ strapi }) => ({
                     .randomWait(5000, 10000))
 
                 await this.scrapQuestSubcategories(browser, category, filteredCategories, importRef, entry, auth);
-                }
+            }
         } catch (error) {
             return { "message": "error" }
         }
@@ -156,7 +158,7 @@ module.exports = ({ strapi }) => ({
         newPage.on('request', (request) => {
             if (request.resourceType() === 'image') request.abort()
             else request.continue()
-        })
+        }) 
 
         try {
             await strapi
@@ -164,7 +166,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .retry(
                     () => newPage.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" }),
-                    5 // retry this 5 times
+                    10 // retry this 5 times
                 );
             // await page.goto(`https://www.questonline.gr${category.link}`, { waitUntil: "networkidle0" });
             const scrapSub = await newPage.$eval('.side-menu', (element) => {
@@ -202,7 +204,7 @@ module.exports = ({ strapi }) => ({
             console.log(error)
         }
         finally {
-            newPage.close()
+            newPage.close() 
         }
     },
 
@@ -224,7 +226,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .retry(
                     () => newPage.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" }),
-                    5 // retry this 5 times
+                    10 // retry this 5 times
                 );
             // await page.goto(`https://www.questonline.gr${subcategory.link}`, { waitUntil: "networkidle0" });
             const sideMenu = await newPage.$('.side-menu')
@@ -295,7 +297,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .retry(
                     () => newPage.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" }),
-                    5 // retry this 5 times
+                    10 // retry this 5 times
                 );
             // await page.goto(`https://www.questonline.gr${link}?pagesize=300&skuavailableindays=1`, { waitUntil: "networkidle0" });
 
@@ -374,12 +376,12 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .retry(
                     () => newPage.goto(productLink, { waitUntil: "networkidle0" }),
-                    5 // retry this 5 times
+                    10 // retry this 5 times
                 );
 
             // await newPage.goto(productLink, { waitUntil: "networkidle0" });
 
-            await newPage.waitForTimeout(strapi
+            await newPage.waitForTimeout(strapi 
                 .plugin('import-products')
                 .service('helpers')
                 .randomWait(1000, 3000))

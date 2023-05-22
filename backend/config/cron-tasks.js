@@ -149,4 +149,32 @@ module.exports = {
         },
     },
 
+    createSkroutzXml: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+
+            await strapi
+                .plugin('export-platforms-xml')
+                .service('xmlService')
+                .createXml('skroutz');
+        },
+        options: {
+            rule: "19 * * * *",
+        },
+    },
+
+    createShopflixXml: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+
+            await strapi
+                .plugin('export-platforms-xml')
+                .service('xmlService')
+                .createXml('shopflix');
+        },
+        options: {
+            rule: "20 * * * *",
+        },
+    },
+
 }; 

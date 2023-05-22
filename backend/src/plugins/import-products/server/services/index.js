@@ -6,6 +6,7 @@ const helpers = require('./helpers');
 const mapping = require('./mapping');
 const oktabitHelper = require('./oktabit-helper');
 const gerasisHelper = require('./gerasis-helper');
+const logicomHelper = require('./logicom-helper');
 const zegetronHelper = require('./zegetron-helper');
 const novatronHelper = require('./novatron-helper');
 const questHelper = require('./quest-helper');
@@ -20,6 +21,7 @@ module.exports = {
   mapping,
   oktabitHelper,
   gerasisHelper,
+  logicomHelper,
   zegetronHelper,
   novatronHelper,
   questHelper,

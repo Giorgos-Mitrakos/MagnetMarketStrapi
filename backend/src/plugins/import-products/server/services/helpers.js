@@ -22,6 +22,14 @@ const stream = require('stream');
 
 module.exports = ({ strapi }) => ({
 
+    async createBrowser(){
+        return await puppeteer.launch({
+            headless: false,
+            executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+    },
+
     async retry(promiseFactory, retryCount, isRetry) {
 
         try {
@@ -289,7 +297,7 @@ module.exports = ({ strapi }) => ({
 
         if (product.retail_price) {
             supplierInfo.retail_price = parseFloat(product.retail_price).toFixed(2)
-        } 
+        }
 
         if (product.recycle_tax) {
             supplierInfo.recycle_tax = parseFloat(product.recycle_tax).toFixed(2)
@@ -439,12 +447,12 @@ module.exports = ({ strapi }) => ({
 
                 return await xml;
             }
-            // else if (entry.name === "Westnet") {
-            //     return await strapi
-            //         .plugin('import-products')
-            //         .service('westnetHelper')
-            //         .getWestnetData(entry, categoryMap)
-            // }
+            else if (entry.name === "Westnet") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('westnetHelper')
+                    .getWestnetData(entry, categoryMap)
+            }
             // console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
@@ -466,7 +474,7 @@ module.exports = ({ strapi }) => ({
                 return data;
             }
             else if (entry.importedFile.ext === ".xml") {
-                return new Promise(async (resolve, reject) => {
+                let xml = new Promise(async (resolve, reject) => {
                     const data = await fs.promises.readFile(`./public/uploads/${entry.importedFile.hash}${entry.importedFile.ext}`)
                         .catch((err) => console.error('Failed to read file', err));
 
@@ -478,6 +486,12 @@ module.exports = ({ strapi }) => ({
                         }
                     });
                 });
+                if (entry.name === "Logicom") {
+                    return await strapi
+                        .plugin('import-products')
+                        .service('logicomHelper')
+                        .getLogicomData(entry, await xml, categoryMap)
+                }
             }
         }
     },
@@ -578,7 +592,7 @@ module.exports = ({ strapi }) => ({
                         {
                             $and: [
                                 { model: mpn },
-                                { model: { $notNull: true, } }
+                                { mpn: { $notNull: true, } }
                             ]
                         },
                         {
@@ -1368,129 +1382,6 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async saveLogicomCookies() {
-        try {
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
-            const page = await browser.newPage();
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
-            await page.goto('https://logicompartners.com/el-gr/countries', { waitUntil: "networkidle0" });
-            let url = page.url()
-
-            await page.click('a[data-store="SanaStore_GR"]');
-            await page.waitForNavigation()
-
-            const acceptCookies = await page.$('.btn-cookies-accept')
-            await acceptCookies.click();
-
-            const cookies = await page.cookies();
-            const cookiesJson = JSON.stringify(cookies, null, 2)
-            fs.writeFile('./public/LogicomCookies.json', cookiesJson, (err) => {
-                if (err)
-                    console.log(err);
-                else {
-                    // console.log("File written successfully\n");
-                }
-            });
-
-            await browser.close();
-
-        } catch (error) {
-
-        }
-    },
-
-    async scrapLogicom(itemID) {
-        try {
-
-            // { headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' }
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
-            const page = await browser.newPage();
-            if (!fs.existsSync('./public/LogicomCookies.json')) {
-                await this.saveLogicomCookies()
-            }
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
-
-            fs.readFile('./public/LogicomCookies.json', async (err, data) => {
-                if (err)
-                    console.log(err);
-                else {
-                    const cookies = JSON.parse(data);
-                    await page.setCookie(...cookies);
-                    // console.log("File readen successfully\n");
-                }
-            })
-
-            await page.goto('https://logicompartners.com/el-gr/', { waitUntil: "networkidle0" });
-
-            const pageUrl = page.url();
-
-            if (pageUrl === "https://logicompartners.com/el-gr/countries") {
-
-                this.saveLogicomCookies()
-            }
-
-            const acceptCookies = await page.$('.btn-cookies-accept')
-            if (acceptCookies) {
-                await acceptCookies.click();
-            }
-
-            const searchBox = await page.$('#searchbox')
-            searchBox.type(`${itemID}`)
-            await page.waitForResponse(response => response.status() === 200)
-            const searchBoxUl = await page.waitForSelector('#ui-id-1', { visible: true })
-            const searchBoxFirstLi = await searchBoxUl.$('li.ui-menu-item')
-
-            const [response] = await Promise.all([
-                // The promise resolves after navigation has finished
-                searchBoxFirstLi.click('a'), // Clicking the link will indirectly cause a navigation
-            ]);
-            await page.waitForNavigation()
-
-            const bodyHandle = await page.$('body');
-
-            let scrap = await bodyHandle.evaluate(() => {
-                let prod_chars = [];
-                const prodSpecs = document.querySelector("#specifications");
-                if (prodSpecs) {
-                    const charTable = prodSpecs.querySelector("table");
-                    const charTableBody = charTable.querySelector("tbody");
-                    const charRows = charTableBody.querySelectorAll("tr");
-                    for (let row of charRows) {
-                        const charValue = row.querySelectorAll('td')
-                        prod_chars.push({
-                            name: charValue[0].innerHTML.trim(),
-                            value: charValue[1].innerHTML.trim()
-                        })
-                    }
-                }
-
-                let imagesSrc = []
-                const detailsImg = document.querySelector("div.details-img")
-                const imageWrapper = detailsImg.querySelector("div")
-                const slickList = imageWrapper.querySelector("div")
-                const slickTrack = slickList.querySelector("div")
-                const images = slickTrack.querySelectorAll("div>img")
-                images.forEach(image => {
-                    if (imagesSrc.length < 5) {
-                        if (imagesSrc.length === 0) {
-                            imagesSrc.push(`https://www.logicompartners.com${image.getAttribute("src")}`);
-                        }
-                        else {
-                            imagesSrc.push(`https://www.logicompartners.com${image.getAttribute("data-src")}`);
-                        }
-                    }
-                })
-
-                return { prod_chars, imagesSrc };
-            });
-
-            await browser.close();
-            return { scrap, productUrl: page.url() }
-        } catch (error) {
-            console.log(error)
-        }
-    },
-
     async getAndConvertImgToWep(product, entryID, auth) {
 
         try {
@@ -1612,7 +1503,9 @@ module.exports = ({ strapi }) => ({
                         .catch(err => {
                             console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
                             try {
-                                fs.unlinkSync(`./public/tmp/${productName}_${index}.webp`);
+                                if (fs.existsSync(`./public/tmp/${productName}_${index}.webp`)) {
+                                    fs.unlinkSync(`./public/tmp/${productName}_${index}.webp`);
+                                }
                             } catch (e) {
                                 console.log(e)
                                 return
@@ -1794,7 +1687,7 @@ module.exports = ({ strapi }) => ({
         try {
             const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
             const taxRate = process.env.GENERAL_TAX_RATE
-
+            let addToPrice = Number(process.env.GENERAL_SHIPPING_PRICE)
             const filteredSupplierInfo = supplierInfo.filter(x => x.in_stock === true)
 
             let minSupplierPrice = filteredSupplierInfo?.reduce((prev, current) => {
@@ -1802,7 +1695,7 @@ module.exports = ({ strapi }) => ({
             })
 
             let generalPercentage = ''
-            let addToPrice = 0
+
             if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
 
                 let findPercentage = categoryInfo.cat_percentage.find(x => x.name === "general")
@@ -2601,7 +2494,9 @@ module.exports = ({ strapi }) => ({
 
             data.price = parseFloat(productPrice)
             data.supplierInfo = updatedSupplierInfo
-            data.model = product.model ? product.model : null
+            if (!entryCheck.model && product.model) {
+                data.model = product.model
+            }
             dbChange = 'updated'
         }
 
