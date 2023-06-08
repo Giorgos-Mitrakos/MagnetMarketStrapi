@@ -16,7 +16,7 @@
     "@strapi/plugin-users-permissions": "^4.9.1",
     "@strapi/strapi": "^4.9.1",
     "cross-env": "^7.0.3",
-    "iconv": "^3.0.1",
+    "iconv-lite": "^0.6.3",
     "jsdom": "^21.1.1",
     "lodash": "^4.17.21",
     "mime-types": "^2.1.35",

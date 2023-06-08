@@ -1,12 +1,15 @@
 'use strict';
 
 const Axios = require('axios');
-const Iconv = require('iconv').Iconv;
+// const Iconv = require('iconv').Iconv;
+const iconv = require('iconv-lite');
+
 
 module.exports = ({ strapi }) => ({
 
     async getOktabitData(entry, categoryMap) {
         try {
+            let downloadingAllSuccess = true
             const { categories_map, char_name_map, char_value_map, stock_map,
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = categoryMap
@@ -65,6 +68,7 @@ module.exports = ({ strapi }) => ({
                 }
 
                 if (productsDescriptions.message) {
+                    downloadingAllSuccess = false
                     return { message: "Error" }
                 }
                 else {
@@ -77,6 +81,7 @@ module.exports = ({ strapi }) => ({
 
                 const chars = []
                 if (productsChars.message) {
+                    downloadingAllSuccess = false
                     return { message: "Error" }
                 }
                 else {
@@ -93,6 +98,7 @@ module.exports = ({ strapi }) => ({
                 }
 
                 if (productsChars2.message) {
+                    downloadingAllSuccess = false
                     return { message: "Error" }
                 }
                 else {
@@ -128,7 +134,7 @@ module.exports = ({ strapi }) => ({
             }
             console.log("Η ενοποίηση των xml ολοκληρώθηκε...")
 
-            return products
+            return { products, downloadingAllSuccess }
         } catch (error) {
             console.log(error)
         }
@@ -143,13 +149,14 @@ module.exports = ({ strapi }) => ({
 
             const { data } = await response
 
-            const iconv = new Iconv('ISO-8859-7', 'UTF-8');
-            const newData = iconv.convert(await data);
+            // const iconv = new Iconv('ISO-8859-7', 'UTF-8');
+            // const newData = iconv.convert(await data);
+            const utf8String = iconv.decode(Buffer.from(await data, 'binary'), 'ISO-8859-7');
 
             const xml = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .parseXml(newData.toString())
+                .parseXml(utf8String)
 
             return xml
         } catch (error) {

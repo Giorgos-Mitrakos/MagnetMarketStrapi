@@ -10,14 +10,6 @@ module.exports = ({ strapi }) => ({
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = categoryMap
 
-            // console.log("newData:", newData.length)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(char_name_map, char_value_map);
-
-            const { mapCharNames, mapCharValues } = charMaps
-
             console.log("Ξεκινάω να κατεβάζω τα xml...")
 
             let data = await Axios.get(`${entry.importedURL}`,
@@ -53,10 +45,10 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    filterData(data, categoryMap) {
+    filterData(data, categoryMap) { 
 
         const newData = data
-            .filter(filterStock)
+            .filter(filterStock) 
             .filter(filterPriceRange)
             .filter(filterCategories)
             .filter(filterImages)

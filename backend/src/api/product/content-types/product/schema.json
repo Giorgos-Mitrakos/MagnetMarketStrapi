@@ -173,6 +173,24 @@
     },
     "deletedAt": {
       "type": "datetime"
+    },
+    "platform": {
+      "displayName": "platforms",
+      "type": "component",
+      "repeatable": true,
+      "component": "products.platforms"
+    },
+    "weight": {
+      "type": "integer"
+    },
+    "length": {
+      "type": "decimal"
+    },
+    "width": {
+      "type": "decimal"
+    },
+    "height": {
+      "type": "decimal"
     }
   }
 }

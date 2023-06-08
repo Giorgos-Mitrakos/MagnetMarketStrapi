@@ -13,9 +13,9 @@ module.exports = ({ strapi }) => ({
         //     args: ['--no-sandbox', '--disable-setuid-sandbox']
         // })
         const browser = await strapi
-        .plugin('import-products')
-        .service('helpers')
-        .createBrowser()
+            .plugin('import-products')
+            .service('helpers')
+            .createBrowser()
 
         try {
 
@@ -54,8 +54,6 @@ module.exports = ({ strapi }) => ({
                     10, // retry this 10 times,
                     false
                 );
-
-            console.log(response)
 
             // await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
             const pageUrl = page.url();
@@ -158,7 +156,7 @@ module.exports = ({ strapi }) => ({
         newPage.on('request', (request) => {
             if (request.resourceType() === 'image') request.abort()
             else request.continue()
-        }) 
+        })
 
         try {
             await strapi
@@ -204,7 +202,7 @@ module.exports = ({ strapi }) => ({
             console.log(error)
         }
         finally {
-            newPage.close() 
+            newPage.close()
         }
     },
 
@@ -384,7 +382,7 @@ module.exports = ({ strapi }) => ({
             await newPage.waitForTimeout(strapi 
                 .plugin('import-products')
                 .service('helpers')
-                .randomWait(1000, 3000))
+                .randomWait(5000, 10000))
 
             const scrapProduct = await newPage.$eval('.details-page', (scrap) => {
                 const product = {}
@@ -411,8 +409,12 @@ module.exports = ({ strapi }) => ({
                 for (let imgSrc of imageWrapper) {
                     const src = imgSrc.getAttribute('src').split('?')[0]
                     // const imageLink = src.startsWith('/') ? `https://www.questonline.gr${src}` : src;
-                    if (src.startsWith('/'))
-                        product.imagesSrc.push({ url: `https://www.questonline.gr${src}` })
+                    if (src.startsWith('/')) {
+                        product.imagesSrc.push({ url: `https://www.questonline.gr${src}?maxsidesize=1024` })
+                    }
+                    else if(!src.endsWith('.jpg.aspx') && !src.endsWith('.png.aspx')){
+                        product.imagesSrc.push({ url: `${src}?maxsidesize=1024` })
+                    }
                 }
 
                 const priceWrapper = element.querySelector('.box-three')
@@ -452,11 +454,25 @@ module.exports = ({ strapi }) => ({
                 return product
             })
 
+            if (scrapProduct.prod_chars.find(x => x.name === "Μεικτό βάρος")) {
+                let chars = scrapProduct.prod_chars.find(x => x.name === "Μεικτό βάρος")
+                let weight = parseFloat(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
+
+                scrapProduct.weight = parseInt(weight)
+            }
+            else if (scrapProduct.prod_chars.find(x => x.name === "Βάρος (κιλά)")) {
+                let chars = scrapProduct.prod_chars.find(x => x.name === "Βάρος (κιλά)")
+                let weight = parseFloat(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
+
+                scrapProduct.weight = parseInt(weight)
+            }
+
             scrapProduct.link = productLink
             scrapProduct.mpn = scrapProduct.prod_chars.find(x => x.name === "Part Number").value?.trim();
             scrapProduct.barcode = scrapProduct.prod_chars.find(x => x.name === "EAN Number").value?.trim();
             scrapProduct.model = scrapProduct.prod_chars.find(x => x.name === "Μοντέλο")?.value?.trim();
             scrapProduct.brand_name = scrapProduct.prod_chars.find(x => x.name === "Κατασκευαστής")?.value?.trim()
+
             scrapProduct.entry = entry
             scrapProduct.category = { title: category }
             scrapProduct.subcategory = { title: subcategory }
@@ -468,7 +484,7 @@ module.exports = ({ strapi }) => ({
             await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .importScrappedProduct(scrapProduct, importRef, entry, auth)
+                .importScrappedProduct(scrapProduct, importRef, auth)
 
         } catch (error) {
             console.log(error)
@@ -565,15 +581,15 @@ module.exports = ({ strapi }) => ({
                     }
 
                     if (product.short_description) {
-                        data.short_description = short_description.model
+                        data.short_description = product.short_description
                     }
 
                     if (brandId) {
                         data.brand = { id: brandId }
                     }
 
-                    if (brandId) {
-                        data.brand = { id: brandId }
+                    if (product.weight) {
+                        data.weight = product.weight
                     }
 
                     const newEntry = await strapi.entityService.create('api::product.product', {

@@ -3,6 +3,7 @@
 const xml2js = require('xml2js');
 const slugify = require("slugify");
 const fs = require('fs');
+const Axios = require('axios');
 
 module.exports = ({ strapi }) => ({
     async createXml(platform) {
@@ -10,7 +11,7 @@ module.exports = ({ strapi }) => ({
             console.log(platform)
 
             const suppliers = await strapi.db.query('plugin::import-products.importxml').findMany({
-                select: ['name', 'availability', 'order_time'],
+                select: ['name', 'availability', 'order_time', 'shipping'],
             });
 
             const entries = await strapi.db.query('api::platform.platform').findOne({
@@ -33,7 +34,8 @@ module.exports = ({ strapi }) => ({
                                     additionalImages: true,
                                     brand: true,
                                     supplierInfo: true,
-                                }
+                                    platform: true,
+                                },                                
                             }
                         }
                     }
@@ -64,30 +66,31 @@ module.exports = ({ strapi }) => ({
 
     async createSkroutzXML(entries, suppliers) {
         try {
-            let finalEntries = []
+            let finalEntries = [] 
             for (let category of entries.export_categories) {
                 let categoryPath = await this.createCategoryPath(category)
                 for (let product of category.products) {
                     let { availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
+                    if (!price) { continue }
                     let newEntry = {
                         uniqueID: product.id,
                         name: product.name,
                         link: `https://magnetmarket.gr/product/${slugify(`${product.name.replaceAll("/", "-").replaceAll("|", "")}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g })}`,
                         image: product.image ? `https://api.magnetmarket.eu/${product.image.url}` : "",
                         category: categoryPath,
-                        price,
+                        price: parseFloat(price),
+                        weight: product.weight,
                         availability,
                         manufacturer: product.brand ? product.brand?.name : "",
                         mpn: product.mpn,
                         sku: product.sku,
                         description: product.description,
-                        // quantity: entry.quantity,
+                        quantity: product.quantity > 0 ? product.quantity : 2,
                         barcode: product.barcode,
                     }
 
                     finalEntries.push({ product: newEntry })
                 }
-
             }
 
             var builder = new xml2js.Builder();
@@ -112,6 +115,7 @@ module.exports = ({ strapi }) => ({
             for (let category of entries.export_categories) {
                 for (let product of category.products) {
                     let { availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
+                    if (!price) { continue }
                     let newEntry = {
                         SKU: product.id,
                         name: product.name,
@@ -123,7 +127,7 @@ module.exports = ({ strapi }) => ({
                         image: product.image ? `https://api.magnetmarket.eu/${product.image.url}` : "",
                         // additional_image: product.additionalImages ? `https://api.magnetmarket.eu/${product.additionalImages[0]}` : "",
                         category: category.name,
-                        price,
+                        price: parseFloat(price),
                         list_price: '',
                         quantity: 2,
                         offer_from: '',
@@ -184,7 +188,7 @@ module.exports = ({ strapi }) => ({
             createPath(entry)
 
             for (let cat of categoryPathArray.reverse()) {
-                categoryPath += `, ${cat}`;
+                categoryPath += `> ${cat}`;
             }
 
             return categoryPath
@@ -202,6 +206,7 @@ module.exports = ({ strapi }) => ({
             const supplierAvailability = suppliers.find(supplier => supplier.name === x.name)
             x.availability = supplierAvailability.availability
             x.order_time = supplierAvailability.order_time
+            x.shipping = supplierAvailability.shipping
         })
 
         const fasterAvailability = availableSuppliers.reduce((previous, current) => {
@@ -233,6 +238,7 @@ module.exports = ({ strapi }) => ({
             else {
                 availability = 0
             }
+            return availability
         }
 
         var minutesOfDay = function (m) {
@@ -280,16 +286,33 @@ module.exports = ({ strapi }) => ({
 
     createPrice(supplierInfo, platform, product, categoryInfo) {
         try {
-            // console.log(supplierInfo)
+            let productPlatformPrice = { price: product.price }
+            if (product.platform) {
+                let productPlatform = product.platform.find(x => x.platform.toLowerCase().trim() === platform.name.toLowerCase().trim())
+                if (productPlatform && productPlatform.price) {
+                    productPlatformPrice.price = productPlatform.price
+                }
+            }
+
+            if (product.inventory && product.inventory > 0) {
+                return productPlatformPrice.price
+            }
+
             const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
             const taxRate = process.env.GENERAL_TAX_RATE
+            let addToPrice = Number(process.env.GENERAL_SHIPPING_PRICE)
 
             let generalPercentage = ''
             if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
 
-                let findPercentage = categoryInfo.cat_percentage.find(x => x.name.toLowerCase() === platform.name.toLowerCase())
+                let findPercentage = categoryInfo.cat_percentage.find(x => x.name?.toLowerCase() === platform.name.toLowerCase())
+
+                if (!findPercentage) {
+                    findPercentage = categoryInfo.cat_percentage.find(x => x.name.toLowerCase() === "general")
+                }
 
                 if (findPercentage) {
+                    addToPrice = findPercentage.add_to_price ? findPercentage.add_to_price : 0;
                     if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
                         let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === brandId)
                         if (findBrandPercentage) {
@@ -311,12 +334,77 @@ module.exports = ({ strapi }) => ({
                 generalPercentage = generalCategoryPercentage
             }
 
-            let minPrice = parseFloat(supplierInfo.wholesale) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
+            let minPrice = (parseFloat(supplierInfo.wholesale) + parseFloat(addToPrice) + parseFloat(supplierInfo.shipping)) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
 
-            return minPrice.toFixed(2)
+            if (minPrice > productPlatformPrice.price) {
+                return minPrice.toFixed(2)
+            }
+            else {
+                return productPlatformPrice.price
+            }
 
         } catch (error) {
             console.log(error)
         }
-    }
+    },
+
+    // async createExcel() {
+
+    //     try {
+
+    //         let data = await Axios.get("https://magnetmarket.gr/products.xml",
+    //             { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
+
+    //         // console.log(data.data)
+
+    //         const oldXml = await strapi
+    //             .plugin('import-products')
+    //             .service('helpers')
+    //             .parseXml(await data.data)
+
+    //         // console.log(oldXml)
+
+    //         let newdata = await Axios.get("https://api.magnetmarket.eu/feeds/Shopflix.xml",
+    //             { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
+
+    //         // console.log(newdata)
+
+    //         const newXml = await strapi
+    //             .plugin('import-products')
+    //             .service('helpers')
+    //             .parseXml(await newdata.data)
+
+    //         const products = []
+    //         newXml.MPITEMS.products[0].product.forEach(element => {
+    //             // console.log(element)
+    //             let old = oldXml.MPITEMS.products[0].product.find(old => old.MPN[0] === element.MPN[0])
+
+    //             if (old) {
+    //                 let checked = {
+    //                     oldSKU: old.SKU[0],
+    //                     newSKU: element.SKU[0],
+    //                     oldEAN: old.EAN[0],
+    //                     newEAN: element.EAN[0]
+    //                 }
+
+    //                 products.push({ product: checked })
+    //             }
+
+    //         });
+
+    //         var builder = new xml2js.Builder();
+    //         let date = new Date()
+    //         let createdAt = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
+    //         var xml = builder.buildObject({ webstore: { products: [products] } });
+
+    //         fs.writeFile('./public/feeds/ShopflixCompare.xml', xml, (err) => {
+    //             if (err)
+    //                 console.log(err);
+    //         })
+    //         // console.log(finalEntries.length);
+    //     } catch (error) {
+    //         console.log(error)
+    //     }
+    // },
+
 });

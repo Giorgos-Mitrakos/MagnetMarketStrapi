@@ -29,6 +29,11 @@
       "default": 1,
       "required": true
     },
+    "shipping": {
+      "type": "decimal",
+      "default": 0,
+      "min": 0
+    },
     "isUpload": {
       "type": "boolean",
       "default": false

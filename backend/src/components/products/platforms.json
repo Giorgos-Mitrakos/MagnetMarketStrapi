@@ -1,0 +1,30 @@
+{
+  "collectionName": "components_products_platforms",
+  "info": {
+    "displayName": "platforms",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "price": {
+      "type": "decimal"
+    },
+    "url": {
+      "type": "string"
+    },
+    "platform": {
+      "type": "enumeration",
+      "enum": [
+        "Skroutz",
+        "Shopflix"
+      ]
+    },
+    "is_fixed_price": {
+      "type": "boolean",
+      "default": false
+    },
+    "category": {
+      "type": "string"
+    }
+  }
+}

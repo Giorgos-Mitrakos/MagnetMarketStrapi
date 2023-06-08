@@ -1,7 +1,6 @@
 'use strict';
 
-const Axios = require('axios');
-const Iconv = require('iconv').Iconv;
+const Axios = require('axios'); 
 
 module.exports = ({ strapi }) => ({
 

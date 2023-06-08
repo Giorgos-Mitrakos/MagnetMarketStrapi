@@ -59,6 +59,11 @@
       "relation": "manyToMany",
       "target": "api::platform.platform",
       "inversedBy": "export_categories"
+    },
+    "average_weight": {
+      "type": "decimal",
+      "min": 0,
+      "default": 0
     }
   }
 }

@@ -26,7 +26,33 @@ module.exports = {
                 .parseQuestXml({ entry, auth });
         },
         options: {
-            rule: "10 8,12,16,18,22 * * *",
+            rule: "10 8,22 * * *",
+        },
+    },
+
+    scrapGLOBALSAT: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "globalsat" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseGlobalsat({ entry, auth });
+        },
+        options: { 
+            rule: "45 * * * *",
         },
     },
 
@@ -78,7 +104,7 @@ module.exports = {
                 .parseOktabitXml({ entry, auth });
         },
         options: {
-            rule: "35 9,13 * * *",
+            rule: "15 9,13 * * *",
         },
     },
 
@@ -159,7 +185,7 @@ module.exports = {
                 .createXml('skroutz');
         },
         options: {
-            rule: "19 * * * *",
+            rule: "0 * * * *",
         },
     },
 
@@ -173,8 +199,22 @@ module.exports = {
                 .createXml('shopflix');
         },
         options: {
-            rule: "20 * * * *",
+            rule: "5 * * * *",
         },
     },
+
+    // createShopflixExcel: {
+    //     task: async ({ strapi }) => {
+    //         // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+
+    //         await strapi
+    //             .plugin('export-platforms-xml')
+    //             .service('xmlService')
+    //             .createExcel();
+    //     },
+    //     options: {
+    //         rule: "15 * * * *",
+    //     },
+    // },
 
 }; 

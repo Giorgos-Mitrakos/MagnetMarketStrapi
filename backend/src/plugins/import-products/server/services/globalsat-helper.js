@@ -10,32 +10,33 @@ module.exports = ({ strapi }) => ({
     async saveGlobalsatCookies(page) {
         try {
             const body = await page.$('body');
-            const closePopUp = await body.waitForSelector('.closeModal');
-            if (closePopUp)
-                await closePopUp.evaluate(el => el.click());
+            // const closePopUp = await body.waitForSelector('.closeModal');
+            // if (closePopUp)
+            //     await closePopUp.evaluate(el => el.click());
 
-            const optionsButton = await body.$('button.open-nv-modal')
-            await optionsButton.click()
 
-            const settingsButton = await body.$('button.nvcookies__button--toggle')
-            await settingsButton.click()
+            // const optionsButton = await body.$('button.open-nv-modal')
+            // await optionsButton.click()
 
-            const settingsSwitch = await body.$('input.nvswitch__input')
-            const v = await (await settingsSwitch.getProperty("checked")).jsonValue()
-            if (v) {
-                await settingsSwitch.click()
-            }
+            // const settingsButton = await body.$('button.nvcookies__button--toggle')
+            // await settingsButton.click()
 
-            const consentButton = await body.waitForSelector('#consent-modal-submit');
+            // const settingsSwitch = await body.$('input.nvswitch__input')
+            // const v = await (await settingsSwitch.getProperty("checked")).jsonValue()
+            // if (v) {
+            //     await settingsSwitch.click()
+            // }
+
+            const consentButton = await body.waitForSelector('.consent-give');
             await consentButton.click()
 
-            const loginOpen = await body.$('.login_nav_head');
-            await loginOpen.click();
+            // const loginOpen = await body.$('.login_nav_head');
+            // await loginOpen.click();
 
             await page.waitForTimeout(500)
             // await body.waitForSelector('#UserName')
-            const loginSubMenu = await body.$('.login')
-            const loginForm = await loginSubMenu.$('form')
+            // const loginSubMenu = await body.$('.login')
+            const loginForm = await body.$('.form')
 
             const username = await loginForm.$('#UserName');
             const password = await loginForm.$('#Password');
@@ -83,11 +84,18 @@ module.exports = ({ strapi }) => ({
                 })
             }
 
-            await page.goto('https://www.globalsat.gr/', { waitUntil: "networkidle0" });
-            const body = await page.$('body');
-            const login = await body.$('.login')
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto('https://b2b.globalsat.gr/', { waitUntil: "networkidle0" }),
+                    10 // retry this 5 times
+                );
 
-            if (login) {
+            const pageUrl = page.url();
+            await page.waitForTimeout(1500)
+
+            if (pageUrl === "https://b2b.globalsat.gr/account/login/") {
                 await this.saveGlobalsatCookies(page)
             }
 
@@ -109,8 +117,10 @@ module.exports = ({ strapi }) => ({
                 // console.dir(category.subCategories)
                 for (let subCategory of category.subCategories) {
                     for (let sub2Category of subCategory.subCategories) {
-                        // console.log(subCategory.subCategory) 
-                        // console.log(category, subCategory.title, sub2Category.title)
+                        await page.waitForTimeout(strapi 
+                            .plugin('import-products')
+                            .service('helpers')
+                            .randomWait(5000, 10000))
                         await this.scrapGlobalsatCategory(page, category, subCategory, sub2Category, importRef, entry, auth)
                     }
                 }
@@ -175,7 +185,13 @@ module.exports = ({ strapi }) => ({
 
     async scrapGlobalsatCategory(page, category, subCategory, sub2Category, importRef, entry, auth) {
         try {
-            await page.goto(`${sub2Category.link}?wbavlb=Διαθέσιμο&sz=3`, { waitUntil: "networkidle0" });
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto(`${sub2Category.link}?wbavlb=Διαθέσιμο&sz=3`, { waitUntil: "networkidle0" }),
+                    10 // retry this 5 times
+                );
 
             const listContainer = await page.$('div.list_container');
 
@@ -200,14 +216,14 @@ module.exports = ({ strapi }) => ({
                     for (let item of productPriceItems) {
                         const txtPrice = item.querySelector('.txt').textContent.trim()
                         if (txtPrice === 'Τλ:') {
-                            product.initial_retail_price = item.querySelector('.initial_price')?.textContent.replace('€', '').replace(',', '.').trim()
+                            product.initial_retail_price = item.querySelector('.initial_price')?.textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
 
                             const sale_prices = item.querySelectorAll('.price')
                             if (sale_prices.length === 1) {
-                                product.retail_price = item.querySelector('.price').textContent.replace('€', '').replace(',', '.').trim()
+                                product.retail_price = item.querySelector('.price').textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
                             }
                             else {
-                                product.retail_price = sale_prices[1].textContent.replace('€', '').replace(',', '.').trim();
+                                product.retail_price = sale_prices[1].textContent.replace('€', '').replace('.', '').replace(',', '.').trim();
                             }
                         }
                         else {
@@ -230,9 +246,13 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .updateAndFilterScrapProducts(productList, category.title, subCategory.title, sub2Category.title, importRef, entry)
 
-            console.log("Products after Filtering:", products.length)
+            // console.log("Products after Filtering:", products.length)
 
             for (let product of products) {
+                await page.waitForTimeout(strapi 
+                    .plugin('import-products')
+                    .service('helpers')
+                    .randomWait(5000, 10000))
                 await this.scrapGlobalsatProduct(page, category, subCategory, sub2Category, product.link, importRef, entry, auth)
             }
 
@@ -243,7 +263,13 @@ module.exports = ({ strapi }) => ({
 
     async scrapGlobalsatProduct(page, category, subcategory, sub2category, productLink, importRef, entry, auth) {
         try {
-            await page.goto(productLink, { waitUntil: "networkidle0" });
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .retry(
+                    () => page.goto(productLink, { waitUntil: "networkidle0" }),
+                    10 // retry this 5 times
+                );
 
             const productPage = await page.$('section.product_page');
 
@@ -300,15 +326,15 @@ module.exports = ({ strapi }) => ({
                 if (suggestedPrices.length > 1) {
                     for (let price of suggestedPrices) {
                         if (price.getAttribute("class") === "price initial_price") {
-                            product.initial_retail_price = price.textContent.replace("€", "").replace(",", ".").trim();
+                            product.initial_retail_price = price.textContent.replace("€", "").replace('.', '').replace(",", ".").trim();
                         }
                         else {
-                            product.retail_price = price.textContent.replace("€", "").replace(",", ".").trim();
+                            product.retail_price = price.textContent.replace("€", "").replace('.', '').replace(",", ".").trim();
                         }
                     }
                 }
                 else {
-                    product.retail_price = suggestedPrices[0].textContent.replace("€", "").replace(",", ".").trim();
+                    product.retail_price = suggestedPrices[0].textContent.replace("€", "").replace('.', '').replace(",", ".").trim();
                 }
 
                 const wholesalePriceWrapper = productInfo.querySelector("div.price_row:not(.trade)");
@@ -341,7 +367,7 @@ module.exports = ({ strapi }) => ({
             scrapProduct.sub2category = sub2category
 
             await strapi
-                .plugin('import-products') 
+                .plugin('import-products')
                 .service('helpers')
                 .importScrappedProduct(scrapProduct, importRef, entry, auth)
 

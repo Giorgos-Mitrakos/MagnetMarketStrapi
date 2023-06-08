@@ -16,7 +16,8 @@
         "general",
         "skroutz",
         "shopflix"
-      ]
+      ],
+      "required": false
     },
     "brand_perc": {
       "type": "component",

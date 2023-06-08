@@ -354,7 +354,7 @@ module.exports = ({ strapi }) => ({
                     }
                 }
 
-                return product
+                return product 
             })
 
             scrapProduct.mpn = productID.toString()
@@ -368,7 +368,7 @@ module.exports = ({ strapi }) => ({
             await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .importScrappedProduct(scrapProduct, importRef, entry, auth)
+                .importScrappedProduct(scrapProduct, importRef, auth)
 
         } catch (error) {
             console.log(error)

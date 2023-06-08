@@ -22,7 +22,7 @@ const stream = require('stream');
 
 module.exports = ({ strapi }) => ({
 
-    async createBrowser(){
+    async createBrowser() {
         return await puppeteer.launch({
             headless: false,
             executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
@@ -61,7 +61,7 @@ module.exports = ({ strapi }) => ({
                 product.category = { title: category }
                 product.sub2category = { title: sub2category }
                 product.subcategory = { title: subcategory }
-                // console.log(product)
+
                 if (stockLevelFilter.includes(product.stockLevel) && product.wholesale) {
 
                     const checkIfEntry = await strapi.db.query('api::product.product').findOne({
@@ -95,83 +95,33 @@ module.exports = ({ strapi }) => ({
                                         }
                                     }
                                 }
-                            }
+                            },
+                            platform: true
                         },
                     });
 
                     if (checkIfEntry) {
+                        if (checkIfEntry.related_import.find(x => x.name.toLowerCase() === "quest")) {
+                            if (checkIfEntry.prod_chars.find(x => x.name === "Μεικτό βάρος")) {
+                                let chars = checkIfEntry.prod_chars.find(x => x.name === "Μεικτό βάρος")
+                                let weight = parseInt(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
+
+                                product.weight = weight
+                            }
+                            else if (checkIfEntry.prod_chars.find(x => x.name === "Βάρος (κιλά)")) {
+                                let chars = checkIfEntry.prod_chars.find(x => x.name === "Βάρος (κιλά)")
+                                let weight = parseInt(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
+
+                                product.weight = weight
+                            }
+                        }
+
+                        if (checkIfEntry.brand) {
+                            product.brand = {
+                                id: checkIfEntry.brand.id
+                            }
+                        }
                         await this.updateEntry(checkIfEntry, product, importRef)
-                        // let dbChange = ''
-                        // const data = {}
-
-                        // importRef.related_entries.push(checkIfEntry.id)
-
-                        // if (product.relativeProducts && product.relativeProducts.length > 0)
-                        //     importRef.related_products.push({ productID: checkIfEntry.id, relatedProducts: product.relativeProducts })
-
-                        // let supplierInfo = checkIfEntry.supplierInfo
-
-                        // const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, category, subcategory, sub2category);
-
-                        // data.category = categoryInfo.id
-
-                        // if (!checkIfEntry.publishedAt) {
-                        //     data.publishedAt = new Date()
-                        //     data.deletedAt = null
-                        //     dbChange = 'republished'
-                        // }
-
-                        // if (!checkIfEntry.brand) {
-                        //     const brandId = await this.brandIdCheck(null, checkIfEntry.name)
-                        //     if (brandId)
-                        //         data.brand = brandId
-                        // }
-
-                        // const { updatedSupplierInfo, isUpdated } = await this.updateSupplierInfo(entry, product, supplierInfo)
-
-                        // if (isUpdated) {
-                        //     dbChange = 'updated';
-                        //     data.supplierInfo = updatedSupplierInfo
-                        // }
-
-                        // const productPrice = await strapi
-                        //     .plugin('import-products')
-                        //     .service('helpers')
-                        //     .setPrice(checkIfEntry, supplierInfo, categoryInfo, checkIfEntry.brand?.id);
-
-                        // data.price = productPrice
-                        // data.model = checkIfEntry.prod_chars.find(x => x.name === "Μοντέλο")?.value;
-
-                        // // if (entry.name === "Novatron" && product.short_description) {
-                        // //     let result = product.short_description.match(/[0-9].[0-9]mm/g)
-                        // //     if (result) {
-                        // //         data.name = `${product.name}-${result[0]}`;
-                        // //         data.slug = slugify(`${product.name}-${result[0]}-${product.supplierCode}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
-
-                        // //         // console.log(result[0])
-                        // //     }
-                        // // }
-
-                        // await strapi.entityService.update('api::product.product', checkIfEntry.id, {
-                        //     data: data,
-                        // });
-
-                        // switch (dbChange) {
-                        //     case 'republished':
-                        //         importRef.republished += 1
-                        //         console.log("Republished:", importRef.republished)
-                        //         break;
-                        //     case 'updated':
-                        //         importRef.updated += 1
-                        //         console.log("Update:", importRef.updated)
-                        //         break;
-                        //     default:
-                        //         importRef.skipped += 1
-                        //         console.log("Skipped:", importRef.skipped)
-                        //         break;
-                        // }
-
-
                     }
                     else {
                         newProducts.push(product)
@@ -299,8 +249,8 @@ module.exports = ({ strapi }) => ({
             supplierInfo.retail_price = parseFloat(product.retail_price).toFixed(2)
         }
 
-        if (product.recycle_tax) {
-            supplierInfo.recycle_tax = parseFloat(product.recycle_tax).toFixed(2)
+        if (product.recycleTax) {
+            supplierInfo.recycle_tax = parseFloat(product.recycleTax).toFixed(2)
         }
 
         if (product.quantity) {
@@ -312,16 +262,6 @@ module.exports = ({ strapi }) => ({
 
     async updateSupplierInfo(entry, product, supplierInfo) {
 
-        //Προσπάθησα να αφαιρέσω τα price_progress που δεν έχουν τιμη wholesale,
-        //θέλει βελτίωση.
-        // for (let i = 0; i < supplierInfo.length; i++) {
-        //     supplierInfo[i].price_progress = supplierInfo[i].price_progress.filter(removeEmptyWholesale)
-        // }
-
-        // function removeEmptyWholesale(o) {
-        //     return !isNaN(o)
-        // }
-
         let isUpdated = false;
         let dbChange = 'skipped'
 
@@ -329,9 +269,6 @@ module.exports = ({ strapi }) => ({
 
         if (supplierInfoUpdate !== -1) {
             if (parseFloat(supplierInfo[supplierInfoUpdate].wholesale).toFixed(2) !== parseFloat(product.wholesale).toFixed(2)) {
-                // console.log(product)
-                // console.log("product", product.name)
-                // console.log("New wholesale:", product.wholesale, "Previous wholesale:", supplierInfo[supplierInfoUpdate].wholesale)
 
                 const price_progress = supplierInfo[supplierInfoUpdate].price_progress;
 
@@ -340,7 +277,7 @@ module.exports = ({ strapi }) => ({
                 price_progress.push(price_progress_data)
 
                 supplierInfo[supplierInfoUpdate] = this.createSupplierInfoData(entry, product, price_progress)
-                // console.log("supplierInfoUpdate", supplierInfo[supplierInfoUpdate])
+
                 isUpdated = true;
                 dbChange = 'updated'
             }
@@ -352,8 +289,6 @@ module.exports = ({ strapi }) => ({
             }
         }
         else {
-            // console.log("New supplier!!!!!!!!")
-
             const price_progress_data = this.createPriceProgress(product)
 
             supplierInfo.push(this.createSupplierInfoData(entry, product, price_progress_data))
@@ -421,7 +356,6 @@ module.exports = ({ strapi }) => ({
     async getData(entry, categoryMap) {
         const parser = new xml2js.Parser();
 
-        // console.log("importedURL:", entry.importedURL)
         if (entry.importedURL) {
             if (entry.name === "Oktabit") {
                 return await strapi
@@ -628,7 +562,8 @@ module.exports = ({ strapi }) => ({
                                 }
                             }
                         }
-                    }
+                    },
+                    platform: true
                 },
             });
 
@@ -726,7 +661,6 @@ module.exports = ({ strapi }) => ({
                             return (subcat2.name.trim().toLowerCase() === subcategory2.trim().toLowerCase())
                         })
 
-                        // console.log(subcategory2Mapping)
                         if (subcategory2Mapping.contains.length > 0) {
                             let find_str = subcategory2Mapping.contains.find(cont => {
 
@@ -1070,7 +1004,7 @@ module.exports = ({ strapi }) => ({
 
             return productUrl
         } catch (error) {
-            // console.log(error)
+            console.log(error)
         }
 
     },
@@ -1137,7 +1071,7 @@ module.exports = ({ strapi }) => ({
         }
 
         let categoryID = await strapi.db.query('api::category.category').findOne({
-            select: ['id', 'slug'],
+            select: ['id', 'slug', 'average_weight'],
             where: { slug: categoryMapping },
             populate: {
                 supplierInfo: true,
@@ -1391,15 +1325,6 @@ module.exports = ({ strapi }) => ({
             let mainImageID = '';
             const imageIDS = { mainImage: [], additionalImages: [], imgUrls: [] }
 
-            // const reduceApiEndpoints = async (previous, endpoint) => {
-            //     await previous;
-            //     index === 1 ? imageIDS.mainImage.push(previous)
-            //         : imageIDS.additionalImages.push(previous)
-            //     return apiCall(endpoint);
-            // };
-
-            // const sequential = product.ImageURLS.reduce(reduceApiEndpoints, Promise.resolve());
-
             for (let imgUrl of product.ImageURLS) {
                 index += 1;
                 const sharpStream = sharp({
@@ -1413,7 +1338,6 @@ module.exports = ({ strapi }) => ({
                         url: imgUrl.url,
                         responseType: 'stream'
                     }).catch(err => {
-                        // console.log("Axios Error:", productName, imgUrl.url, "Supplier Code:", product.supplierInfo[0].supplierProductId);
                         cont = true;
                     })
 
@@ -1428,63 +1352,6 @@ module.exports = ({ strapi }) => ({
                     const imgID = await sharpStream
                         .webp({ quality: 75 })
                         .resize({ width: 1000 })
-                        // .toBuffer({ resolveWithObject: true })                        
-                        // .then(({ data }) => {
-                        //     const formData = new FormData();
-                        //     formData.append("files", data,
-                        //         {
-                        //             filename: `${productName}_${index}.webp`,
-                        //         },
-
-                        //     );
-                        //     formData.append('fileInfo', JSON.stringify({
-                        //         alternativeText: `${productName}_${index}`,
-                        //         caption: `${productName}_${index}`
-                        //     }));
-                        //     formData.append("refId", entryID);
-                        //     formData.append("ref", "api::product.product");
-                        //     if (index === 1) {
-                        //         formData.append("field", "image");
-                        //     }
-                        //     else {
-                        //         formData.append("field", "additionalImages");
-                        //     }
-                        //     return formData
-                        // })
-                        // .then(async (formData) => {
-                        //     try {
-                        //         await strapi.plugins.upload.services.upload.upload({
-
-                        //         })
-                        //         // const imgid = await Axios.post(`${process.env.PUBLIC_API_URL}/upload`, formData, {
-                        //         //     headers: {
-                        //         //         ...formData.getHeaders(),
-                        //         //         Authorization: `Bearer ${process.env.STRAPI_TOKEN}`,
-                        //         //     }
-                        //         // })
-                        //         // if (index === 1) {
-                        //         //     //Δημιουργώ αυτόματα το SEO για το προϊόν 
-                        //         //     await strapi
-                        //         //         .plugin('import-products')
-                        //         //         .service('helpers')
-                        //         //         .saveSEO(await imgid, product, entryID);
-                        //         // mainImageID = await imgid
-                        //         return await imgid.data[0]
-                        //         // }
-                        //     } catch (error) {
-                        //         console.log("Axios Error:", error.response?.data)
-                        //     }
-                        // })
-                        // .then(async (imgid) => {
-                        //     if (index === 1) {
-                        //         //Δημιουργώ αυτόματα το SEO για το προϊόν 
-                        //         await strapi
-                        //             .plugin('import-products')
-                        //             .service('helpers')
-                        //             .saveSEO(imgid, product, entryID);
-                        //     }
-                        // })
-                        // απο εδώ ξεκινά η προσπάθεια
                         .toFile(`./public/tmp/${productName}_${index}.webp`)
                         .then(async () => {
                             const image = await strapi
@@ -1494,12 +1361,9 @@ module.exports = ({ strapi }) => ({
                             return image
                         })
                         .then((image) => {
-                            // console.log("ImageID:", image.id, "Index:", index)
                             index === 1 ? imageIDS.mainImage.push(image.id)
                                 : imageIDS.additionalImages.push(image.id)
                         })
-                        // .then(async () => { return await this.delay(3000) })
-                        // εδώ τελιώνει
                         .catch(err => {
                             console.error("Error processing files, let's clean it up", err, "File:", product.name, "supplier Code:", product.supplierCode);
                             try {
@@ -1512,14 +1376,6 @@ module.exports = ({ strapi }) => ({
                             }
                         })
 
-                    // const image = await strapi
-                    //     .plugin('import-products')
-                    //     .service('imageHelper')
-                    //     .upload(`./public/tmp/${productName}_${index}.webp`, 'uploads');
-
-                    // console.log(image)
-                    // return image;
-
                 } catch (error) {
                     console.log("Axios Error:", error)
                 }
@@ -1527,15 +1383,7 @@ module.exports = ({ strapi }) => ({
 
             if (imageIDS.imgUrls.length === 0) { return }
 
-            // await this.saveImageURLS(imgUrls, entryID)
-
-            // console.log("imageIDS:", imageIDS)
             return imageIDS
-            // if (mainImageID) {
-            //     return { mainImageID } 
-            // } else {
-            //     return null
-            // }
         } catch (error) {
             console.log("Error in converting Image:", error)
         }
@@ -1617,12 +1465,15 @@ module.exports = ({ strapi }) => ({
     async parseChars(chars, mapCharNames, mapCharValues) {
         try {
             let newChars = chars.map(char => {
+                char = JSON.parse(JSON.stringify(char))
                 if (mapCharNames.get(char.name) !== undefined) {
-                    char.name = mapCharNames.get(char.name)
+                    let name = mapCharNames.get(char.name)
+                    char.name = name
                 }
                 if (char.value) {
                     if (mapCharValues.get(char.value) !== undefined) {
-                        char.value = mapCharValues.get(char.value)
+                        let value = mapCharValues.get(char.value)
+                        char.value = value
                     }
                 }
                 return char
@@ -1683,49 +1534,407 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async setPrice(existedProduct, supplierInfo, categoryInfo, brandId) {
+    findProductPlatformPercentage(categoryInfo, brandId) {
+        let percentage = Number(process.env.GENERAL_CATEGORY_PERCENTAGE)
+        let addToPrice = Number(process.env.GENERAL_SHIPPING_PRICE)
+
+        let percentages = {
+            general: {
+                platformCategoryPercentage: percentage,
+                addToPrice: addToPrice,
+            },
+            skroutz: {
+                platformCategoryPercentage: percentage,
+                addToPrice: addToPrice,
+            },
+            shopflix: {
+                platformCategoryPercentage: percentage,
+                addToPrice: addToPrice,
+            }
+        }
+
+        const generalCategoryPercentage = categoryInfo.cat_percentage.find(x => x.name.toLowerCase().trim() === "general")
+        const skroutzCategoryPercentage = categoryInfo.cat_percentage.find(x => x.name.toLowerCase().trim() === "skroutz")
+        const shopflixCategoryPercentage = categoryInfo.cat_percentage.find(x => x.name.toLowerCase().trim() === "shopflix")
+
+        if (generalCategoryPercentage) {
+            if (generalCategoryPercentage.percentage) {
+                percentages.general.platformCategoryPercentage = generalCategoryPercentage.percentage
+            }
+            percentages.general.addToPrice = generalCategoryPercentage.add_to_price ? generalCategoryPercentage.add_to_price : 0
+
+            if (generalCategoryPercentage.brand_perc && generalCategoryPercentage.brand_perc.length > 0) {
+                let brandPercentage = generalCategoryPercentage.brand_perc.find(x => x.brand?.id === brandId)
+                percentages.general.brandPercentage = brandPercentage?.percentage
+            }
+        }
+
+        if (skroutzCategoryPercentage) {
+            if (skroutzCategoryPercentage.percentage) {
+                percentages.skroutz.platformCategoryPercentage = skroutzCategoryPercentage.percentage
+            }
+            else {
+                percentages.skroutz.platformCategoryPercentage = percentages.general.platformCategoryPercentage
+            }
+
+            percentages.skroutz.addToPrice = skroutzCategoryPercentage.add_to_price ? skroutzCategoryPercentage.add_to_price : 0
+
+            if (skroutzCategoryPercentage.brand_perc && skroutzCategoryPercentage.brand_perc.length > 0) {
+                let brandPercentage = skroutzCategoryPercentage.brand_perc.find(x => x.brand?.id === brandId)
+                percentages.skroutz.brandPercentage = brandPercentage?.percentage
+            }
+        }
+        else {
+            percentages.skroutz.platformCategoryPercentage = percentages.general.platformCategoryPercentage
+            percentages.skroutz.addToPrice = percentages.general.addToPrice
+        }
+
+        if (shopflixCategoryPercentage) {
+            if (shopflixCategoryPercentage.percentage) {
+                percentages.shopflix.platformCategoryPercentage = shopflixCategoryPercentage.percentage
+            }
+            else {
+                percentages.shopflix.platformCategoryPercentage = percentages.general.platformCategoryPercentage
+            }
+
+            percentages.shopflix.addToPrice = shopflixCategoryPercentage.add_to_price ? shopflixCategoryPercentage.add_to_price : 0
+
+            if (shopflixCategoryPercentage.brand_perc && shopflixCategoryPercentage.brand_perc.length > 0) {
+                let brandPercentage = shopflixCategoryPercentage.brand_perc.find(x => x.brand?.id === brandId)
+                percentages.shopflix.brandPercentage = brandPercentage?.percentage
+            }
+        }
+        else {
+            percentages.shopflix.platformCategoryPercentage = percentages.general.platformCategoryPercentage
+            percentages.shopflix.addToPrice = percentages.general.addToPrice
+        }
+
+        percentages.general.platformCategoryPercentage = percentages.general.brandPercentage ? percentages.general.brandPercentage : percentages.general.platformCategoryPercentage
+        percentages.skroutz.platformCategoryPercentage = percentages.skroutz.brandPercentage ? percentages.skroutz.brandPercentage :
+            (percentages.general.brandPercentage ? percentages.general.brandPercentage : percentages.skroutz.platformCategoryPercentage)
+        percentages.shopflix.platformCategoryPercentage = percentages.shopflix.brandPercentage ? percentages.shopflix.brandPercentage :
+            (percentages.general.brandPercentage ? percentages.general.brandPercentage : percentages.shopflix.platformCategoryPercentage)
+
+        return percentages
+    },
+
+    async setPrice(existedProduct, supplierInfo, categoryInfo, product) {
         try {
-            const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
-            const taxRate = process.env.GENERAL_TAX_RATE
-            let addToPrice = Number(process.env.GENERAL_SHIPPING_PRICE)
+            let brandId = product.brand?.id;
+            // const generalCategoryPercentage = Number(process.env.GENERAL_CATEGORY_PERCENTAGE)
+            const taxRate = Number(process.env.GENERAL_TAX_RATE)
+            // let addToPrice = Number(process.env.GENERAL_SHIPPING_PRICE)
             const filteredSupplierInfo = supplierInfo.filter(x => x.in_stock === true)
+            let recycleTax = product.recycleTax ? parseFloat(product.recycleTax).toFixed(2) : parseFloat(0).toFixed(2)
 
             let minSupplierPrice = filteredSupplierInfo?.reduce((prev, current) => {
                 return (prev.wholesale < current.wholesale) ? prev : current
             })
 
-            let generalPercentage = ''
+            const supplier = await strapi.db.query('plugin::import-products.importxml').findOne({
+                select: ['name', 'shipping'],
+                where: { name: minSupplierPrice.name },
+            });
 
-            if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
+            let supplierShipping = supplier.shipping ? supplier.shipping : 0
 
-                let findPercentage = categoryInfo.cat_percentage.find(x => x.name === "general")
+            let percentages = this.findProductPlatformPercentage(categoryInfo, brandId)
 
-                if (findPercentage) {
-                    addToPrice = findPercentage.add_to_price ? findPercentage.add_to_price : 0;
-                    if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
-                        let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand?.id === brandId)
-                        if (findBrandPercentage) {
-                            generalPercentage = findBrandPercentage.percentage
+            let minPrices = {}
+
+            let prices = {}
+            
+            minPrices.general = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.general.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.general.platformCategoryPercentage) / 100 + 1)).toFixed(2)
+            minPrices.skroutz = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.skroutz.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.skroutz.platformCategoryPercentage) / 100 + 1)).toFixed(2)
+            minPrices.shopflix = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.shopflix.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.shopflix.platformCategoryPercentage) / 100 + 1)).toFixed(2)
+
+            const skroutz = existedProduct?.platform.find(x => x.platform === "Skroutz")
+            const shopflix = existedProduct?.platform.find(x => x.platform === "Shopflix")
+
+            if (existedProduct) {
+                if (minSupplierPrice.name.toLowerCase() === "globalsat") {
+                    if (parseFloat(existedProduct.price).toFixed(2) > parseFloat(supplierInfo.retail_price).toFixed(2)) {
+                        if (existedProduct.is_fixed_price) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
                         }
                         else {
-                            generalPercentage = findPercentage.percentage
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat((parseFloat(supplierInfo.retail_price) - 0.5)).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                    }
+                    else if (parseFloat(existedProduct.price).toFixed(2) > parseFloat(minPrices.general).toFixed(2)) {
+                        if (existedProduct.is_fixed_price) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
                         }
                     }
                     else {
-                        generalPercentage = findPercentage.percentage
+                        if (existedProduct.inventory && existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: false
+                            }
+                        }
+                    }
+
+                    if (skroutz) {
+                        if (parseFloat(skroutz.price).toFixed(2) > parseFloat(supplierInfo.retail_price).toFixed(2)) {
+                            if (skroutz.is_fixed_price) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(supplierInfo.retail_price).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                        else if (parseFloat(skroutz.price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                            if (skroutz.is_fixed_price) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                    }
+                    else {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(minPrices.skroutz).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+
+                    if (shopflix) {
+                        if (parseFloat(shopflix.price).toFixed(2) > parseFloat(supplierInfo.retail_price).toFixed(2)) {
+                            if (shopflix.is_fixed_price) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(supplierInfo.retail_price).toFixed(2)
+                                shopflix.is_fixed_price = false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                        else if (parseFloat(shopflix.price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                            if (shopflix.is_fixed_price) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                    }
+                    else {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(minPrices.shopflix).toFixed(2),
+                            is_fixed_price: false,
+                        }
                     }
                 }
                 else {
-                    generalPercentage = generalCategoryPercentage
+                    if (existedProduct.price > minPrices.general) {
+                        if (existedProduct.is_fixed_price) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                    }
+                    else {
+                        if (existedProduct.inventory && existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: false
+                            }
+                        }
+                    }
+
+                    if (skroutz) {
+                        if (parseFloat(skroutz.price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                            if (skroutz.is_fixed_price) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                    }
+                    else {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(minPrices.skroutz).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+
+                    if (shopflix) {
+                        if (parseFloat(shopflix.price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                            if (shopflix.is_fixed_price) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                    }
+                    else {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(minPrices.shopflix).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
                 }
             }
             else {
-                generalPercentage = generalCategoryPercentage
+                if (minSupplierPrice.name.toLowerCase() === "globalsat") {
+                    if (parseFloat(product.retail_price).toFixed(2) > parseFloat(minPrices.general).toFixed(2)) {
+                        prices.generalPrice = {
+                            price: prices.generalPrice = parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
+                            isFixed: false
+                        }
+                    }
+                    else {
+                        prices.generalPrice = {
+                            price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                            isFixed: false
+                        }
+                    }
+
+                    if (parseFloat(product.retail_price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(product.retail_price).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                    else {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(minPrices.skroutz).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+
+                    if (parseFloat(product.retail_price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(product.retail_price).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                    else {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(minPrices.shopflix).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                }
+                else
+                {
+                    prices.generalPrice = {
+                        price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                        isFixed: false
+                    }
+
+                    prices.skroutzPrice = {
+                        platform: "Skroutz",
+                        price: parseFloat(minPrices.skroutz).toFixed(2),
+                        is_fixed_price: false,
+                    }
+
+
+                    prices.shopflixPrice = {
+                        platform: "Shopflix",
+                        price: parseFloat(minPrices.shopflix).toFixed(2),
+                        is_fixed_price: false,
+                    }
+                }
             }
 
-            let minPrice = parseFloat(minSupplierPrice.wholesale + addToPrice) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
-
-            return existedProduct && existedProduct.price > minPrice && existedProduct.is_fixed_price ? parseFloat(existedProduct.price).toFixed(2) : minPrice.toFixed(2)
+            return prices
 
         } catch (error) {
             console.log(error)
@@ -1774,8 +1983,6 @@ module.exports = ({ strapi }) => ({
             delete entries.id;
             delete entries.name;
 
-            // console.log(entries.related_products.length)
-
             for (let entry of entries.related_products) {
                 let newEntry = {
                     name: entry.name,
@@ -1800,7 +2007,6 @@ module.exports = ({ strapi }) => ({
 
                 let imageURL = []
 
-                // console.log(entry.ImageURLS)
                 for (let imageUrl of entry.ImageURLS) {
                     imageURL.push(imageUrl.url)
                 }
@@ -1832,18 +2038,6 @@ module.exports = ({ strapi }) => ({
 
             var builder = new xml2js.Builder();
             var xml = builder.buildObject({ products: finalEntries });
-
-            // console.log(xml)
-
-            // fs.writeFile(`./public/${supplier}.xml`, xml, (err) => {
-            //     if (err)
-            //         console.log(err);
-            //     else {
-            //         console.log("File written successfully\n");
-            //     }
-            // });
-
-            // const response = fs.readFile(`./public/${supplier}.xml`)
 
             return xml;
         } catch (error) {
@@ -2164,8 +2358,6 @@ module.exports = ({ strapi }) => ({
     async createEntry(product, importRef, auth) {
 
         try {
-            // console.log("New Product:", product.name)
-
             //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
             const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
 
@@ -2173,52 +2365,65 @@ module.exports = ({ strapi }) => ({
 
             const supplierInfo = [this.createSupplierInfoData(product.entry, product, price_progress_data)]
 
-            const productPrice = await this.setPrice(null, supplierInfo, categoryInfo, product.brand?.id);
-
-            // const { mapCharNames, mapCharValues } = importRef.charMaps
-
-            // //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
-            // const parsedChars = await strapi
-            //     .plugin('import-products')
-            //     .service('helpers')
-            //     .parseChars(product.prod_chars, mapCharNames, mapCharValues)
+            const productPrices = await this.setPrice(null, supplierInfo, categoryInfo, product);
 
             product.supplierInfo = supplierInfo
             product.category = categoryInfo.id;
-            product.price = parseFloat(productPrice);
-            // product.prod_chars = parsedChars;
+            if (product.entry.name.toLowerCase() === "globalsat") {
+                if (parseFloat(productPrices.generalPrice.price).toFixed(2) < parseFloat(product.retail_price).toFixed(2)) {
+                    product.price = parseFloat(product.retail_price).toFixed(2)
+                }
+                else {
+                    product.price = parseFloat(productPrices.generalPrice.price).toFixed(2)
+                }
+                if (parseFloat(productPrices.skroutzPrice.price).toFixed(2) < parseFloat(product.retail_price).toFixed(2)) {
+                    product.price = parseFloat(product.retail_price).toFixed(2)
+                }
+                else {
+                    product.price = parseFloat(productPrices.skroutzPrice.price).toFixed(2)
+                }
+                if (parseFloat(productPrices.shopflixPrice.price).toFixed(2) < parseFloat(product.retail_price).toFixed(2)) {
+                    product.price = parseFloat(product.retail_price).toFixed(2)
+                }
+                else {
+                    product.price = parseFloat(productPrices.shopflixPrice.price).toFixed(2)
+                }
+            }
+            else { product.price = parseFloat(productPrices.generalPrice.price).toFixed(2); }
+
+            product.is_fixed_price = productPrices.generalPrice.isFixed;
+
+            let platforms = [
+                productPrices.skroutzPrice,
+                productPrices.shopflixPrice
+            ]
 
             const data = {
                 name: product.name,
                 slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g }),
                 category: categoryInfo.id,
-                price: parseFloat(productPrice).toFixed(2),
+                price: parseFloat(productPrices.generalPrice.price).toFixed(2),
+                is_fixed_price: product.is_fixed_price,
                 publishedAt: new Date(),
                 status: product.status,
                 related_import: product.entry.id,
                 supplierInfo: supplierInfo,
                 prod_chars: product.prod_chars,
                 ImageURLS: product.imagesSrc,
-
-
-                // short_description: product.short_description,
-                // description: product.description,                        
-                // mpn: product.mpn ? product.mpn : null,                        
-                // brand: { id: brandId },                        
+                platform: platforms
             }
 
-            if (product.entry.name === "Novatron" && product.short_description) {
+            if (product.entry.name.toLowerCase() === "novatron" && product.short_description) {
                 let result = product.short_description.match(/[0-9].[0-9]mm/g)
                 if (result) {
                     data.name = `${product.name}-${result[0]}`;
                     data.slug = slugify(`${product.name}-${result[0]}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
-
-                    // console.log(result[0])
                 }
             }
 
             if (product.mpn) {
                 data.mpn = product.mpn.trim()
+                data.slug = slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
             }
 
             if (product.barcode) {
@@ -2241,13 +2446,30 @@ module.exports = ({ strapi }) => ({
                 data.brand = product.brand
             }
 
+            if (product.length && product.width && product.height) {
+                data.length = parseInt(product.length)
+                data.width = parseInt(product.width)
+                data.height = parseInt(product.height)
+            }
+
+            //Υπολογισμός βάρους
+            if (!product.weight) {
+                product.weight = this.createProductWeight(product, categoryInfo)
+            }
+            if (product.weight) {
+                data.weight = parseInt(product.weight)
+            }
+            else if (categoryInfo.average_weight) {
+                data.weight = parseInt(categoryInfo.average_weight)
+            }
+            else {
+                data.weight = 0
+            }
             //Κατευάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
             let responseImage = await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .getAndConvertImgToWep(data, null, auth);
-
-            // console.log("ResponseImage:", await responseImage)
 
             data.image = await responseImage?.mainImage[0]
             data.additionalImages = await responseImage?.additionalImages
@@ -2270,7 +2492,6 @@ module.exports = ({ strapi }) => ({
                 importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
 
             importRef.created += 1;
-            // console.log("Created:", importRef.created)
         } catch (error) {
             console.log("Error in Entry Function:", error, error.details?.errors, product.name)
         }
@@ -2304,91 +2525,7 @@ module.exports = ({ strapi }) => ({
             if (!entryCheck) {
                 try {
                     await this.createEntry(product, importRef, auth)
-                    // console.log("New Product:", product.name)
 
-                    // //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-                    // const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
-
-                    // const price_progress_data = this.createPriceProgress(product)
-
-                    // const supplierInfo = [this.createSupplierInfoData(product.entry, product, price_progress_data)]
-
-                    // const productPrice = await this.setPrice(null, supplierInfo, categoryInfo, brandId);
-
-                    // const data = {
-                    //     name: product.name,
-                    //     slug: slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
-                    //     category: categoryInfo.id,
-                    //     price: parseFloat(productPrice).toFixed(2),
-                    //     publishedAt: new Date(),
-                    //     status: product.status.trim(),
-                    //     related_import: product.entry.id,
-                    //     supplierInfo: supplierInfo,
-                    //     prod_chars: product.prod_chars,
-                    //     ImageURLS: product.imagesSrc,
-
-                    //     // short_description: product.short_description,
-                    //     // description: product.description,                        
-                    //     // mpn: product.mpn ? product.mpn : null,                        
-                    //     // brand: { id: brandId },                        
-                    // }
-
-                    // if (product.entry.name === "Novatron" && product.short_description) {
-                    //     let result = product.short_description.match(/[0-9].[0-9]mm/g)
-                    //     if (result) {
-                    //         data.name = `${product.name}-${result[0]}`;
-                    //         data.slug = slugify(`${product.name}-${result[0]}-${product.mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g })
-
-                    //         // console.log(result[0])
-                    //     }
-                    // }
-
-                    // if (product.mpn) {
-                    //     data.mpn = product.mpn.trim()
-                    // }
-
-                    // if (product.barcode) {
-                    //     data.barcode = product.barcode.trim()
-                    // }
-
-                    // if (product.model) {
-                    //     data.model = product.model.trim()
-                    // }
-
-                    // if (product.description) {
-                    //     data.description = product.description.trim()
-                    // }
-
-                    // if (product.short_description) {
-                    //     data.short_description = product.short_description.trim()
-                    // }
-
-                    // if (brandId) {
-                    //     data.brand = { id: brandId }
-                    // }
-
-                    // const newEntry = await strapi.entityService.create('api::product.product', {
-                    //     data: data,
-                    // });
-
-                    // //Κατεβάζω τις φωτογραφίες του προϊόντος , τις μετατρέπω σε webp και τις συνδέω με το προϊόν
-                    // let responseImage = await strapi
-                    //     .plugin('import-products')
-                    //     .service('helpers')
-                    //     .getAndConvertImgToWep(data, newEntry.id, auth);
-
-                    // // //Δημιουργώ αυτόματα το SEO για το προϊόν
-                    // await strapi
-                    //     .plugin('import-products')
-                    //     .service('helpers')
-                    //     .saveSEO(responseImage.mainImageID.data[0], data, newEntry.id);
-
-                    // importRef.related_entries.push(newEntry.id)
-                    // if (product.relativeProducts && product.relativeProducts.length > 0)
-                    //     importRef.related_products.push({ productID: newEntry.id, relatedProducts: product.relativeProducts })
-
-                    // importRef.created += 1;
-                    // console.log("Created:", importRef.created)
                 } catch (error) {
                     console.log("entryCheck:", entryCheck, "mpn:", product.mpn, "name:", product.name,
                         "barcode:", product.barcode, "brand_name:", product.brand_name, "model:", product.model)
@@ -2397,53 +2534,25 @@ module.exports = ({ strapi }) => ({
             }
             else {
                 try {
+                    if (product.entry.name.toLowerCase() === "quest") {
+                        if (entryCheck.prod_chars) {
+                            if (entryCheck.prod_chars.find(x => x.name === "Μεικτό βάρος")) {
+                                let chars = entryCheck.prod_chars.find(x => x.name === "Μεικτό βάρος")
+                                let weight = parseInt(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
+
+                                product.weight = weight
+                            }
+                            else if (entryCheck.prod_chars.find(x => x.name === "Βάρος (κιλά)")) {
+                                let chars = entryCheck.prod_chars.find(x => x.name === "Βάρος (κιλά)")
+                                let weight = parseInt(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
+
+                                product.weight = weight
+                            }
+                        }
+                    }
+
                     await this.updateEntry(entryCheck, product, importRef)
-                    // console.log("Existed Data:", product.name)
 
-                    // //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-                    // const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map, product.name, product.category.title, product.subcategory.title, product.sub2category.title);
-
-                    // importRef.related_entries.push(entryCheck.id)
-
-                    // if (product.relativeProducts && product.relativeProducts.length > 0)
-                    //     importRef.related_products.push({ productID: entryCheck.id, relatedProducts: product.relativeProducts })
-
-                    // let supplierInfo = entryCheck.supplierInfo
-                    // const relatedImport = entryCheck.related_import;
-                    // const relatedImportId = relatedImport.map(x => x.id)
-
-                    // const findImport = relatedImport.findIndex(x =>
-                    //     x.id === product.entry.id)
-
-                    // if (findImport === -1) { relatedImportId.push(product.entry.id) }
-
-                    // const { updatedSupplierInfo, isUpdated } = await strapi
-                    //     .plugin('import-products')
-                    //     .service('helpers')
-                    //     .updateSupplierInfo(product.entry, product, supplierInfo)
-
-                    // if (isUpdated) {
-                    //     supplierInfo = updatedSupplierInfo
-                    // }
-
-                    // const productPrice = await strapi
-                    //     .plugin('import-products')
-                    //     .service('helpers')
-                    //     .setPrice(entryCheck, supplierInfo, categoryInfo, brandId);
-
-                    // await strapi.entityService.update('api::product.product', entryCheck.id, {
-                    //     data: {
-                    //         // name: product.productTitle,
-                    //         category: categoryInfo.id,
-                    //         model: product.model ? product.model : null,
-                    //         price: parseFloat(productPrice),
-                    //         supplierInfo: supplierInfo,
-                    //         related_import: relatedImportId,
-                    //         publishedAt: new Date()
-                    //     },
-                    // });
-                    // importRef.updated += 1
-                    // console.log("Updated:", importRef.updated)
                 } catch (error) {
                     console.log(error)
                 }
@@ -2478,7 +2587,82 @@ module.exports = ({ strapi }) => ({
         if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
             data.category = categoryInfo.id
             dbChange = 'updated'
-            // console.log("categoryInfo.id:", categoryInfo.id, "entryCheck.categories", entryCheck.category)
+        }
+
+        //Υπολογισμός βάρους
+        if (!product.weight) {
+            product.weight = this.createProductWeight(product, categoryInfo)
+        }
+
+        if (entryCheck.slug.includes("undefined")) {
+            if (product.mpn) {
+                data.slug = slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
+                dbChange = 'updated'
+            }
+            else {
+                data.slug = slugify(`${product.name}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
+                dbChange = 'updated'
+            }
+        }
+
+        if (!entryCheck.barcode && product.barcode) {
+            data.barcode = product.barcode
+            dbChange = 'updated'
+        }
+
+        if (!entryCheck.length && product.length) {
+            data.length = parseInt(product.length)
+            dbChange = 'updated'
+        }
+
+        if (!entryCheck.width && product.width) {
+            data.width = parseInt(product.width)
+            dbChange = 'updated'
+        }
+
+        if (!entryCheck.height && product.height) {
+            data.height = (product.height)
+            dbChange = 'updated'
+        }
+
+        if (!entryCheck.model && product.model) {
+            data.model = product.model
+            dbChange = 'updated'
+        }
+
+
+        if (!entryCheck.weight) {
+            if (entryCheck.weight === 0) {
+                if (parseInt(product.weight) === 0) {
+                    if (categoryInfo.average_weight) {
+                        data.weight = parseInt(categoryInfo.average_weight)
+                        dbChange = 'updated'
+                    }
+                }
+                else if (parseInt(product.weight) !== 0) {
+                    data.weight = parseInt(product.weight)
+                    dbChange = 'updated'
+                }
+            }
+            else {
+                data.weight = parseInt(categoryInfo.average_weight ? categoryInfo.average_weight : 0)
+                dbChange = 'updated'
+            }
+        }
+        else {
+            if (product.weight) {
+                if (parseInt(entryCheck.weight) === parseInt(categoryInfo.average_weight)
+                    && parseInt(entryCheck.weight) !== parseInt(product.weight)) {
+                    data.weight = parseInt(product.weight)
+                    dbChange = 'updated'
+                }
+            }
+            else {
+                if (categoryInfo.average_weight && parseInt(categoryInfo.average_weight) !== parseInt(entryCheck.weight)) {
+                    data.weight = parseInt(categoryInfo.average_weight)
+                    dbChange = 'updated'
+                }
+            }
         }
 
         const { updatedSupplierInfo, isUpdated } = await strapi
@@ -2486,19 +2670,43 @@ module.exports = ({ strapi }) => ({
             .service('helpers')
             .updateSupplierInfo(product.entry, product, supplierInfo)
 
-        if (isUpdated) {
-            const productPrice = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .setPrice(entryCheck, supplierInfo, categoryInfo, product.brand?.id);
+        const skroutz = entryCheck.platform.find(x => x.platform === "Skroutz")
+        const shopflix = entryCheck.platform.find(x => x.platform === "Shopflix")
 
-            data.price = parseFloat(productPrice)
-            data.supplierInfo = updatedSupplierInfo
-            if (!entryCheck.model && product.model) {
-                data.model = product.model
-            }
+        const productPrices = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .setPrice(entryCheck, supplierInfo, categoryInfo, product);
+
+        if (isUpdated || !entryCheck.category
+            || entryCheck.category.id !== categoryInfo.id
+            || !skroutz || !shopflix) {
+
+            data.is_fixed_price = productPrices.generalPrice.isFixed;
+
+            data.price = parseFloat(productPrices.generalPrice.price)
+            data.platform = [
+                productPrices.skroutzPrice,
+                productPrices.shopflixPrice
+            ]
             dbChange = 'updated'
         }
+
+        if (isUpdated) {
+            data.supplierInfo = updatedSupplierInfo
+            dbChange = 'updated'
+        }
+
+        if (parseFloat(entryCheck.price).toFixed(2) !== parseFloat(productPrices.generalPrice.price).toFixed(2)) {
+            if (parseFloat(entryCheck.price).toFixed(2) > parseFloat(productPrices.generalPrice.price).toFixed(2)) {
+                if (!entryCheck.is_fixed_price) { data.price = parseFloat(productPrices.generalPrice.price).toFixed(2) }
+            }
+            else {
+                data.price = parseFloat(productPrices.generalPrice.price).toFixed(2)
+                data.is_fixed_price = false
+            }
+        }
+
 
         if (entryCheck.publishedAt === null) {
             data.publishedAt = new Date()
@@ -2516,25 +2724,17 @@ module.exports = ({ strapi }) => ({
         switch (dbChange) {
             case 'republished':
                 importRef.republished += 1
-                // console.log("Republished:", importRef.republished)
                 break;
             case 'updated':
                 importRef.updated += 1
-                // console.log("Update:", importRef.updated)
                 break;
             case 'created':
                 importRef.created += 1
-                // console.log("Created:", importRef.created)
                 break;
             default:
                 importRef.skipped += 1
-                // console.log("Skipped:", importRef.skipped)
                 break;
         }
-        // const imgUrls = []
-
-
-        // console.log("Updated:", importRef.updated, "Skipped:", importRef.skipped)
     },
 
     async deleteEntry(entry, importRef) {
@@ -2564,10 +2764,6 @@ module.exports = ({ strapi }) => ({
                 },
             });
 
-        console.log("related_products:", importXmlFile.related_products.length,
-            "importRef.related_entries:", importRef.related_entries.length)
-
-
         for (let product of importXmlFile.related_products) {
 
             if (!importRef.related_entries.includes(product.id)) {
@@ -2592,13 +2788,11 @@ module.exports = ({ strapi }) => ({
                     data.related_import = relatedImports
                 }
                 else {
-                    // console.log(supplierInfo, index)
                     supplierInfo[index].in_stock = false;
                 }
 
                 const isAllSuppliersOutOfStock = supplierInfo.every(supplier => supplier.in_stock === false)
-                // supplierInfo.splice(index, 1)
-                // console.log("Product Deleted:", product.name)
+
                 if (!isAllSuppliersOutOfStock) {
                     data.supplierInfo = supplierInfo
                 }
@@ -2622,4 +2816,33 @@ module.exports = ({ strapi }) => ({
                 },
             })
     },
+
+    createProductWeight(product, categoryInfo) {
+        try {
+            let weight = 0
+            if (product.length && product.width && product.height) {
+                let calcWweight = parseInt(product.length) * parseInt(product.width) * parseInt(product.height) / 5
+                weight = parseInt(calcWweight)
+            }
+            else if (product.recycleTax) {
+                let tax = parseFloat(product.recycleTax)
+                if (categoryInfo) {
+                    if (categoryInfo.slug === "othones-ypologisti"
+                        || categoryInfo.slug === "othones-surveilance-cctv"
+                        || categoryInfo.slug === "tileoraseis") {
+                        weight = parseInt(tax * 1000 / 0.25424)
+                    }
+                    else {
+                        weight = parseInt(tax * 1000 / 0.16)
+                    }
+                }
+            }
+            else {
+                weight = parseInt(0)
+            }
+            return weight
+        } catch (error) {
+            console.log(error)
+        }
+    }
 })

@@ -1,7 +1,6 @@
 'use strict';
 
 const Axios = require('axios');
-const Iconv = require('iconv').Iconv;
 
 module.exports = ({ strapi }) => ({
 
@@ -11,15 +10,15 @@ module.exports = ({ strapi }) => ({
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = categoryMap
 
-            // console.log("newData:", newData.length)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(char_name_map, char_value_map);
+            // // console.log("newData:", newData.length)
+            // const charMaps = await strapi
+            //     .plugin('import-products')
+            //     .service('helpers')
+            //     .parseCharsToMap(char_name_map, char_value_map);
 
-            const { mapCharNames, mapCharValues } = charMaps
+            // const { mapCharNames, mapCharValues } = charMaps
 
-            const products = []
+            // const products = []
 
             const data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })

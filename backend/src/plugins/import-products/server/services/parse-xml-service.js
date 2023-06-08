@@ -22,6 +22,7 @@ module.exports = ({ strapi }) => ({
             .then(async () => { return updateZEGETRON() })
             .then(async () => { return updateGERASIS() })
             .then(async () => { return updateOKTABIT() })
+            .then(async () => { return updateWESTNET() })
             .then(async () => { return scrapQUEST() })
 
         async function scrapNOVATRON() {
@@ -104,6 +105,26 @@ module.exports = ({ strapi }) => ({
                 .parseOktabitXml({ entry, auth });
         }
 
+        async function updateWESTNET() {
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Westnet" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseWestnetXml({ entry, auth });
+        }
+
         async function scrapQUEST() {
             const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
                 where: { name: "QUEST" },
@@ -148,13 +169,7 @@ module.exports = ({ strapi }) => ({
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = importRef.categoryMap
 
-            // console.log("newData:", newData.length)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(char_name_map, char_value_map);
-
-            const { mapCharNames, mapCharValues } = charMaps
+            const { mapCharNames, mapCharValues } = importRef.charMaps
 
             const { browser, page } =
                 await strapi
@@ -287,7 +302,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .createImportRef(entry);
 
-            const products = await strapi
+            const { products, downloadingAllSuccess } = await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
@@ -295,18 +310,8 @@ module.exports = ({ strapi }) => ({
             if (products.message) {
                 return { message: "Error" }
             }
-            // let index = 0
-
-            // async function* iterateProducts(products) {
 
             for (let dt of products) {
-                // index++
-
-
-                // setTimeout(async () => {
-
-
-                // console.log("delay:", `${5000 * index}`, "MPN: ", dt.mpn, " Barcode: ", dt.barcode)
 
                 const { entryCheck, brandId } = await strapi
                     .plugin('import-products')
@@ -316,35 +321,6 @@ module.exports = ({ strapi }) => ({
                 //Κατασκευάζω το URL του προϊόντος του προμηθευτή
                 let productUrl = `http://www.oktabit.gr/product_details.asp?productid=${dt.supplierCode}`
 
-                // const productPrevius = {
-                //     name: dt.title,
-                //     description: dt.description,
-                //     // category: categoryInfo.id,
-                //     mpn: dt.partNumber.toString(),
-                //     barcode: dt.barcode.toString(),
-                //     slug: dt.partNumber ?
-                //         slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
-                //         slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
-                //     publishedAt: new Date(),
-                //     status: 'InStock',
-                //     ImageURLS: dt.ImageURLS,
-                //     brand: { id: await brandId },
-                //     related_import: entry.id,
-                //     supplierInfo: [{
-                //         name: entry.name,
-                //         in_stock: true,
-                //         wholesale: dt.price,
-                //         recycle_tax: dt.recycleTax,
-                //         supplierProductId: dt.supplierCode,
-                //         supplierProductURL: productUrl,
-                //         retail_price: dt.suggestedPrice,
-                //         price_progress: [{
-                //             date: new Date(),
-                //             wholesale: dt.price,
-                //         }]
-                //     }],
-                //     prod_chars: dt.prod_chars
-                // }
 
                 const product = {
                     entry,
@@ -384,24 +360,85 @@ module.exports = ({ strapi }) => ({
                     prod_chars: dt.prod_chars
                 }
 
+                if (downloadingAllSuccess) {
+                    if (product.prod_chars) {
+
+                        let weightChar = product.prod_chars.find(x => x.name.includes("Βάρος"))
+                        if (weightChar) {
+                            if (weightChar.name.includes("κιλά") && !product.supplierCode === "281-69-ANPNAB2") {
+                                if (weightChar.value.trim() !== "") {
+                                    let result = weightChar.value.match(/\d{1,3}(.|,)\d{0,3}/gmi)
+                                    let weightString = result.find(x => x !== undefined)
+                                    if (weightString && weightString.trim() !== "") {
+                                        let weight = parseFloat(weightString.replace("Kg", "").replace(",", ".").trim()) * 1000
+                                        product.weight = parseInt(weight)
+                                    }
+                                }
+                            }
+                            else if (weightChar.name.includes("γραμμάρια") || product.supplierCode === "281-69-ANPNAB2") {
+                                if (weightChar.value.trim() !== "") {
+                                    let result = weightChar.value.match(/\d{1,5}/gmi)
+                                    let weightString = result?.find(x => x !== undefined)
+                                    if (weightString) {
+                                        let weight = parseFloat(weightString.replace(",", ".").trim())
+                                        product.weight = parseInt(weight)
+                                    }
+                                }
+                            }
+                        }
+
+                        let diminsionChar = product.prod_chars.find(x => x.name.includes("Διαστάσεις "))
+                        if (diminsionChar && diminsionChar.value.trim() !== "") {
+                            let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
+                            let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
+
+                            let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
+                            let length = dim[0].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                            product.length = length.includes("-") ? length.split("-")[1] : length
+                            let width = dim[1].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                            product.width = width.includes("-") ? width.split("-")[1] : width
+                            let height = dim[2].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                            product.height = height.includes("-") ? height.split("-")[1] : height
+
+                        }
+                    }
+
+                    // if (!product.weight) {
+                    //     if (product.recycleTax) {
+                    //         let tax = parseFloat(product.recycleTax)
+                    //         if (product.category === "Οθόνες / Display") {
+                    //             product.weight = parseInt(tax * 1000 / 0.25424)
+                    //         }
+                    //         else {
+                    //             product.weight = parseInt(tax * 1000 / 0.16)
+                    //         }
+                    //     }
+                    //     else {
+                    //         product.weight = 0
+                    //     }
+
+                    // }
+                }
+
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
                 if (!entryCheck) {
+                    if (downloadingAllSuccess) {
+                        try {
+                            // var startTime = performance.now()
+                            // setTimeout(async () => {
+                            const response = await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .createEntry(product, importRef, auth);
+                            // var endTime = performance.now()
 
-                    try {
-                        // var startTime = performance.now()
-                        // setTimeout(async () => {
-                        const response = await strapi
-                            .plugin('import-products')
-                            .service('helpers')
-                            .createEntry(product, importRef, auth);
-                        // var endTime = performance.now()
-
-                        await response
-                        //     console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
-                        // }, 3000 * index);
-                    } catch (error) {
-                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                            await response
+                            //     console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
+                            // }, 3000 * index);
+                        } catch (error) {
+                            console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                        }
                     }
                 }
                 else {
@@ -410,33 +447,19 @@ module.exports = ({ strapi }) => ({
                             .plugin('import-products')
                             .service('helpers')
                             .updateEntry(entryCheck, product, importRef);
-
-                        // console.log("Updated")
                     } catch (error) {
                         console.log(error)
                     }
                 }
-                // }, 10000 * index);
 
             }
-            // }
-
-            // const reduceApiEndpoints = async (previous, endpoint) => {
-            //     await previous;
-            //     return apiCall(endpoint);
-            // };
-
-            // const sequential = await products.reduce(reduceApiEndpoints, Promise.resolve());
-
-
-            // console.log("Ίδια προιόντα:", numberOfSame)
 
             await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .deleteEntry(entry, importRef);
 
-            console.log(importRef)
+            // console.log(importRef)
 
             console.log("End of Import")
             return { "message": "ok" }
@@ -465,25 +488,11 @@ module.exports = ({ strapi }) => ({
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = importRef.categoryMap
 
-            // console.log("newData:", newData.length)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(char_name_map, char_value_map);
 
-            const { mapCharNames, mapCharValues } = charMaps
-            // console.log(products)
 
-            // let index = 0;
+            const { mapCharNames, mapCharValues } = importRef.charMaps
             for (let dt of products) {
-                // index++
-
-
-                // setTimeout(async () => {
-
-
-                // console.log("delay:", `${5000 * index}`, "MPN: ", dt.mpn, " Barcode: ", dt.barcode)
-
+                
                 let mpn = dt.part_number[0].trim().toString()
                 let name = dt.title[0].trim()
                 let barcode = dt.barcode ? dt.barcode[0].trim() : null
@@ -504,6 +513,10 @@ module.exports = ({ strapi }) => ({
                     sub2category: { title: null },
                     mpn,
                     barcode,
+                    weight: dt.weight ? dt.weight[0] : 0,
+                    length: dt.length ? parseFloat(dt.length[0].replace(',', '.')).toFixed(2) : 0,
+                    width: dt.width ? parseFloat(dt.width[0].replace(',', '.')).toFixed(2) : 0,
+                    height: dt.height ? parseFloat(dt.height[0].replace(',', '.')).toFixed(2) : 0,
                     // slug: dt.partNumber ? 
                     //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
                     //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
@@ -552,7 +565,7 @@ module.exports = ({ strapi }) => ({
 
                     product.imagesSrc = imageUrls
                 }
-                // console.log(product) 
+                
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
                 if (!entryCheck) {
@@ -585,8 +598,7 @@ module.exports = ({ strapi }) => ({
                         console.log(error)
                     }
                 }
-                // }, 10000 * index);
-
+                
             }
 
             await strapi
@@ -643,14 +655,8 @@ module.exports = ({ strapi }) => ({
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = importRef.categoryMap
 
-            // console.log("newData:", newData.length)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(char_name_map, char_value_map);
-
-            const { mapCharNames, mapCharValues } = charMaps
-
+            const { mapCharNames, mapCharValues } = importRef.charMaps
+            let index = 0
             for (let dt of products) {
 
                 let mpn = dt.partNumber[0].trim().toString()
@@ -667,10 +673,9 @@ module.exports = ({ strapi }) => ({
                 let productUrl = `https://www.mywestnet.com/el${dt.url[0]}`
 
                 const chars = []
-                // console.log(typeof dt.specs[0].spec)
+
                 if (dt.specs[0].spec) {
                     for (let productChar of dt.specs[0].spec) {
-                        // console.log(char)
                         const char = {}
                         char.name = productChar.name[0]
                         char.value = productChar.value[0]
@@ -701,7 +706,7 @@ module.exports = ({ strapi }) => ({
                     wholesale: parseFloat(dt.price[0]).toFixed(2),
                     imagesSrc: [{ url: dt.image[0] }],
                     brand: { id: await brandId },
-                    recycleTax: parseFloat(dt.recycle_tax[0]).toFixed(2),
+                    recycleTax: parseFloat(dt.recycle_tax[0].replace(",", ".")).toFixed(2),
                     link: productUrl,
                     related_import: entry.id,
                     // supplierInfo: [{
@@ -720,7 +725,78 @@ module.exports = ({ strapi }) => ({
                     prod_chars: parsedChars
                 }
 
-                console.log(product)
+                let weightChar = chars.find(x => x.name === "Weight")
+                if (weightChar) {
+                    if (weightChar.value.includes("GW")) {
+                        let result = weightChar.value.match(/GW: \d{1,3}(.|,|\s)\d{0,3}\s*kgs/gmi)
+                        let weightString = result.find(x => x !== undefined)
+                        let weight = parseFloat(weightString.replace("GW: ", "").replace("kgs", "").replace(",", ".").trim()) * 1000
+                        product.weight = parseInt(weight)
+                    }
+                    else if (weightChar.value.includes("Gross")) {
+                        let result = weightChar.value.match(/Gross \d{1,3}(.|,|\s)\d{0,3}\s*kg/gmi)
+                        let weightString = result.find(x => x !== undefined)
+                        let weight = parseFloat(weightString.replace("Gross ", "").replace("kgs", "").replace(",", ".").trim()) * 1000
+                        product.weight = parseInt(weight)
+                    }
+                    else if (weightChar.value.includes("kg") || weightChar.value.includes("Kg")) {
+                        let result = weightChar.value.match(/\d{1,3}(.|,|\s)\d{0,3}\s*kg/gmi)
+                        let weightString = result.find(x => x !== undefined)
+                        let weight = parseFloat(weightString.replace("kg", "").replace(",", ".").trim()) * 1000
+                        product.weight = parseInt(weight)
+                    }
+                    else if (weightChar.value.includes("grams")) {
+                        let result = weightChar.value.match(/\d{1,5}\s*grams/gmi)
+                        let weightString = result.find(x => x !== undefined)
+                        let weight = parseFloat(weightString.replace("kg", "").replace(",", ".").trim())
+                        product.weight = parseInt(weight)
+                    }
+                    else if (weightChar.value.includes("g")) {
+                        let result = weightChar.value.match(/\d{1,5}\s*g/gmi)
+                        let weightString = result.find(x => x !== undefined)
+                        let weight = parseFloat(weightString.replace("kg", "").replace(",", ".").trim())
+                        product.weight = parseInt(weight)
+                    }
+                    else {
+                        let result = weightChar.value.match(/\d{1,3}(.|,)\d{0,3}/gmi)
+                        let weightString = result.find(x => x !== undefined)
+                        let weight = parseFloat(weightString.replace(",", ".").trim()) * 1000
+                        product.weight = parseInt(weight)
+                    }
+                }
+
+
+                let diminsionChar = chars.find(x => x.name.includes("Dimensions"))
+
+                if (diminsionChar && diminsionChar.value.trim() !== "") {
+
+                    if (diminsionChar.value.includes("mm")) {
+                        let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
+                        if (result.length < 3) { continue }
+                        let length = parseFloat(result[0].replace(",", ".").trim())
+                        product.length = parseInt(length)
+                        let width = parseFloat(result[1].replace(",", ".").trim())
+                        product.width = parseInt(width)
+                        let height = parseFloat(result[2].replace(",", ".").trim())
+                        product.height = parseInt(height)
+                    }
+                    else {
+                        let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
+                        let length = parseFloat(result[0].replace(",", ".").trim()) * 10
+                        product.length = parseInt(length)
+                        let width = parseFloat(result[1].replace(",", ".").trim()) * 10
+                        product.width = parseInt(width)
+                        let height = parseFloat(result[2].replace(",", ".").trim()) * 10
+                        product.height = parseInt(height)
+                    }
+
+                    // let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
+                    // let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
+
+                    // let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
+
+
+                }
 
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
@@ -786,29 +862,18 @@ module.exports = ({ strapi }) => ({
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = importRef.categoryMap
 
-            // console.log("newData:", newData.length)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(char_name_map, char_value_map);
+            const { mapCharNames, mapCharValues } = importRef.charMaps
 
-            const { mapCharNames, mapCharValues } = charMaps
-            // console.log(products)
-
-            // let index = 0;
             for (let dt of products) {
-                // index++
-
-
-                // setTimeout(async () => {
-
-
-                // console.log("delay:", `${5000 * index}`, "MPN: ", dt.mpn, " Barcode: ", dt.barcode)
 
                 let mpn = dt.mpn[0].trim().toString()
                 let name = dt.name[0].trim()
                 let barcode = dt.barcode ? dt.barcode[0].trim() : null
                 let brand_name = dt.manufacturer[0].trim()
+                let weightFromData = null
+                if (dt.weight) {
+                    weightFromData = parseFloat(dt.weight[0].replace("kg", "").replace(",", ".").trim()) * 1000
+                }
 
                 const { entryCheck, brandId } = await strapi
                     .plugin('import-products')
@@ -825,6 +890,7 @@ module.exports = ({ strapi }) => ({
                     sub2category: dt.product_categories[0].category_path[0]._.split("->")[2] ? { title: dt.product_categories[0].category_path[0]._.split("->")[2].trim() } : { title: null },
                     mpn,
                     barcode,
+                    weight: weightFromData ? parseInt(weightFromData) : 0,
                     // slug: dt.partNumber ? 
                     //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
                     //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
@@ -837,6 +903,7 @@ module.exports = ({ strapi }) => ({
                     // recycleTax: dt.recycleTax,
                     link: dt.url[0].trim(),
                     related_import: entry.id,
+
                     // prod_chars: dt.prod_chars
                 }
 
@@ -871,23 +938,17 @@ module.exports = ({ strapi }) => ({
                     product.imagesSrc = imageUrls
                 }
 
-                // console.log(product)
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
                 if (!entryCheck) {
 
                     try {
-                        // var startTime = performance.now()
-                        // setTimeout(async () => {
                         const response = await strapi
                             .plugin('import-products')
                             .service('helpers')
                             .createEntry(product, importRef, auth);
-                        // var endTime = performance.now()
 
                         await response
-                        //     console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
-                        // }, 3000 * index);
                     } catch (error) {
                         console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
                     }
@@ -904,20 +965,8 @@ module.exports = ({ strapi }) => ({
                         console.log(error)
                     }
                 }
-                // }, 10000 * index);
 
             }
-            // }
-
-            // const reduceApiEndpoints = async (previous, endpoint) => {
-            //     await previous;
-            //     return apiCall(endpoint);
-            // };
-
-            // const sequential = await products.reduce(reduceApiEndpoints, Promise.resolve());
-
-
-            // console.log("Ίδια προιόντα:", numberOfSame)
 
             await strapi
                 .plugin('import-products')
@@ -1094,12 +1143,7 @@ module.exports = ({ strapi }) => ({
 
             //     console.log(newData.length)
 
-            //     const charMaps = await strapi
-            //         .plugin('import-products')
-            //         .service('helpers')
-            //         .parseCharsToMap(char_name_map, char_value_map);
-
-            //     const { mapCharNames, mapCharValues } = charMaps
+            //     const { mapCharNames, mapCharValues } = importRef.charMaps
 
             //     for (let dt of newData) {
 
