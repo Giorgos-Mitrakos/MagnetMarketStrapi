@@ -492,7 +492,7 @@ module.exports = ({ strapi }) => ({
 
             const { mapCharNames, mapCharValues } = importRef.charMaps
             for (let dt of products) {
-                
+
                 let mpn = dt.part_number[0].trim().toString()
                 let name = dt.title[0].trim()
                 let barcode = dt.barcode ? dt.barcode[0].trim() : null
@@ -565,7 +565,7 @@ module.exports = ({ strapi }) => ({
 
                     product.imagesSrc = imageUrls
                 }
-                
+
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
                 if (!entryCheck) {
@@ -598,7 +598,7 @@ module.exports = ({ strapi }) => ({
                         console.log(error)
                     }
                 }
-                
+
             }
 
             await strapi
@@ -622,17 +622,31 @@ module.exports = ({ strapi }) => ({
             .service('helpers')
             .createImportRef(entry);
 
-        await strapi
+        const response = await strapi
             .plugin('import-products')
             .service('globalsatHelper')
             .scrapGlobalsat(importRef, entry, auth);
 
-        await strapi
-            .plugin('import-products')
-            .service('helpers')
-            .deleteEntry(entry, importRef);
 
-        console.log(importRef)
+        if (response && response.message === "error") {
+            console.log("AN error occured")
+            await strapi.entityService.update('plugin::import-products.importxml', entry.id,
+                {
+                    data: {
+                        lastRun: new Date(),
+                        report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted},
+                            Δημιουργήθηκε κάποιο σφάλμα κατά τη διαδικάσία. Ξαναπροσπασθήστε!`,
+                    },
+                })
+        }
+        else {
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .deleteEntry(entry, importRef);
+
+            console.log(importRef)
+        } 
 
         console.log("End of Import")
         return { "message": "ok" }
@@ -991,17 +1005,30 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .createImportRef(entry);
 
-            await strapi
+            let response = await strapi
                 .plugin('import-products')
                 .service('novatronHelper')
                 .scrapNovatronCategories(importRef, entry, auth);
 
-            await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .deleteEntry(entry, importRef);
+            if (response && response.message === "error") {
+                console.log("AN error occured")
+                await strapi.entityService.update('plugin::import-products.importxml', entry.id,
+                    {
+                        data: {
+                            lastRun: new Date(),
+                            report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted},
+                            Δημιουργήθηκε κάποιο σφάλμα κατά τη διαδικάσία. Ξαναπροσπασθήστε!`,
+                        },
+                    })
+            }
+            else {
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
 
-            console.log(importRef)
+                console.log(importRef)
+            }
 
             console.log("End of Import")
             return { "message": "ok" }
@@ -1023,14 +1050,24 @@ module.exports = ({ strapi }) => ({
                 .service('questHelper')
                 .scrapQuest(importRef, entry, auth);
 
-            if (response && response.message === "error") { console.log("AN error occured") }
+            if (response && response.message === "error") {
+                console.log("AN error occured")
+                await strapi.entityService.update('plugin::import-products.importxml', entry.id,
+                    {
+                        data: {
+                            lastRun: new Date(),
+                            report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted},
+                            Δημιουργήθηκε κάποιο σφάλμα κατά τη διαδικάσία. Ξαναπροσπασθήστε!`,
+                        },
+                    })
+            }
             else {
                 await strapi
                     .plugin('import-products')
                     .service('helpers')
                     .deleteEntry(entry, importRef);
 
-                console.log(importRef)
+                // console.log(importRef)
             }
 
             console.log("End of Import")

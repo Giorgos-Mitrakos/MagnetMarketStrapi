@@ -128,7 +128,6 @@ module.exports = ({ strapi }) => ({
                     }
                 }
             }
-
             return newProducts
         } catch (error) {
             console.log(error)
@@ -1643,7 +1642,7 @@ module.exports = ({ strapi }) => ({
             let minPrices = {}
 
             let prices = {}
-            
+
             minPrices.general = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.general.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.general.platformCategoryPercentage) / 100 + 1)).toFixed(2)
             minPrices.skroutz = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.skroutz.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.skroutz.platformCategoryPercentage) / 100 + 1)).toFixed(2)
             minPrices.shopflix = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.shopflix.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.shopflix.platformCategoryPercentage) / 100 + 1)).toFixed(2)
@@ -1653,7 +1652,37 @@ module.exports = ({ strapi }) => ({
 
             if (existedProduct) {
                 if (minSupplierPrice.name.toLowerCase() === "globalsat") {
-                    if (parseFloat(existedProduct.price).toFixed(2) > parseFloat(supplierInfo.retail_price).toFixed(2)) {
+                    
+                    if (parseFloat(existedProduct.price).toFixed(2) <= parseFloat(minPrices.general).toFixed(2)) {
+                        if (existedProduct.inventory && existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price 
+                            } 
+                        } 
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: false
+                            }
+                        }
+                    }
+                    else if (parseFloat(existedProduct.price).toFixed(2) > parseFloat(minPrices.general).toFixed(2)
+                        && parseFloat(existedProduct.price).toFixed(2) <= parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2)) {
+                        if (existedProduct.is_fixed_price) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                    }
+                    else {
                         if (existedProduct.is_fixed_price) {
                             prices.generalPrice = {
                                 price: parseFloat(existedProduct.price).toFixed(2),
@@ -1667,37 +1696,30 @@ module.exports = ({ strapi }) => ({
                             }
                         }
                     }
-                    else if (parseFloat(existedProduct.price).toFixed(2) > parseFloat(minPrices.general).toFixed(2)) {
-                        if (existedProduct.is_fixed_price) {
-                            prices.generalPrice = {
-                                price: parseFloat(existedProduct.price).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price
-                            }
-                        }
-                        else {
-                            prices.generalPrice = {
-                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price
-                            }
-                        }
-                    }
-                    else {
-                        if (existedProduct.inventory && existedProduct.inventory > 0) {
-                            prices.generalPrice = {
-                                price: parseFloat(existedProduct.price).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price
-                            }
-                        }
-                        else {
-                            prices.generalPrice = {
-                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
-                                isFixed: false
-                            }
-                        }
-                    }
 
                     if (skroutz) {
-                        if (parseFloat(skroutz.price).toFixed(2) > parseFloat(supplierInfo.retail_price).toFixed(2)) {
+                        if (parseFloat(skroutz.price).toFixed(2) <= parseFloat(minPrices.skroutz).toFixed(2)) {
+                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                        else if (parseFloat(skroutz.price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)
+                            && parseFloat(skroutz.price).toFixed(2) <= parseFloat(supplierInfo.retail_price).toFixed(2)) {
+                            if (skroutz.is_fixed_price) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        } 
+                        else {
                             if (skroutz.is_fixed_price) {
                                 prices.skroutzPrice = skroutz
                             }
@@ -1707,37 +1729,47 @@ module.exports = ({ strapi }) => ({
                                 prices.skroutzPrice = skroutz
                             }
                         }
-                        else if (parseFloat(skroutz.price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
-                            if (skroutz.is_fixed_price) {
-                                prices.skroutzPrice = skroutz
-                            }
-                            else {
-                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
-                                skroutz.is_fixed_price = false
-                                prices.skroutzPrice = skroutz
-                            }
-                        }
-                        else {
-                            if (existedProduct.inventory && existedProduct.inventory > 0) {
-                                prices.skroutzPrice = skroutz
-                            }
-                            else {
-                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
-                                skroutz.is_fixed_price = false
-                                prices.skroutzPrice = skroutz
-                            }
-                        }
                     }
                     else {
-                        prices.skroutzPrice = {
-                            platform: "Skroutz",
-                            price: parseFloat(minPrices.skroutz).toFixed(2),
-                            is_fixed_price: false,
+                        if (parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        } 
+                        else {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(minPrices.skroutz).toFixed(2),
+                                is_fixed_price: false,
+                            }
                         }
                     }
 
                     if (shopflix) {
-                        if (parseFloat(shopflix.price).toFixed(2) > parseFloat(supplierInfo.retail_price).toFixed(2)) {
+                        if (parseFloat(shopflix.price).toFixed(2) <= parseFloat(minPrices.shopflix).toFixed(2)) {
+                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                        else if (parseFloat(shopflix.price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)
+                            && parseFloat(shopflix.price).toFixed(2) <= parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2)) {
+                            if (shopflix.is_fixed_price) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                        else {
                             if (shopflix.is_fixed_price) {
                                 prices.shopflixPrice = shopflix
                             }
@@ -1747,33 +1779,23 @@ module.exports = ({ strapi }) => ({
                                 prices.shopflixPrice = shopflix
                             }
                         }
-                        else if (parseFloat(shopflix.price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
-                            if (shopflix.is_fixed_price) {
-                                prices.shopflixPrice = shopflix
-                            }
-                            else {
-                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
-                                shopflix.is_fixed_price = false
-                                prices.shopflixPrice = shopflix
+                    }
+                    else {
+                        if (parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2),
+                                is_fixed_price: false,
                             }
                         }
                         else {
-                            if (existedProduct.inventory && existedProduct.inventory > 0) {
-                                prices.shopflixPrice = shopflix
-                            }
-                            else {
-                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
-                                shopflix.is_fixed_price = false
-                                prices.shopflixPrice = shopflix
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(minPrices.shopflix).toFixed(2),
+                                is_fixed_price: false,
                             }
                         }
-                    }
-                    else {
-                        prices.shopflixPrice = {
-                            platform: "Shopflix",
-                            price: parseFloat(minPrices.shopflix).toFixed(2),
-                            is_fixed_price: false,
-                        }
+
                     }
                 }
                 else {
@@ -1869,7 +1891,7 @@ module.exports = ({ strapi }) => ({
             }
             else {
                 if (minSupplierPrice.name.toLowerCase() === "globalsat") {
-                    if (parseFloat(product.retail_price).toFixed(2) > parseFloat(minPrices.general).toFixed(2)) {
+                    if (parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.general).toFixed(2)) {
                         prices.generalPrice = {
                             price: prices.generalPrice = parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
                             isFixed: false
@@ -1882,10 +1904,10 @@ module.exports = ({ strapi }) => ({
                         }
                     }
 
-                    if (parseFloat(product.retail_price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                    if (parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
                         prices.skroutzPrice = {
                             platform: "Skroutz",
-                            price: parseFloat(product.retail_price).toFixed(2),
+                            price: parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
                             is_fixed_price: false,
                         }
                     }
@@ -1897,10 +1919,10 @@ module.exports = ({ strapi }) => ({
                         }
                     }
 
-                    if (parseFloat(product.retail_price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                    if (parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
                         prices.shopflixPrice = {
                             platform: "Shopflix",
-                            price: parseFloat(product.retail_price).toFixed(2),
+                            price: parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
                             is_fixed_price: false,
                         }
                     }
@@ -1912,8 +1934,7 @@ module.exports = ({ strapi }) => ({
                         }
                     }
                 }
-                else
-                {
+                else {
                     prices.generalPrice = {
                         price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
                         isFixed: false
@@ -1925,7 +1946,6 @@ module.exports = ({ strapi }) => ({
                         is_fixed_price: false,
                     }
 
-
                     prices.shopflixPrice = {
                         platform: "Shopflix",
                         price: parseFloat(minPrices.shopflix).toFixed(2),
@@ -1934,6 +1954,7 @@ module.exports = ({ strapi }) => ({
                 }
             }
 
+            console.log(prices)
             return prices
 
         } catch (error) {
@@ -2367,6 +2388,8 @@ module.exports = ({ strapi }) => ({
 
             const productPrices = await this.setPrice(null, supplierInfo, categoryInfo, product);
 
+            console.log("productPrices:", productPrices,
+                "product.retail_price:", product.retail_price)
             product.supplierInfo = supplierInfo
             product.category = categoryInfo.id;
             if (product.entry.name.toLowerCase() === "globalsat") {
@@ -2563,258 +2586,268 @@ module.exports = ({ strapi }) => ({
     },
 
     async updateEntry(entryCheck, product, importRef) {
-        //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
-        const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map,
-            product.name, product.category.title, product.subcategory?.title, product.sub2category?.title);
 
-        let dbChange = ''
-        const data = {}
+        try {
 
-        importRef.related_entries.push(entryCheck.id)
+            //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
+            const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map,
+                product.name, product.category.title, product.subcategory?.title, product.sub2category?.title);
 
-        if (product.relativeProducts && product.relativeProducts.length > 0)
-            importRef.related_products.push({ productID: entryCheck.id, relatedProducts: product.relativeProducts })
+            let dbChange = ''
+            const data = {}
 
-        let supplierInfo = entryCheck.supplierInfo;
-        const relatedImport = entryCheck.related_import;
-        const relatedImportIds = relatedImport.map(x => x.id)
+            importRef.related_entries.push(entryCheck.id)
 
-        const findImport = relatedImport.findIndex(x =>
-            x.id === product.entry.id)
+            if (product.relativeProducts && product.relativeProducts.length > 0)
+                importRef.related_products.push({ productID: entryCheck.id, relatedProducts: product.relativeProducts })
 
-        if (findImport === -1) { data.related_import = [...relatedImportIds, product.entry.id] }
+            let supplierInfo = entryCheck.supplierInfo;
+            const relatedImport = entryCheck.related_import;
+            const relatedImportIds = relatedImport.map(x => x.id)
 
-        if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
-            data.category = categoryInfo.id
-            dbChange = 'updated'
-        }
+            const findImport = relatedImport.findIndex(x =>
+                x.id === product.entry.id)
 
-        //Υπολογισμός βάρους
-        if (!product.weight) {
-            product.weight = this.createProductWeight(product, categoryInfo)
-        }
+            if (findImport === -1) { data.related_import = [...relatedImportIds, product.entry.id] }
 
-        if (entryCheck.slug.includes("undefined")) {
-            if (product.mpn) {
-                data.slug = slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
+            if (!entryCheck.category || entryCheck.category.id !== categoryInfo.id) {
+                data.category = categoryInfo.id
                 dbChange = 'updated'
+            }
+
+            //Υπολογισμός βάρους
+            if (!product.weight) {
+                product.weight = this.createProductWeight(product, categoryInfo)
+            }
+
+            if (entryCheck.slug.includes("undefined")) {
+                if (product.mpn) {
+                    data.slug = slugify(`${product.name}-${product.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
+                    dbChange = 'updated'
+                }
+                else {
+                    data.slug = slugify(`${product.name}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
+                    dbChange = 'updated'
+                }
+            }
+
+            if (!entryCheck.barcode && product.barcode) {
+                data.barcode = product.barcode
+                dbChange = 'updated'
+            }
+
+            if (!entryCheck.length && product.length) {
+                data.length = parseInt(product.length)
+                dbChange = 'updated'
+            }
+
+            if (!entryCheck.width && product.width) {
+                data.width = parseInt(product.width)
+                dbChange = 'updated'
+            }
+
+            if (!entryCheck.height && product.height) {
+                data.height = (product.height)
+                dbChange = 'updated'
+            }
+
+            if (!entryCheck.model && product.model) {
+                data.model = product.model
+                dbChange = 'updated'
+            }
+
+            if (!entryCheck.weight) {
+                if (entryCheck.weight === 0) {
+                    if (parseInt(product.weight) === 0) {
+                        if (categoryInfo.average_weight) {
+                            data.weight = parseInt(categoryInfo.average_weight)
+                            dbChange = 'updated'
+                        }
+                    }
+                    else if (parseInt(product.weight) !== 0) {
+                        data.weight = parseInt(product.weight)
+                        dbChange = 'updated'
+                    }
+                }
+                else {
+                    data.weight = parseInt(categoryInfo.average_weight ? categoryInfo.average_weight : 0)
+                    dbChange = 'updated'
+                }
             }
             else {
-                data.slug = slugify(`${product.name}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
-                dbChange = 'updated'
-            }
-        }
-
-        if (!entryCheck.barcode && product.barcode) {
-            data.barcode = product.barcode
-            dbChange = 'updated'
-        }
-
-        if (!entryCheck.length && product.length) {
-            data.length = parseInt(product.length)
-            dbChange = 'updated'
-        }
-
-        if (!entryCheck.width && product.width) {
-            data.width = parseInt(product.width)
-            dbChange = 'updated'
-        }
-
-        if (!entryCheck.height && product.height) {
-            data.height = (product.height)
-            dbChange = 'updated'
-        }
-
-        if (!entryCheck.model && product.model) {
-            data.model = product.model
-            dbChange = 'updated'
-        }
-
-
-        if (!entryCheck.weight) {
-            if (entryCheck.weight === 0) {
-                if (parseInt(product.weight) === 0) {
-                    if (categoryInfo.average_weight) {
+                if (product.weight) {
+                    if (parseInt(entryCheck.weight) === parseInt(categoryInfo.average_weight)
+                        && parseInt(entryCheck.weight) !== parseInt(product.weight)) {
+                        data.weight = parseInt(product.weight)
+                        dbChange = 'updated'
+                    }
+                }
+                else {
+                    if (categoryInfo.average_weight && parseInt(categoryInfo.average_weight) !== parseInt(entryCheck.weight)) {
                         data.weight = parseInt(categoryInfo.average_weight)
                         dbChange = 'updated'
                     }
                 }
-                else if (parseInt(product.weight) !== 0) {
-                    data.weight = parseInt(product.weight)
-                    dbChange = 'updated'
-                }
             }
-            else {
-                data.weight = parseInt(categoryInfo.average_weight ? categoryInfo.average_weight : 0)
+
+            const { updatedSupplierInfo, isUpdated } = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .updateSupplierInfo(product.entry, product, supplierInfo)
+
+            const skroutz = entryCheck.platform.find(x => x.platform === "Skroutz")
+            const shopflix = entryCheck.platform.find(x => x.platform === "Shopflix")
+
+            const productPrices = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .setPrice(entryCheck, supplierInfo, categoryInfo, product);
+
+            if (isUpdated || !entryCheck.category
+                || entryCheck.category.id !== categoryInfo.id
+                || !skroutz || !shopflix) {
+
+                data.is_fixed_price = productPrices.generalPrice.isFixed;
+
+                data.price = parseFloat(productPrices.generalPrice.price)
+                data.platform = [
+                    productPrices.skroutzPrice,
+                    productPrices.shopflixPrice
+                ]
                 dbChange = 'updated'
             }
-        }
-        else {
-            if (product.weight) {
-                if (parseInt(entryCheck.weight) === parseInt(categoryInfo.average_weight)
-                    && parseInt(entryCheck.weight) !== parseInt(product.weight)) {
-                    data.weight = parseInt(product.weight)
-                    dbChange = 'updated'
+
+            if (isUpdated) {
+                data.supplierInfo = updatedSupplierInfo
+                dbChange = 'updated'
+            }
+
+            if (parseFloat(entryCheck.price).toFixed(2) !== parseFloat(productPrices.generalPrice.price).toFixed(2)) {
+                if (parseFloat(entryCheck.price).toFixed(2) > parseFloat(productPrices.generalPrice.price).toFixed(2)) {
+                    if (!entryCheck.is_fixed_price) { data.price = parseFloat(productPrices.generalPrice.price).toFixed(2) }
+                }
+                else {
+                    data.price = parseFloat(productPrices.generalPrice.price).toFixed(2)
+                    data.is_fixed_price = false
                 }
             }
-            else {
-                if (categoryInfo.average_weight && parseInt(categoryInfo.average_weight) !== parseInt(entryCheck.weight)) {
-                    data.weight = parseInt(categoryInfo.average_weight)
-                    dbChange = 'updated'
-                }
+
+
+            if (entryCheck.publishedAt === null) {
+                data.publishedAt = new Date()
+                data.deletedAt = null
+                dbChange = 'republished'
             }
-        }
 
-        const { updatedSupplierInfo, isUpdated } = await strapi
-            .plugin('import-products')
-            .service('helpers')
-            .updateSupplierInfo(product.entry, product, supplierInfo)
+            console.log(data)
+            if (Object.keys(data).length !== 0) {
+                await strapi.entityService.update('api::product.product', entryCheck.id, {
+                    data
+                });
 
-        const skroutz = entryCheck.platform.find(x => x.platform === "Skroutz")
-        const shopflix = entryCheck.platform.find(x => x.platform === "Shopflix")
-
-        const productPrices = await strapi
-            .plugin('import-products')
-            .service('helpers')
-            .setPrice(entryCheck, supplierInfo, categoryInfo, product);
-
-        if (isUpdated || !entryCheck.category
-            || entryCheck.category.id !== categoryInfo.id
-            || !skroutz || !shopflix) {
-
-            data.is_fixed_price = productPrices.generalPrice.isFixed;
-
-            data.price = parseFloat(productPrices.generalPrice.price)
-            data.platform = [
-                productPrices.skroutzPrice,
-                productPrices.shopflixPrice
-            ]
-            dbChange = 'updated'
-        }
-
-        if (isUpdated) {
-            data.supplierInfo = updatedSupplierInfo
-            dbChange = 'updated'
-        }
-
-        if (parseFloat(entryCheck.price).toFixed(2) !== parseFloat(productPrices.generalPrice.price).toFixed(2)) {
-            if (parseFloat(entryCheck.price).toFixed(2) > parseFloat(productPrices.generalPrice.price).toFixed(2)) {
-                if (!entryCheck.is_fixed_price) { data.price = parseFloat(productPrices.generalPrice.price).toFixed(2) }
             }
-            else {
-                data.price = parseFloat(productPrices.generalPrice.price).toFixed(2)
-                data.is_fixed_price = false
+
+            switch (dbChange) {
+                case 'republished':
+                    importRef.republished += 1
+                    break;
+                case 'updated':
+                    importRef.updated += 1
+                    break;
+                case 'created':
+                    importRef.created += 1
+                    break;
+                default:
+                    importRef.skipped += 1
+                    break;
             }
-        }
-
-
-        if (entryCheck.publishedAt === null) {
-            data.publishedAt = new Date()
-            data.deletedAt = null
-            dbChange = 'republished'
-        }
-
-        if (Object.keys(data).length !== 0) {
-            await strapi.entityService.update('api::product.product', entryCheck.id, {
-                data
-            });
-
-        }
-
-        switch (dbChange) {
-            case 'republished':
-                importRef.republished += 1
-                break;
-            case 'updated':
-                importRef.updated += 1
-                break;
-            case 'created':
-                importRef.created += 1
-                break;
-            default:
-                importRef.skipped += 1
-                break;
+        } catch (error) {
+            console.log(error, error?.details?.errors)
         }
     },
 
     async deleteEntry(entry, importRef) {
-
-        const importXmlFile = await strapi.entityService.findOne('plugin::import-products.importxml', entry.id,
-            {
-                populate: {
-                    related_products: {
-                        filters: {
-                            $and: [
-                                {
-                                    $not: {
-                                        publishedAt: null
-                                    }
-                                },
-                                {
-                                    supplierInfo: {
-                                        $and: [
-                                            { name: entry.name },
-                                            { in_stock: true },
-                                        ]
-                                    }
-                                },
-                            ]
-                        },
-                    }
-                },
-            });
-
-        for (let product of importXmlFile.related_products) {
-
-            if (!importRef.related_entries.includes(product.id)) {
-
-                const data = {}
-                const checkProduct = await strapi.entityService.findOne('api::product.product', product.id, {
-                    // fields: ['supplierInfo', 'name'],
+        try {
+            const importXmlFile = await strapi.entityService.findOne('plugin::import-products.importxml', entry.id,
+                {
                     populate: {
-                        supplierInfo: true,
-                        related_import: true
+                        related_products: {
+                            filters: {
+                                $and: [
+                                    {
+                                        $not: {
+                                            publishedAt: null
+                                        }
+                                    },
+                                    {
+                                        supplierInfo: {
+                                            $and: [
+                                                { name: entry.name },
+                                                { in_stock: true },
+                                            ]
+                                        }
+                                    },
+                                ]
+                            },
+                        }
+                    },
+                });
+
+            for (let product of importXmlFile.related_products) {
+
+                if (!importRef.related_entries.includes(product.id)) {
+
+                    const data = {}
+                    const checkProduct = await strapi.entityService.findOne('api::product.product', product.id, {
+                        // fields: ['supplierInfo', 'name'],
+                        populate: {
+                            supplierInfo: true,
+                            related_import: true
+                        },
+                    })
+
+                    let supplierInfo = checkProduct.supplierInfo
+
+                    const index = supplierInfo.findIndex((o) => {
+                        return o.name === entry.name
+                    })
+
+                    if (index === -1) {
+                        let relatedImports = checkProduct.related_import.filter(x => x.id !== entry.id)
+                        data.related_import = relatedImports
+                    }
+                    else {
+                        supplierInfo[index].in_stock = false;
+                    }
+
+                    const isAllSuppliersOutOfStock = supplierInfo.every(supplier => supplier.in_stock === false)
+
+                    if (!isAllSuppliersOutOfStock) {
+                        data.supplierInfo = supplierInfo
+                    }
+                    else {
+                        data.supplierInfo = supplierInfo
+                        data.deletedAt = new Date();
+                        if (!checkProduct.inventory || checkProduct.inventory !== 0) { data.publishedAt = null }
+                    }
+                    await strapi.entityService.update('api::product.product', product.id, {
+                        data: data,
+                    });
+                    importRef.deleted += 1;
+                }
+            }
+
+            await strapi.entityService.update('plugin::import-products.importxml', entry.id,
+                {
+                    data: {
+                        lastRun: new Date(),
+                        report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted}`,
                     },
                 })
 
-                let supplierInfo = checkProduct.supplierInfo
-
-                const index = supplierInfo.findIndex((o) => {
-                    return o.name === entry.name
-                })
-
-                if (index === -1) {
-                    let relatedImports = checkProduct.related_import.filter(x => x.id !== entry.id)
-                    data.related_import = relatedImports
-                }
-                else {
-                    supplierInfo[index].in_stock = false;
-                }
-
-                const isAllSuppliersOutOfStock = supplierInfo.every(supplier => supplier.in_stock === false)
-
-                if (!isAllSuppliersOutOfStock) {
-                    data.supplierInfo = supplierInfo
-                }
-                else {
-                    data.supplierInfo = supplierInfo
-                    data.publishedAt = null
-                    data.deletedAt = new Date();
-                }
-                await strapi.entityService.update('api::product.product', product.id, {
-                    data: data,
-                });
-                importRef.deleted += 1;
-            }
+        } catch (error) {
+            console.log(error)
         }
-
-        await strapi.entityService.update('plugin::import-products.importxml', entry.id,
-            {
-                data: {
-                    lastRun: new Date(),
-                    report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted}`,
-                },
-            })
     },
 
     createProductWeight(product, categoryInfo) {

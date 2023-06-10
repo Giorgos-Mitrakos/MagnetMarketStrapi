@@ -181,16 +181,20 @@
       "component": "products.platforms"
     },
     "weight": {
-      "type": "integer"
+      "type": "integer",
+      "default": 0
     },
     "length": {
-      "type": "decimal"
+      "type": "decimal",
+      "default": 0
     },
     "width": {
-      "type": "decimal"
+      "type": "decimal",
+      "default": 0
     },
     "height": {
-      "type": "decimal"
+      "type": "decimal",
+      "default": 0
     }
   }
 }

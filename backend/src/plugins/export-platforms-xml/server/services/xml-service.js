@@ -4,6 +4,7 @@ const xml2js = require('xml2js');
 const slugify = require("slugify");
 const fs = require('fs');
 const Axios = require('axios');
+const { invert } = require('lodash');
 
 module.exports = ({ strapi }) => ({
     async createXml(platform) {
@@ -35,14 +36,13 @@ module.exports = ({ strapi }) => ({
                                     brand: true,
                                     supplierInfo: true,
                                     platform: true,
-                                },                                
+                                },
                             }
                         }
                     }
-
                 },
             });
-
+            
             let finalEntries = []
 
             switch (platform.toLowerCase()) {
@@ -66,7 +66,7 @@ module.exports = ({ strapi }) => ({
 
     async createSkroutzXML(entries, suppliers) {
         try {
-            let finalEntries = [] 
+            let finalEntries = []
             for (let category of entries.export_categories) {
                 let categoryPath = await this.createCategoryPath(category)
                 for (let product of category.products) {
@@ -199,34 +199,69 @@ module.exports = ({ strapi }) => ({
 
     createAvailabilityAndPrice(product, suppliers, platform, category) {
 
-        // console.log(platform)
-        let availableSuppliers = product.supplierInfo.filter(x => x.in_stock === true)
+        try {
+            const availabilityAndPrice = {}
 
-        availableSuppliers.forEach(x => {
-            const supplierAvailability = suppliers.find(supplier => supplier.name === x.name)
-            x.availability = supplierAvailability.availability
-            x.order_time = supplierAvailability.order_time
-            x.shipping = supplierAvailability.shipping
-        })
+            if (product.inventory && product.inventory > 0) {
+                if (platform.name === "skroutz") {
+                    availabilityAndPrice.availability = "Διαθέσιμο από 1-3 ημέρες"
+                }
+                else {
+                    availabilityAndPrice.availability = 0
+                }
+                availabilityAndPrice.price = this.createPrice(null, platform, product, null)
 
-        const fasterAvailability = availableSuppliers.reduce((previous, current) => {
-            if (current.availability <= previous.availability) {
-                if (current.availability = previous.availability) {
-                    if (current.wholesale < previous.wholesale) {
+                return { availability: availabilityAndPrice.availability, price: availabilityAndPrice.price }
+            }
+            else {
+                let availableSuppliers = product.supplierInfo.filter(x => x.in_stock === true)
+
+                availableSuppliers.forEach(x => {
+                    const supplierAvailability = suppliers.find(supplier => supplier.name === x.name)
+                    x.availability = supplierAvailability.availability
+                    x.order_time = supplierAvailability.order_time
+                    x.shipping = supplierAvailability.shipping
+                })
+
+                const cheaperAvailability = availableSuppliers.reduce((previous, current) => {
+                    let currentRecycleTax = current.recycle_tax ? parseFloat(current.recycle_tax).toFixed(2) : parseFloat(0)
+                    let previousRecycleTax = previous.recycle_tax ? parseFloat(previous.recycle_tax).toFixed(2) : parseFloat(0)
+                    let currentCost = parseFloat(current.wholesale).toFixed(2) + currentRecycleTax + parseFloat(current.shipping).toFixed(2)
+                    let previousCost = parseFloat(previous.wholesale).toFixed(2) + previousRecycleTax + parseFloat(previous.shipping).toFixed(2)
+                    if (parseFloat(currentCost).toFixed(2) <= parseFloat(previousCost).toFixed(2)) {
+                        if (parseFloat(currentCost).toFixed(2) === parseFloat(previousCost).toFixed(2)) {
+                            if (current.availability < previous.availability) {
+                                return current
+                            }
+                            return previous
+                        }
                         return current
                     }
-                    return previous
-                }
-                return current
+                    return previous;
+                });
+
+                // const fasterAvailability = availableSuppliers.reduce((previous, current) => {
+                //     if (current.availability <= previous.availability) {
+                //         if (current.availability = previous.availability) {
+                //             if (current.wholesale < previous.wholesale) {
+                //                 return current
+                //             }
+                //             return previous
+                //         }
+                //         return current
+                //     }
+                //     return previous;
+                // });
+
+                let availability = this.createAvailability(cheaperAvailability, platform, product)
+
+                let price = this.createPrice(cheaperAvailability, platform, product, category)
+
+                return { availability, price }
             }
-            return previous;
-        });
-
-        let availability = this.createAvailability(fasterAvailability, platform, product)
-
-        let price = this.createPrice(fasterAvailability, platform, product, category)
-
-        return { availability, price }
+        } catch (error) {
+            console.log(error)
+        }
     },
 
     createAvailability(fasterAvailability, platform, product) {

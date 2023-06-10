@@ -65,9 +65,11 @@ module.exports = ({ strapi }) => ({
     },
 
     async scrapGlobalsat(importRef, entry, auth) {
+        const browser = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .createBrowser()
         try {
-            // const browser = await puppeteer.launch()
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
             const page = await browser.newPage();
             await page.setViewport({ width: 1200, height: 500 })
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
@@ -128,7 +130,10 @@ module.exports = ({ strapi }) => ({
             await browser.close();
 
         } catch (error) {
-            console.error(error, importRef, entry, auth)
+            return { "message": "error" }
+        }
+        finally {
+            await browser.close();
         }
     },
 
@@ -227,7 +232,7 @@ module.exports = ({ strapi }) => ({
                             }
                         }
                         else {
-                            product.wholesale = item.querySelector('.price').textContent.replace('€', '').replace(',', '.').trim()
+                            product.wholesale = item.querySelector('.price').textContent.replace('€', '').replace(".", "").replace(',', '.').trim()
                         }
                     }
 
@@ -236,7 +241,7 @@ module.exports = ({ strapi }) => ({
 
                     products.push(product)
                 }
-                return products
+                return products 
             })
 
             // console.log("Products in GLobalsat Site:", productList)
@@ -246,7 +251,7 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .updateAndFilterScrapProducts(productList, category.title, subCategory.title, sub2Category.title, importRef, entry)
 
-            // console.log("Products after Filtering:", products.length)
+            // console.log("Products after Filtering:", products.length) 
 
             for (let product of products) {
                 await page.waitForTimeout(strapi 
@@ -334,12 +339,12 @@ module.exports = ({ strapi }) => ({
                     }
                 }
                 else {
-                    product.retail_price = suggestedPrices[0].textContent.replace("€", "").replace('.', '').replace(",", ".").trim();
+                    product.retail_price = suggestedPrices[0].textContent.replace(".", "").replace("€", "").replace('.', '').replace(",", ".").trim();
                 }
 
                 const wholesalePriceWrapper = productInfo.querySelector("div.price_row:not(.trade)");
                 const wholesaleNode = wholesalePriceWrapper.querySelector("span.price").textContent;
-                product.wholesale = wholesaleNode.replace("€", "").replace(",", ".").trim();
+                product.wholesale = wholesaleNode.replace("€", "").replace(".", "").replace(",", ".").trim();
 
                 const description = productContainer.querySelector("div.main_prod_info>div");
                 product.description = description.textContent.trim();

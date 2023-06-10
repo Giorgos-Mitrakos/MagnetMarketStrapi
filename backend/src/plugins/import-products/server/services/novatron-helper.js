@@ -11,9 +11,9 @@ module.exports = ({ strapi }) => ({
     async scrapNovatronCategories(importRef, entry, auth) {
         // const browser = await puppeteer.launch()
         const browser = await strapi
-        .plugin('import-products')
-        .service('helpers')
-        .createBrowser()
+            .plugin('import-products')
+            .service('helpers')
+            .createBrowser()
 
         const page = await browser.newPage();
         await page.setViewport({ width: 1200, height: 500 })
@@ -48,7 +48,7 @@ module.exports = ({ strapi }) => ({
                     false
                 );
 
-                const pageUrl = page.url();
+            const pageUrl = page.url();
 
             if (pageUrl === "https://novatronsec.com/Account/Login?ReturnUrl=%2F") {
                 const bodyHandle = await page.$('body');
@@ -118,7 +118,9 @@ module.exports = ({ strapi }) => ({
             await this.scrapNovatronCategory(browser, newCategories, importRef, entry, auth)
             await browser.close();
         } catch (error) {
-            console.log(error)
+            return { "message": "error" }
+        }
+        finally {
             await browser.close();
         }
     },
@@ -153,7 +155,7 @@ module.exports = ({ strapi }) => ({
                             5, // retry this 5 times,
                             false
                         );
-                        
+
                     const bodyHandle = await newPage.$("body");
 
                     let scrap = await bodyHandle.evaluate(() => {
@@ -207,7 +209,7 @@ module.exports = ({ strapi }) => ({
                         .plugin('import-products')
                         .service('helpers')
                         .updateAndFilterScrapProducts(scrap, cat.title, sub.title, null, importRef, entry)
-                        
+
                     for (let prod of products) {
                         await newPage.waitForTimeout(
                             strapi
@@ -354,7 +356,7 @@ module.exports = ({ strapi }) => ({
                     }
                 }
 
-                return product 
+                return product
             })
 
             scrapProduct.mpn = productID.toString()

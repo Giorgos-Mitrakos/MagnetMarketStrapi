@@ -78,7 +78,7 @@ module.exports = {
     //             .parseNovatronXml({ entry, auth });
     //     },
     //     options: {
-    //         rule: "0 17 * * *",
+    //         rule: "0 * * * *",
     //     },
     // },
 
@@ -182,10 +182,10 @@ module.exports = {
             await strapi
                 .plugin('export-platforms-xml')
                 .service('xmlService')
-                .createXml('skroutz');
+                .createXml('Skroutz');
         },
         options: {
-            rule: "0 * * * *",
+            rule: "59 * * * *",
         },
     },
 
@@ -196,10 +196,10 @@ module.exports = {
             await strapi
                 .plugin('export-platforms-xml')
                 .service('xmlService')
-                .createXml('shopflix');
+                .createXml('Shopflix');
         },
-        options: {
-            rule: "5 * * * *",
+        options: { 
+            rule: "03 * * * *",
         },
     },
 
