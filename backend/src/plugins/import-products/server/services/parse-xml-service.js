@@ -387,37 +387,21 @@ module.exports = ({ strapi }) => ({
                             }
                         }
 
-                        let diminsionChar = product.prod_chars.find(x => x.name.includes("Διαστάσεις "))
-                        if (diminsionChar && diminsionChar.value.trim() !== "") {
-                            let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
-                            let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
+                        // let diminsionChar = product.prod_chars.find(x => x.name.includes("Διαστάσεις "))
+                        // if (diminsionChar && diminsionChar.value.trim() !== "") {
+                        //     let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
+                        //     let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
 
-                            let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
-                            let length = dim[0].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
-                            product.length = length.includes("-") ? length.split("-")[1] : length
-                            let width = dim[1].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
-                            product.width = width.includes("-") ? width.split("-")[1] : width
-                            let height = dim[2].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
-                            product.height = height.includes("-") ? height.split("-")[1] : height
+                        //     let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
+                        //     let length = dim[0].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                        //     product.length = length.includes("-") ? length.split("-")[1] : length
+                        //     let width = dim[1].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                        //     product.width = width.includes("-") ? width.split("-")[1] : width
+                        //     let height = dim[2].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                        //     product.height = height.includes("-") ? height.split("-")[1] : height
 
-                        }
+                        // }
                     }
-
-                    // if (!product.weight) {
-                    //     if (product.recycleTax) {
-                    //         let tax = parseFloat(product.recycleTax)
-                    //         if (product.category === "Οθόνες / Display") {
-                    //             product.weight = parseInt(tax * 1000 / 0.25424)
-                    //         }
-                    //         else {
-                    //             product.weight = parseInt(tax * 1000 / 0.16)
-                    //         }
-                    //     }
-                    //     else {
-                    //         product.weight = 0
-                    //     }
-
-                    // }
                 }
 
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
@@ -425,17 +409,12 @@ module.exports = ({ strapi }) => ({
                 if (!entryCheck) {
                     if (downloadingAllSuccess) {
                         try {
-                            // var startTime = performance.now()
-                            // setTimeout(async () => {
                             const response = await strapi
                                 .plugin('import-products')
                                 .service('helpers')
                                 .createEntry(product, importRef, auth);
-                            // var endTime = performance.now()
 
                             await response
-                            //     console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
-                            // }, 3000 * index);
                         } catch (error) {
                             console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
                         }
@@ -458,8 +437,6 @@ module.exports = ({ strapi }) => ({
                 .plugin('import-products')
                 .service('helpers')
                 .deleteEntry(entry, importRef);
-
-            // console.log(importRef)
 
             console.log("End of Import")
             return { "message": "ok" }
@@ -571,17 +548,12 @@ module.exports = ({ strapi }) => ({
                 if (!entryCheck) {
 
                     try {
-                        // var startTime = performance.now()
-                        // setTimeout(async () => {
                         const response = await strapi
                             .plugin('import-products')
                             .service('helpers')
                             .createEntry(product, importRef, auth);
-                        // var endTime = performance.now()
 
                         await response
-                        //     console.log(`Call to doSomething took ${endTime - startTime} milliseconds`)
-                        // }, 3000 * index);
                     } catch (error) {
                         console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
                     }
@@ -592,8 +564,6 @@ module.exports = ({ strapi }) => ({
                             .plugin('import-products')
                             .service('helpers')
                             .updateEntry(entryCheck, product, importRef);
-
-                        // console.log("Updated")
                     } catch (error) {
                         console.log(error)
                     }
@@ -644,8 +614,6 @@ module.exports = ({ strapi }) => ({
                 .plugin('import-products')
                 .service('helpers')
                 .deleteEntry(entry, importRef);
-
-            console.log(importRef)
         } 
 
         console.log("End of Import")
@@ -843,8 +811,6 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .deleteEntry(entry, importRef);
 
-            console.log(importRef)
-
             console.log("End of Import")
             return { "message": "ok" }
         }
@@ -866,8 +832,6 @@ module.exports = ({ strapi }) => ({
                 .plugin('import-products')
                 .service('helpers')
                 .getData(entry, importRef.categoryMap);
-
-            console.log(products.length)
 
             if (products.length === 0)
                 return { "message": "xml is empty" }
@@ -973,8 +937,6 @@ module.exports = ({ strapi }) => ({
                             .plugin('import-products')
                             .service('helpers')
                             .updateEntry(entryCheck, product, importRef);
-
-                        // console.log("Updated")
                     } catch (error) {
                         console.log(error)
                     }
@@ -986,8 +948,6 @@ module.exports = ({ strapi }) => ({
                 .plugin('import-products')
                 .service('helpers')
                 .deleteEntry(entry, importRef);
-
-            console.log(importRef)
 
             console.log("End of Import")
             return { "message": "ok" }
@@ -1011,7 +971,6 @@ module.exports = ({ strapi }) => ({
                 .scrapNovatronCategories(importRef, entry, auth);
 
             if (response && response.message === "error") {
-                console.log("AN error occured")
                 await strapi.entityService.update('plugin::import-products.importxml', entry.id,
                     {
                         data: {
@@ -1026,8 +985,6 @@ module.exports = ({ strapi }) => ({
                     .plugin('import-products')
                     .service('helpers')
                     .deleteEntry(entry, importRef);
-
-                console.log(importRef)
             }
 
             console.log("End of Import")

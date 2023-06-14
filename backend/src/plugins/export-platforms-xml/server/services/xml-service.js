@@ -393,7 +393,7 @@ module.exports = ({ strapi }) => ({
     //         // console.log(data.data)
 
     //         const oldXml = await strapi
-    //             .plugin('import-products')
+    //             .plugin('import-products') 
     //             .service('helpers')
     //             .parseXml(await data.data)
 

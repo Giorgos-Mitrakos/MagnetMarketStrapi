@@ -115,6 +115,83 @@ module.exports = ({ strapi }) => ({
                                 product.weight = weight
                             }
                         }
+                        else if (checkIfEntry.related_import.find(x => x.name.toLowerCase() === "globalsat")) {
+                            if (checkIfEntry.prod_chars.find(x => x.name.toLowerCase().includes("βάρος") ||
+                                x.name.toLowerCase().includes("specs"))) {
+                                if (checkIfEntry.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))) {
+                                    let weightChar = checkIfEntry.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))
+                                    if (weightChar) {
+                                        if (weightChar.value.toLowerCase().includes("kg")) {
+                                            let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
+                                            if (result) {
+                                                if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
+                                                    product.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+                                                    // console.log("weight:", weight)
+                                                }
+                                                else {
+                                                    product.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                                    // console.log("weight:", weight)
+                                                }
+
+                                            }
+                                        }
+                                        else if (weightChar.value.toLowerCase().includes("gr")) {
+                                            let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
+                                            if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
+                                                product.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
+                                                // console.log("weight:", weight)
+                                            }
+                                            else {
+                                                product.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
+                                                // console.log("weight:", weight)
+                                            }
+                                        }
+                                    }
+                                }
+                                else {
+                                    let weightChar = checkIfEntry.prod_chars.find(x => x.name.toLowerCase().includes("βάρος"))
+                                    if (weightChar) {
+                                        if (weightChar.value.toLowerCase().includes("kg")) {
+                                            let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
+                                            if (result) {
+                                                if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
+                                                    product.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+                                                    // console.log("weight:", weight)
+                                                }
+                                                else {
+                                                    product.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                                    // console.log("weight:", weight)
+                                                }
+
+                                            }
+                                        }
+                                        else if (weightChar.value.toLowerCase().includes("gr")) {
+                                            let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
+                                            if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
+                                                product.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
+                                                // console.log("weight:", weight)
+                                            }
+                                            else {
+                                                product.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
+                                                // console.log("weight:", weight)
+                                            }
+                                        }
+                                    }
+
+                                    let specsChar = checkIfEntry.prod_chars.find(x => x.name.toLowerCase().includes("specs"))
+                                    if (specsChar) {
+                                        if (specsChar.value.toLowerCase().includes("βάρος") || specsChar.value.toLowerCase().includes("weight")) {
+                                            let result = specsChar.value.toLowerCase().match(/(βάρος|weight)\s?:\s?\d+(.)?\d+\s?gr?/gmi)
+                                            if (result) {
+                                                if (result[result.length - 1].match(/\d+.?\d+/gmi)) {
+                                                    product.weight = parseFloat(result[result.length - 1].match(/\d+.?\d+/gmi)[0])
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         if (checkIfEntry.brand) {
                             product.brand = {
@@ -1643,33 +1720,22 @@ module.exports = ({ strapi }) => ({
 
             let prices = {}
 
-            minPrices.general = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.general.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.general.platformCategoryPercentage) / 100 + 1)).toFixed(2)
-            minPrices.skroutz = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.skroutz.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.skroutz.platformCategoryPercentage) / 100 + 1)).toFixed(2)
-            minPrices.shopflix = parseFloat((parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.shopflix.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.shopflix.platformCategoryPercentage) / 100 + 1)).toFixed(2)
+            const minGeneral=(parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.general.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.general.platformCategoryPercentage) / 100 + 1)
+            minPrices.general = parseFloat(minGeneral)
+            const minSkroutz=(parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.skroutz.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.skroutz.platformCategoryPercentage) / 100 + 1)
+            minPrices.skroutz = parseFloat(minSkroutz)
+            const minShopflix=(parseFloat(minSupplierPrice.wholesale) + parseFloat(recycleTax) + parseFloat(percentages.shopflix.addToPrice) + parseFloat(supplierShipping)) * (taxRate / 100 + 1) * (parseFloat(percentages.shopflix.platformCategoryPercentage) / 100 + 1)
+            minPrices.shopflix = parseFloat(minShopflix)
 
             const skroutz = existedProduct?.platform.find(x => x.platform === "Skroutz")
             const shopflix = existedProduct?.platform.find(x => x.platform === "Shopflix")
 
-            if (existedProduct) {
+            if (existedProduct) {  
                 if (minSupplierPrice.name.toLowerCase() === "globalsat") {
+                    let retail_price = parseFloat(minSupplierPrice.retail_price) - 0.5
                     
-                    if (parseFloat(existedProduct.price).toFixed(2) <= parseFloat(minPrices.general).toFixed(2)) {
-                        if (existedProduct.inventory && existedProduct.inventory > 0) {
-                            prices.generalPrice = {
-                                price: parseFloat(existedProduct.price).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price 
-                            } 
-                        } 
-                        else {
-                            prices.generalPrice = {
-                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
-                                isFixed: false
-                            }
-                        }
-                    }
-                    else if (parseFloat(existedProduct.price).toFixed(2) > parseFloat(minPrices.general).toFixed(2)
-                        && parseFloat(existedProduct.price).toFixed(2) <= parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2)) {
-                        if (existedProduct.is_fixed_price) {
+                    if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
+                        if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
                             prices.generalPrice = {
                                 price: parseFloat(existedProduct.price).toFixed(2),
                                 isFixed: existedProduct.is_fixed_price
@@ -1678,12 +1744,12 @@ module.exports = ({ strapi }) => ({
                         else {
                             prices.generalPrice = {
                                 price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price
+                                isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
                             }
                         }
                     }
                     else {
-                        if (existedProduct.is_fixed_price) {
+                        if (existedProduct.inventory > 0 || parseFloat(existedProduct.price) > parseFloat(retail_price)) {
                             prices.generalPrice = {
                                 price: parseFloat(existedProduct.price).toFixed(2),
                                 isFixed: existedProduct.is_fixed_price
@@ -1691,53 +1757,44 @@ module.exports = ({ strapi }) => ({
                         }
                         else {
                             prices.generalPrice = {
-                                price: prices.generalPrice = parseFloat((parseFloat(supplierInfo.retail_price) - 0.5)).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price
+                                price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
+                                isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
                             }
                         }
                     }
 
                     if (skroutz) {
-                        if (parseFloat(skroutz.price).toFixed(2) <= parseFloat(minPrices.skroutz).toFixed(2)) {
-                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+
+                        if (parseFloat(minPrices.skroutz) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
                                 prices.skroutzPrice = skroutz
                             }
                             else {
                                 skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
-                                skroutz.is_fixed_price = false
+                                skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
                                 prices.skroutzPrice = skroutz
                             }
                         }
-                        else if (parseFloat(skroutz.price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)
-                            && parseFloat(skroutz.price).toFixed(2) <= parseFloat(supplierInfo.retail_price).toFixed(2)) {
-                            if (skroutz.is_fixed_price) {
-                                prices.skroutzPrice = skroutz
-                            }
-                            else {
-                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
-                                skroutz.is_fixed_price = false
-                                prices.skroutzPrice = skroutz
-                            }
-                        } 
                         else {
-                            if (skroutz.is_fixed_price) {
+                            if (existedProduct.inventory > 0 || parseFloat(skroutz.price) > parseFloat(retail_price)) {
                                 prices.skroutzPrice = skroutz
                             }
                             else {
-                                skroutz.price = parseFloat(supplierInfo.retail_price).toFixed(2)
-                                skroutz.is_fixed_price = false
+                                skroutz.price = parseFloat(retail_price).toFixed(2)
+                                skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
                                 prices.skroutzPrice = skroutz
                             }
                         }
+
                     }
                     else {
-                        if (parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                        if (parseFloat(retail_price) > parseFloat(minPrices.skroutz)) {
                             prices.skroutzPrice = {
                                 platform: "Skroutz",
-                                price: parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2),
+                                price: parseFloat(retail_price).toFixed(2),
                                 is_fixed_price: false,
                             }
-                        } 
+                        }
                         else {
                             prices.skroutzPrice = {
                                 platform: "Skroutz",
@@ -1748,43 +1805,32 @@ module.exports = ({ strapi }) => ({
                     }
 
                     if (shopflix) {
-                        if (parseFloat(shopflix.price).toFixed(2) <= parseFloat(minPrices.shopflix).toFixed(2)) {
-                            if (existedProduct.inventory && existedProduct.inventory > 0) {
+                        if (parseFloat(minPrices.shopflix) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
                                 prices.shopflixPrice = shopflix
                             }
                             else {
                                 shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
-                                shopflix.is_fixed_price = false
-                                prices.shopflixPrice = shopflix
-                            }
-                        }
-                        else if (parseFloat(shopflix.price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)
-                            && parseFloat(shopflix.price).toFixed(2) <= parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2)) {
-                            if (shopflix.is_fixed_price) {
-                                prices.shopflixPrice = shopflix
-                            }
-                            else {
-                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
-                                shopflix.is_fixed_price = false
+                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
                                 prices.shopflixPrice = shopflix
                             }
                         }
                         else {
-                            if (shopflix.is_fixed_price) {
+                            if (existedProduct.inventory > 0 || parseFloat(shopflix.price) > parseFloat(retail_price)) {
                                 prices.shopflixPrice = shopflix
                             }
                             else {
-                                shopflix.price = parseFloat(supplierInfo.retail_price).toFixed(2)
-                                shopflix.is_fixed_price = false
+                                shopflix.price = parseFloat(retail_price).toFixed(2)
+                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
                                 prices.shopflixPrice = shopflix
                             }
                         }
                     }
                     else {
-                        if (parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                        if (parseFloat(retail_price) > parseFloat(minPrices.shopflix)) {
                             prices.shopflixPrice = {
                                 platform: "Shopflix",
-                                price: parseFloat(parseFloat(supplierInfo.retail_price) - 0.5).toFixed(2),
+                                price: parseFloat(retail_price).toFixed(2),
                                 is_fixed_price: false,
                             }
                         }
@@ -1829,7 +1875,7 @@ module.exports = ({ strapi }) => ({
                     }
 
                     if (skroutz) {
-                        if (parseFloat(skroutz.price).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                        if (parseFloat(skroutz.price) > parseFloat(minPrices.skroutz)) {
                             if (skroutz.is_fixed_price) {
                                 prices.skroutzPrice = skroutz
                             }
@@ -1859,7 +1905,7 @@ module.exports = ({ strapi }) => ({
                     }
 
                     if (shopflix) {
-                        if (parseFloat(shopflix.price).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                        if (parseFloat(shopflix.price) > parseFloat(minPrices.shopflix)) {
                             if (shopflix.is_fixed_price) {
                                 prices.shopflixPrice = shopflix
                             }
@@ -1891,7 +1937,7 @@ module.exports = ({ strapi }) => ({
             }
             else {
                 if (minSupplierPrice.name.toLowerCase() === "globalsat") {
-                    if (parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.general).toFixed(2)) {
+                    if (parseFloat(parseFloat(product.retail_price) - 0.5) > parseFloat(minPrices.general)) {
                         prices.generalPrice = {
                             price: prices.generalPrice = parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
                             isFixed: false
@@ -1904,7 +1950,7 @@ module.exports = ({ strapi }) => ({
                         }
                     }
 
-                    if (parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.skroutz).toFixed(2)) {
+                    if (parseFloat(parseFloat(product.retail_price) - 0.5) > parseFloat(minPrices.skroutz)) {
                         prices.skroutzPrice = {
                             platform: "Skroutz",
                             price: parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
@@ -1919,7 +1965,7 @@ module.exports = ({ strapi }) => ({
                         }
                     }
 
-                    if (parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2) > parseFloat(minPrices.shopflix).toFixed(2)) {
+                    if (parseFloat(parseFloat(product.retail_price) - 0.5) > parseFloat(minPrices.shopflix)) {
                         prices.shopflixPrice = {
                             platform: "Shopflix",
                             price: parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
@@ -1953,8 +1999,6 @@ module.exports = ({ strapi }) => ({
                     }
                 }
             }
-
-            console.log(prices)
             return prices
 
         } catch (error) {
@@ -1965,46 +2009,69 @@ module.exports = ({ strapi }) => ({
     async exportToXML(supplier) {
         try {
             console.log(supplier)
-            const entries = await strapi.db.query('plugin::import-products.importxml').findOne({
-                select: ['name'],
-                where: { name: supplier },
-                populate: {
-                    related_products: {
-                        where: {
-                            $and: [
-                                {
-                                    $not: {
-                                        publishedAt: null
-                                    },
-                                    supplierInfo: {
-                                        $and: [
-                                            { name: supplier },
-                                            { in_stock: true }
-                                        ]
-                                    }
-                                }
-                            ]
-                        },
-                        populate: {
-                            category: { fields: ['name', 'slug'] },
-                            brand: { fields: ['name'] },
-                            prod_chars: { fields: ['name', 'value'] },
-                            ImageURLS: { fields: ['url'] },
-                            image: { fields: ['url'] },
-                            additionalImages: true,
-                            related_with: true,
-                            supplierInfo: true
-                        }
-                    }
-                },
-            });
-
+            const xmlEntries = {}
             let finalEntries = []
+            if (supplier === "inventory") {
+                const entries = await strapi.entityService.findMany('api::product.product', {
+                    filters: {
+                        inventory: {
+                            $gt: 0,
+                        }
+                    },
+                    populate: {
+                        category: { fields: ['name', 'slug'] },
+                        brand: { fields: ['name'] },
+                        prod_chars: { fields: ['name', 'value'] },
+                        ImageURLS: { fields: ['url'] },
+                        image: { fields: ['url'] },
+                        additionalImages: true,
+                        related_with: true,
+                        supplierInfo: true
+                    }
+                });
+                xmlEntries.entries = entries
+            }
+            else {
+                const entries = await strapi.db.query('plugin::import-products.importxml').findOne({
+                    select: ['name'],
+                    where: { name: supplier },
+                    populate: {
+                        related_products: {
+                            where: {
+                                $and: [
+                                    {
+                                        $not: {
+                                            publishedAt: null
+                                        },
+                                        supplierInfo: {
+                                            $and: [
+                                                { name: supplier },
+                                                { in_stock: true }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            },
+                            populate: {
+                                category: { fields: ['name', 'slug'] },
+                                brand: { fields: ['name'] },
+                                prod_chars: { fields: ['name', 'value'] },
+                                ImageURLS: { fields: ['url'] },
+                                image: { fields: ['url'] },
+                                additionalImages: true,
+                                related_with: true,
+                                supplierInfo: true
+                            }
+                        }
+                    },
+                });
 
-            delete entries.id;
-            delete entries.name;
+                delete entries.id;
+                delete entries.name;
+                xmlEntries.entries = entries.related_products
+            }
 
-            for (let entry of entries.related_products) {
+            for (let entry of xmlEntries.entries) {
                 let newEntry = {
                     name: entry.name,
                     description: entry.description,
@@ -2388,31 +2455,9 @@ module.exports = ({ strapi }) => ({
 
             const productPrices = await this.setPrice(null, supplierInfo, categoryInfo, product);
 
-            console.log("productPrices:", productPrices,
-                "product.retail_price:", product.retail_price)
             product.supplierInfo = supplierInfo
             product.category = categoryInfo.id;
-            if (product.entry.name.toLowerCase() === "globalsat") {
-                if (parseFloat(productPrices.generalPrice.price).toFixed(2) < parseFloat(product.retail_price).toFixed(2)) {
-                    product.price = parseFloat(product.retail_price).toFixed(2)
-                }
-                else {
-                    product.price = parseFloat(productPrices.generalPrice.price).toFixed(2)
-                }
-                if (parseFloat(productPrices.skroutzPrice.price).toFixed(2) < parseFloat(product.retail_price).toFixed(2)) {
-                    product.price = parseFloat(product.retail_price).toFixed(2)
-                }
-                else {
-                    product.price = parseFloat(productPrices.skroutzPrice.price).toFixed(2)
-                }
-                if (parseFloat(productPrices.shopflixPrice.price).toFixed(2) < parseFloat(product.retail_price).toFixed(2)) {
-                    product.price = parseFloat(product.retail_price).toFixed(2)
-                }
-                else {
-                    product.price = parseFloat(productPrices.shopflixPrice.price).toFixed(2)
-                }
-            }
-            else { product.price = parseFloat(productPrices.generalPrice.price).toFixed(2); }
+            product.price = parseFloat(productPrices.generalPrice.price).toFixed(2);
 
             product.is_fixed_price = productPrices.generalPrice.isFixed;
 
@@ -2573,6 +2618,23 @@ module.exports = ({ strapi }) => ({
                             }
                         }
                     }
+                    else if (product.entry.name.toLowerCase() === "globalsat") {
+                        if (entryCheck.prod_chars) {
+                            if (entryCheck.prod_chars.find(x => x.name.toLowerCase().contains("βάρος") || x.name.toLowerCase().contains("specs"))) {
+                                let chars = entryCheck.prod_chars.find(x => x.name.toLowerCase().contains("βάρος"))
+                                console.log(chars)
+                                let specs = entryCheck.prod_chars.find(x => x).toLowerCase().contains("specs")
+                                console.log(specs)
+                                let value = chars.value.toLowerCase()
+                                // if (value.contains("kg")) {
+                                //     product.weight = parseInt(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
+                                // }
+                                // else if (value.contains("gr")) {
+                                //     product.weight = parseInt(chars.value.replace("gr", "").replace(",", ".").trim())
+                                // }
+                            }
+                        }
+                    }
 
                     await this.updateEntry(entryCheck, product, importRef)
 
@@ -2717,13 +2779,25 @@ module.exports = ({ strapi }) => ({
                 dbChange = 'updated'
             }
 
+            if (parseFloat(entryCheck.price).toFixed(2) !== parseFloat(productPrices.generalPrice.price).toFixed(2)
+                && entryCheck.is_fixed_price === false) {
+                data.is_fixed_price = productPrices.generalPrice.isFixed;
+
+                data.price = parseFloat(productPrices.generalPrice.price)
+                data.platform = [
+                    productPrices.skroutzPrice,
+                    productPrices.shopflixPrice
+                ]
+                dbChange = 'updated'
+            }
+
             if (isUpdated) {
                 data.supplierInfo = updatedSupplierInfo
                 dbChange = 'updated'
             }
 
             if (parseFloat(entryCheck.price).toFixed(2) !== parseFloat(productPrices.generalPrice.price).toFixed(2)) {
-                if (parseFloat(entryCheck.price).toFixed(2) > parseFloat(productPrices.generalPrice.price).toFixed(2)) {
+                if (parseFloat(entryCheck.price) > parseFloat(productPrices.generalPrice.price)) {
                     if (!entryCheck.is_fixed_price) { data.price = parseFloat(productPrices.generalPrice.price).toFixed(2) }
                 }
                 else {
@@ -2739,7 +2813,6 @@ module.exports = ({ strapi }) => ({
                 dbChange = 'republished'
             }
 
-            console.log(data)
             if (Object.keys(data).length !== 0) {
                 await strapi.entityService.update('api::product.product', entryCheck.id, {
                     data

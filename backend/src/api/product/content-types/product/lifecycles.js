@@ -71,7 +71,7 @@ module.exports = {
 
         event.params.data.slug = slugify(`${data.name}-${data.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
 
-    },
+    }, 
     // async beforeUpdate(event) {
     //     const { data, where, select, populate } = event.params;
 

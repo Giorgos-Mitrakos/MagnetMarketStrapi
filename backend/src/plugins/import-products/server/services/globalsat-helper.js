@@ -119,7 +119,7 @@ module.exports = ({ strapi }) => ({
                 // console.dir(category.subCategories)
                 for (let subCategory of category.subCategories) {
                     for (let sub2Category of subCategory.subCategories) {
-                        await page.waitForTimeout(strapi 
+                        await page.waitForTimeout(strapi
                             .plugin('import-products')
                             .service('helpers')
                             .randomWait(5000, 10000))
@@ -241,7 +241,7 @@ module.exports = ({ strapi }) => ({
 
                     products.push(product)
                 }
-                return products 
+                return products
             })
 
             // console.log("Products in GLobalsat Site:", productList)
@@ -254,7 +254,7 @@ module.exports = ({ strapi }) => ({
             // console.log("Products after Filtering:", products.length) 
 
             for (let product of products) {
-                await page.waitForTimeout(strapi 
+                await page.waitForTimeout(strapi
                     .plugin('import-products')
                     .service('helpers')
                     .randomWait(5000, 10000))
@@ -351,17 +351,19 @@ module.exports = ({ strapi }) => ({
 
                 const productCharsContainer = document.querySelector('div.product_chars');
 
-                const charTable = productCharsContainer.querySelector('tbody')
-                const charRow = charTable.querySelectorAll('tr')
-                product.prod_chars = []
-                charRow.forEach(tr => {
-                    const charValue = tr.querySelectorAll('td')
-                    product.prod_chars.push({
-                        "name": charValue[0].innerHTML.trim(),
-                        "value": charValue[1].querySelector('b').innerHTML.trim()
-                    })
+                if (productCharsContainer) {
+                    const charTable = productCharsContainer.querySelector('tbody')
+                    const charRow = charTable.querySelectorAll('tr')
+                    product.prod_chars = []
+                    charRow.forEach(tr => {
+                        const charValue = tr.querySelectorAll('td')
+                        product.prod_chars.push({
+                            "name": charValue[0].innerHTML.trim(),
+                            "value": charValue[1].querySelector('b').innerHTML.trim()
+                        })
 
-                });
+                    });
+                } 
 
                 return product
             })
@@ -370,6 +372,82 @@ module.exports = ({ strapi }) => ({
             scrapProduct.category = category
             scrapProduct.subcategory = subcategory
             scrapProduct.sub2category = sub2category
+
+            if (scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("βάρος") ||
+                x.name.toLowerCase().includes("specs"))) {
+                if (scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))) {
+                    let weightChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))
+                    if (weightChar) {
+                        if (weightChar.value.toLowerCase().includes("kg")) {
+                            let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
+                            if (result) {
+                                if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+                                    // console.log("weight:", weight)
+                                }
+                                else {
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                    // console.log("weight:", weight)
+                                }
+
+                            }
+                        }
+                        else if (weightChar.value.toLowerCase().includes("gr")) {
+                            let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
+                            if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
+                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
+                                // console.log("weight:", weight)
+                            }
+                            else {
+                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
+                                // console.log("weight:", weight)
+                            }
+                        }
+                    }
+                }
+                else {
+                    let weightChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("βάρος"))
+                    if (weightChar) {
+                        if (weightChar.value.toLowerCase().includes("kg")) {
+                            let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
+                            if (result) {
+                                if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+                                    // console.log("weight:", weight)
+                                }
+                                else {
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                    // console.log("weight:", weight)
+                                }
+
+                            }
+                        }
+                        else if (weightChar.value.toLowerCase().includes("gr")) {
+                            let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
+                            if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
+                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
+                                // console.log("weight:", weight)
+                            }
+                            else {
+                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
+                                // console.log("weight:", weight)
+                            }
+                        }
+                    }
+
+                    let specsChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("specs"))
+                    if (specsChar) {
+                        if (specsChar.value.toLowerCase().includes("βάρος") || specsChar.value.toLowerCase().includes("weight")) {
+                            let result = specsChar.value.toLowerCase().match(/(βάρος|weight)\s?:\s?\d+(.)?\d+\s?gr?/gmi)
+                            if (result) {
+                                if (result[result.length - 1].match(/\d+.?\d+/gmi)) {
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].match(/\d+.?\d+/gmi)[0])
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             await strapi
                 .plugin('import-products')
@@ -537,7 +615,6 @@ module.exports = ({ strapi }) => ({
                         },
                     });
                     importRef.updated += 1
-                    console.log("Updated:", importRef.updated)
                 } catch (error) {
                     console.log(error)
                 }
