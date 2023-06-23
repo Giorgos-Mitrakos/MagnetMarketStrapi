@@ -2048,7 +2048,7 @@ module.exports = ({ strapi }) => ({
                                                 { name: supplier },
                                                 { in_stock: true }
                                             ]
-                                        }
+                                        },
                                     }
                                 ]
                             },
@@ -2720,7 +2720,7 @@ module.exports = ({ strapi }) => ({
 
             if (!entryCheck.weight) {
                 if (entryCheck.weight === 0) {
-                    if (parseInt(product.weight) === 0) {
+                    if (parseInt(product.weight) === 0 ) {
                         if (categoryInfo.average_weight) {
                             data.weight = parseInt(categoryInfo.average_weight)
                             dbChange = 'updated'
@@ -2737,7 +2737,7 @@ module.exports = ({ strapi }) => ({
                 }
             }
             else {
-                if (product.weight) {
+                if (product.weight && product.weight>0) {
                     if (parseInt(entryCheck.weight) === parseInt(categoryInfo.average_weight)
                         && parseInt(entryCheck.weight) !== parseInt(product.weight)) {
                         data.weight = parseInt(product.weight)

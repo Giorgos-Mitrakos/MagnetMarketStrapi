@@ -42,7 +42,7 @@ module.exports = ({ strapi }) => ({
                     }
                 },
             });
-            
+
             let finalEntries = []
 
             switch (platform.toLowerCase()) {
@@ -70,7 +70,8 @@ module.exports = ({ strapi }) => ({
             for (let category of entries.export_categories) {
                 let categoryPath = await this.createCategoryPath(category)
                 for (let product of category.products) {
-                    let { availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
+                    let { cheaperAvailability, availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
+
                     if (!price) { continue }
                     let newEntry = {
                         uniqueID: product.id,
@@ -85,7 +86,8 @@ module.exports = ({ strapi }) => ({
                         mpn: product.mpn,
                         sku: product.sku,
                         description: product.description,
-                        quantity: product.quantity > 0 ? product.quantity : 2,
+                        quantity: product.inventory > 0 ? product.inventory
+                            : (cheaperAvailability && cheaperAvailability.name.toLowerCase() === "globalsat" ? 1 : 2),
                         barcode: product.barcode,
                     }
 
@@ -114,7 +116,7 @@ module.exports = ({ strapi }) => ({
             let finalEntries = []
             for (let category of entries.export_categories) {
                 for (let product of category.products) {
-                    let { availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
+                    let { cheaperAvailability, availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
                     if (!price) { continue }
                     let newEntry = {
                         SKU: product.id,
@@ -129,7 +131,8 @@ module.exports = ({ strapi }) => ({
                         category: category.name,
                         price: parseFloat(price),
                         list_price: '',
-                        quantity: 2,
+                        quantity: product.inventory > 0 ? product.inventory
+                            : (cheaperAvailability && cheaperAvailability.name.toLowerCase() === "globalsat" ? 1 : 2),
                         offer_from: '',
                         offer_to: '',
                         offer_price: '',
@@ -203,7 +206,7 @@ module.exports = ({ strapi }) => ({
             const availabilityAndPrice = {}
 
             if (product.inventory && product.inventory > 0) {
-                if (platform.name === "skroutz") {
+                if (platform.name.toLowerCase() === "skroutz") {
                     availabilityAndPrice.availability = "Διαθέσιμο από 1-3 ημέρες"
                 }
                 else {
@@ -240,24 +243,11 @@ module.exports = ({ strapi }) => ({
                     return previous;
                 });
 
-                // const fasterAvailability = availableSuppliers.reduce((previous, current) => {
-                //     if (current.availability <= previous.availability) {
-                //         if (current.availability = previous.availability) {
-                //             if (current.wholesale < previous.wholesale) {
-                //                 return current
-                //             }
-                //             return previous
-                //         }
-                //         return current
-                //     }
-                //     return previous;
-                // });
-
                 let availability = this.createAvailability(cheaperAvailability, platform, product)
 
                 let price = this.createPrice(cheaperAvailability, platform, product, category)
 
-                return { availability, price }
+                return { cheaperAvailability, availability, price }
             }
         } catch (error) {
             console.log(error)
@@ -269,7 +259,7 @@ module.exports = ({ strapi }) => ({
         let availability = ""
 
         if (product.inventory && product.inventory > 0) {
-            if (platform.name === "skroutz") { availability = "Διαθέσιμο από 1-3 ημέρες" }
+            if (platform.name.toLowerCase() === "skroutz") { availability = "Διαθέσιμο από 1-3 ημέρες" }
             else {
                 availability = 0
             }
