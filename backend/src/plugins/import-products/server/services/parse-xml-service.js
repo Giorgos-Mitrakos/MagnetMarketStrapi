@@ -614,7 +614,7 @@ module.exports = ({ strapi }) => ({
                 .plugin('import-products')
                 .service('helpers')
                 .deleteEntry(entry, importRef);
-        } 
+        }
 
         console.log("End of Import")
         return { "message": "ok" }
@@ -1031,6 +1031,199 @@ module.exports = ({ strapi }) => ({
             return { "message": "ok" }
         } catch (error) {
             console.log(error)
+        }
+    },
+
+    async parseDotMedia({ entry, auth }) {
+        const browser = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .createBrowser()
+
+        try {
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            const products = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .getData(entry, importRef.categoryMap);
+
+            const { categories_map, char_name_map, char_value_map, stock_map,
+                isWhitelistSelected, whitelist_map, blacklist_map,
+                xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+            const login = await strapi
+                .plugin('import-products')
+                .service('dotMediaHelper')
+                .loginToDotMedia(browser);
+
+            await login
+            const { mapCharNames, mapCharValues } = importRef.charMaps
+            // let index = 0 
+            for (let dt of products) {
+
+                let mpn = dt.MakerID[0].trim().toString()
+                let name = dt.Description[0].trim()
+                let barcode = dt.BarCode ? dt.BarCode[0].trim() : null
+                let brand_name = dt.Maker[0].trim()
+                let wholesaleFromXml = parseFloat(dt.WholesalePrice[0].replace(",", ".")).toFixed(2)
+                let suggestedRetailPriceFromXml = parseFloat(dt.Suggested_x0020_Retail_x0020_Price[0].replace(",", ".")).toFixed(2)
+                let suggestedWebPriceFromXml = parseFloat(dt.Suggested_x0020_Web_x0020_Price[0].replace(",", ".")).toFixed(2)
+
+                const { wholesale, initial_wholesale } = await strapi
+                    .plugin('import-products')
+                    .service('dotMediaHelper')
+                    .getPrices(wholesaleFromXml, suggestedRetailPriceFromXml, suggestedWebPriceFromXml, dt.ProIDLink[0].trim(), browser);
+                
+                    const { entryCheck, brandId } = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                // let chars = dt.DetailedDescriptionPre[0].split('\n')
+
+
+                let imageUrls = [{ url: dt.ImageLink[0] },
+                { url: dt.ImageLink1[0] },
+                { url: dt.ImageLink2[0] },
+                { url: dt.ImageLink3[0] }]
+                // const chars = [] 
+
+                // if (dt.specs[0].spec) {
+                //     for (let productChar of dt.specs[0].spec) {
+                //         const char = {}
+                //         char.name = productChar.name[0]
+                //         char.value = productChar.value[0]
+                //         chars.push(char)
+                //     }
+                // }
+
+                // const parsedChars = await strapi
+                //     .plugin('import-products')
+                //     .service('helpers')
+                //     .parseChars(chars, mapCharNames, mapCharValues)
+
+                const product = {
+                    entry,
+                    name,
+                    supplierCode: dt.ProductID[0],
+                    short_description: dt.DetailedDescription[0],
+                    description: `${dt.DetailedDescription[0]} Χαρακτηριστικά\n ${dt.DetailedDescriptionPre[0]}`,
+                    category: { title: dt.Category[0] },
+                    subcategory: { title: dt.SubCategory[0] },
+                    sub2category: { title: null },
+                    mpn,
+                    barcode,
+                    stockLevel: dt.Availability[0],
+                    wholesale: parseFloat(wholesale.replace(",", ".")).toFixed(2),
+                    initial_wholesale: initial_wholesale ? parseFloat(initial_wholesale.replace(",", ".")).toFixed(2) : null,
+                    retail_price: suggestedWebPriceFromXml,
+                    imagesSrc: imageUrls,
+                    brand: { id: await brandId },
+                    recycleTax: parseFloat(dt.Eisfora[0].replace(",", ".")).toFixed(2),
+                    link: dt.ProIDLink[0].trim(),
+                    related_import: entry.id,
+                    // prod_chars: parsedChars
+                }
+
+                // console.log(product)
+
+                let weight = []
+                let weightInKilos = []
+                let weightInKilos1 = dt.DetailedDescriptionPre[0].match(/(?<!Gross )Weight\s*:?\s*\d{1,3}(.|,|\s)\d{0,3}\s*kg/gmi)
+                if (weightInKilos1 && weightInKilos1.length > 0)
+                    weightInKilos.push(weightInKilos1)
+
+                let weightInKilos2 = dt.DetailedDescriptionPre[0].match(/(?<!Gross )Weight\s*\(kg\)\s*:?\s*\d{1,3}(.|,|\s)\d{0,3}/gmi)
+                if (weightInKilos2 && weightInKilos2.length > 0)
+                    weightInKilos.push(weightInKilos2)
+
+                if (weightInKilos.length > 0) {
+                    let weightsList = []
+                    let weightFlattenArray = weightInKilos.flat()
+                    weightFlattenArray.forEach(wt => {
+                        let result = wt.match(/\d{1,3}(.|,)\d{0,3}/)
+                        weightsList.push(result[0])
+                    });
+                    let maxWeight = weightsList?.reduce((prev, current) => {
+                        return (parseFloat(prev.replace(",", ".")) > parseFloat(current.replace(",", "."))) ? prev : current
+                    })
+                    weight.push(parseFloat(maxWeight.replace(",", ".")) * 1000)
+                }
+
+                let weightInGrams = []
+                let weightInGrams1 = dt.DetailedDescriptionPre[0].match(/Weight\s*:?\s*\d*\s*g/gmi)
+                if (weightInGrams1 && weightInGrams1.length > 0)
+                    weightInGrams.push(weightInGrams1)
+
+                let weightInGrams2 = dt.DetailedDescriptionPre[0].match(/Weight\s*\((gram|g)\)\s*:?\s*\d*/gmi)
+                if (weightInGrams2 && weightInGrams2.length > 0)
+                    weightInGrams.push(weightInGrams2)
+
+                if (weightInGrams.length > 0) {
+                    let weightsList = []
+                    let weightFlattenArray = weightInGrams.flat()
+                    weightFlattenArray.forEach(wt => {
+                        let result = wt.match(/\d{1,3}(.|,)\d{0,3}/)
+                        weightsList.push(result[0])
+                    });
+                    let maxWeight = weightsList?.reduce((prev, current) => {
+                        return (parseFloat(prev.replace(",", ".")) > parseFloat(current.replace(",", "."))) ? prev : current
+                    })
+                    weight.push(parseFloat(maxWeight.replace(",", ".")))
+                }
+
+                if (weight.length > 0) {
+                    let maxWeight = weight.reduce((prev, current) => {
+                        return (parseFloat(prev) > parseFloat(current)) ? prev : current
+                    })
+                    product.weight = parseInt(maxWeight)
+                }
+
+                // console.log(product)
+                // //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+
+                if (!entryCheck) {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .createEntry(product, importRef, auth);
+
+                    } catch (error) {
+                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                    }
+                }
+                else {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .updateEntry(entryCheck, product, importRef);
+                    } catch (error) {
+                        console.log(error)
+                    }
+                }
+            }
+
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .deleteEntry(entry, importRef);
+
+            console.log("End of Import")
+            return { "message": "ok" }
+        }
+        catch (err) {
+            console.log(err)
+            return { "message": "Error" }
+        }
+        finally {
+            await browser.close()
         }
     },
 

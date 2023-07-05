@@ -160,6 +160,32 @@ module.exports = {
         },
     },
 
+    updateDOTMEDIA: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "DotMedia" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseDotMedia({ entry, auth });
+        },
+        options: {
+            rule: "15 7,12,16,18,22 * * *",
+        },
+    },
+
     updateAll: {
         task: async ({ strapi }) => {
             // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
@@ -184,8 +210,8 @@ module.exports = {
                 .service('xmlService')
                 .createXml('Skroutz');
         },
-        options: {
-            rule: "59 * * * *",
+        options: { 
+            rule: "14 * * * *", 
         },
     },
 
@@ -197,9 +223,9 @@ module.exports = {
                 .plugin('export-platforms-xml')
                 .service('xmlService')
                 .createXml('Shopflix');
-        },
-        options: { 
-            rule: "03 * * * *",
+        }, 
+        options: {
+            rule: "22 * * * *",
         },
     },
 

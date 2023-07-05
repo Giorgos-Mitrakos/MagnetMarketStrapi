@@ -12,6 +12,7 @@ const novatronHelper = require('./novatron-helper');
 const questHelper = require('./quest-helper');
 const globalsatHelper = require('./globalsat-helper');
 const westnetHelper = require('./westnet-helper');
+const dotMediaHelper = require('./dotMedia-helper');
 const imageHelper = require('./image-helper');
 
 module.exports = {
@@ -27,6 +28,7 @@ module.exports = {
   questHelper,
   globalsatHelper,
   westnetHelper,
+  dotMediaHelper,
   imageHelper,
 };
 
