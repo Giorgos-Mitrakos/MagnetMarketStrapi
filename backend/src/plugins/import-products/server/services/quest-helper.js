@@ -53,10 +53,10 @@ module.exports = ({ strapi }) => ({
                     () => page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" }),
                     10, // retry this 10 times,
                     false
-                );
-
+                ); 
+ 
             // await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
-            const pageUrl = page.url();
+            const pageUrl = page.url(); 
             await page.waitForTimeout(1500)
 
             if (pageUrl === "https://www.questonline.gr/Special-Pages/Logon?ReturnUrl=%2f") {
@@ -67,6 +67,7 @@ module.exports = ({ strapi }) => ({
                     const acceptCookiesButton = await page.$('#CybotCookiebotDialogBodyButtonAccept')
                     acceptCookiesButton.click();
                 }
+                await page.waitForTimeout(1500)
 
                 const formHandle = await bodyHandle.$('form');
 
@@ -75,11 +76,14 @@ module.exports = ({ strapi }) => ({
                 const passwordWrapper = await formHandle.$('#password');
                 const password = await passwordWrapper.$('input');
                 const button = await formHandle.$('#submit-button');
-                await username.type(process.env.QUEST_USERNAME)
-                await password.type(process.env.QUEST_PASSWORD)
+                await username.type(process.env.QUEST_USERNAME, {delay: 200})
+                
+                await password.type(process.env.QUEST_PASSWORD, {delay: 200})
                 await Promise.all([
                     await button.click(),
-                    await page.waitForNavigation()
+                    await page.waitForNavigation({
+                        waitUntil: 'networkidle0',
+                      })
                 ])
                 await page.cookies()
                     .then((cookies) => {
