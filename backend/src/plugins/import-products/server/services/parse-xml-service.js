@@ -1014,7 +1014,7 @@ module.exports = ({ strapi }) => ({
                         data: {
                             lastRun: new Date(),
                             report: `Created: ${importRef.created}, Updated: ${importRef.updated},Republished: ${importRef.republished} Skipped: ${importRef.skipped}, Deleted: ${importRef.deleted},
-                            Δημιουργήθηκε κάποιο σφάλμα κατά τη διαδικάσία. Ξαναπροσπασθήστε!`,
+                            Δημιουργήθηκε κάποιο σφάλμα κατά τη διαδικάσία. Ξαναπροσπαθήστε!`,
                         },
                     })
             }
@@ -1087,9 +1087,8 @@ module.exports = ({ strapi }) => ({
 
 
                 let imageUrls = [{ url: dt.ImageLink[0] },
-                { url: dt.ImageLink1[0] },
                 { url: dt.ImageLink2[0] },
-                { url: dt.ImageLink3[0] }]
+                { url: dt.ImageLink3[0] }] 
                 // const chars = [] 
 
                 // if (dt.specs[0].spec) {

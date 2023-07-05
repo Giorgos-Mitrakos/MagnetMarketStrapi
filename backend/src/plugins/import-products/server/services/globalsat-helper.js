@@ -363,7 +363,7 @@ module.exports = ({ strapi }) => ({
                         })
 
                     });
-                } 
+                }
 
                 return product
             })
@@ -373,75 +373,77 @@ module.exports = ({ strapi }) => ({
             scrapProduct.subcategory = subcategory
             scrapProduct.sub2category = sub2category
 
-            if (scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("βάρος") ||
-                x.name.toLowerCase().includes("specs"))) {
-                if (scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))) {
-                    let weightChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))
-                    if (weightChar) {
-                        if (weightChar.value.toLowerCase().includes("kg")) {
-                            let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
-                            if (result) {
-                                if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
-                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+            if (scrapProduct.prod_chars) {
+                if (scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("βάρος") ||
+                    x.name.toLowerCase().includes("specs"))) {
+                    if (scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))) {
+                        let weightChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("μεικτό βάρος"))
+                        if (weightChar) {
+                            if (weightChar.value.toLowerCase().includes("kg")) {
+                                let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
+                                if (result) {
+                                    if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
+                                        scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+                                        // console.log("weight:", weight)
+                                    }
+                                    else {
+                                        scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                        // console.log("weight:", weight)
+                                    }
+
+                                }
+                            }
+                            else if (weightChar.value.toLowerCase().includes("gr")) {
+                                let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
+                                if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
                                     // console.log("weight:", weight)
                                 }
                                 else {
-                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
                                     // console.log("weight:", weight)
                                 }
-
-                            }
-                        }
-                        else if (weightChar.value.toLowerCase().includes("gr")) {
-                            let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
-                            if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
-                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
-                                // console.log("weight:", weight)
-                            }
-                            else {
-                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
-                                // console.log("weight:", weight)
                             }
                         }
                     }
-                }
-                else {
-                    let weightChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("βάρος"))
-                    if (weightChar) {
-                        if (weightChar.value.toLowerCase().includes("kg")) {
-                            let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
-                            if (result) {
-                                if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
-                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+                    else {
+                        let weightChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("βάρος"))
+                        if (weightChar) {
+                            if (weightChar.value.toLowerCase().includes("kg")) {
+                                let result = weightChar.value.toLowerCase().match(/\d{1,3}(.|,|\s)?\d{0,3}\s*kg/gmi)
+                                if (result) {
+                                    if (result[result.length - 1].match(/\d{1,3}(.|\s)?\d{0,3}\s*kg/gmi)) {
+                                        scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(",", ".").trim()) * 1000
+                                        // console.log("weight:", weight)
+                                    }
+                                    else {
+                                        scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                        // console.log("weight:", weight)
+                                    }
+
+                                }
+                            }
+                            else if (weightChar.value.toLowerCase().includes("gr")) {
+                                let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
+                                if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
                                     // console.log("weight:", weight)
                                 }
                                 else {
-                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("kg", "").replace(".", "").replace(",", ".").trim()) * 1000
+                                    scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
                                     // console.log("weight:", weight)
                                 }
-
                             }
                         }
-                        else if (weightChar.value.toLowerCase().includes("gr")) {
-                            let result = weightChar.value.toLowerCase().match(/\d*(.|,|\s)?\d{0,3}\s*gr/gmi)
-                            if (result[result.length - 1].match(/\d*.\d{3}\s*gr/gmi)) {
-                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(".", "").trim())
-                                // console.log("weight:", weight)
-                            }
-                            else {
-                                scrapProduct.weight = parseFloat(result[result.length - 1].replace("gr", "").replace(",", ".").trim())
-                                // console.log("weight:", weight)
-                            }
-                        }
-                    }
 
-                    let specsChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("specs"))
-                    if (specsChar) {
-                        if (specsChar.value.toLowerCase().includes("βάρος") || specsChar.value.toLowerCase().includes("weight")) {
-                            let result = specsChar.value.toLowerCase().match(/(βάρος|weight)\s?:\s?\d+(.)?\d+\s?gr?/gmi)
-                            if (result) {
-                                if (result[result.length - 1].match(/\d+.?\d+/gmi)) {
-                                    scrapProduct.weight = parseFloat(result[result.length - 1].match(/\d+.?\d+/gmi)[0])
+                        let specsChar = scrapProduct.prod_chars.find(x => x.name.toLowerCase().includes("specs"))
+                        if (specsChar) {
+                            if (specsChar.value.toLowerCase().includes("βάρος") || specsChar.value.toLowerCase().includes("weight")) {
+                                let result = specsChar.value.toLowerCase().match(/(βάρος|weight)\s?:\s?\d+(.)?\d+\s?gr?/gmi)
+                                if (result) {
+                                    if (result[result.length - 1].match(/\d+.?\d+/gmi)) {
+                                        scrapProduct.weight = parseFloat(result[result.length - 1].match(/\d+.?\d+/gmi)[0])
+                                    }
                                 }
                             }
                         }

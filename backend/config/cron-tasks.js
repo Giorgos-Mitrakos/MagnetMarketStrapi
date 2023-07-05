@@ -182,7 +182,7 @@ module.exports = {
                 .parseDotMedia({ entry, auth });
         },
         options: {
-            rule: "15 7,12,16,18,22 * * *",
+            rule: "10 7,12,17,18,22 * * *",
         },
     },
 
@@ -211,7 +211,7 @@ module.exports = {
                 .createXml('Skroutz');
         },
         options: { 
-            rule: "14 * * * *", 
+            rule: "0 * * * *", 
         },
     },
 
@@ -225,7 +225,7 @@ module.exports = {
                 .createXml('Shopflix');
         }, 
         options: {
-            rule: "22 * * * *",
+            rule: "4 * * * *",
         },
     },
 
