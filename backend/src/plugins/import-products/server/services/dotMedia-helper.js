@@ -50,7 +50,7 @@ module.exports = ({ strapi }) => ({
 
         const newData = data
             .filter(filterStock)
-            // .filter(filterPriceRange)
+            .filter(filterWholesaleOrRetailExist)
             .filter(filterCategories)
             .filter(filterImages)
 
@@ -119,25 +119,10 @@ module.exports = ({ strapi }) => ({
             }
         }
 
-        function filterPriceRange(priceRange) {
+        function filterWholesaleOrRetailExist(product) {
 
-            let minPrice = categoryMap.minimumPrice ? parseFloat(categoryMap.minimumPrice).toFixed(2) : 0;
-            let maxPrice;
-            if (categoryMap.maximumPrice && categoryMap.maximumPrice > 0) {
-                maxPrice = parseFloat(categoryMap.maximumPrice).toFixed(2);
-            }
-            else {
-                maxPrice = 100000;
-            }
+            if (parseFloat(product.WholesalePrice) > 0 || parseFloat(product.Suggested_x0020_Web_x0020_Price) > 0) { return true }
 
-            const productPrice = priceRange.price[0].replace(",", ".")
-
-            if (productPrice >= minPrice && productPrice <= maxPrice) {
-                return true
-            }
-            else {
-                return false
-            }
         }
 
         function filterImages(image) {
@@ -233,10 +218,11 @@ module.exports = ({ strapi }) => ({
         await page.setViewport({ width: 1200, height: 500 })
         await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
-        await page.waitForTimeout(strapi 
+        await page.waitForTimeout(strapi
             .plugin('import-products')
-            .service('helpers') 
+            .service('helpers')
             .randomWait(2000, 5000))
+
         try {
             if (parseFloat(wholesale) > 0) {
                 return { initial_wholesale: null, wholesale }
@@ -263,9 +249,9 @@ module.exports = ({ strapi }) => ({
                     else {
                         prices.wholesale = priceSpans[0].textContent.replace(",", ".")
                     }
-                    return { prices } 
+                    return { prices }
                 })
-                
+
                 return { initial_wholesale: scrapProduct.prices.initial_wholesale, wholesale: scrapProduct.prices.wholesale }
             }
 

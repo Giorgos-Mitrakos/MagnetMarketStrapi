@@ -83,7 +83,7 @@ module.exports = ({ strapi }) => ({
                     await button.click(),
                     await page.waitForNavigation({
                         waitUntil: 'networkidle0',
-                      })
+                      }) 
                 ])
                 await page.cookies()
                     .then((cookies) => {

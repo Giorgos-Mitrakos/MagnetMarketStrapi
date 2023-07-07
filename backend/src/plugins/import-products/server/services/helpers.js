@@ -46,8 +46,6 @@ module.exports = ({ strapi }) => ({
         return Math.random() * (max - min) + min
     },
 
-    async delay(milliseconds) { return new Promise((resolve) => setTimeout(resolve, milliseconds)) },
-
     async updateAndFilterScrapProducts(products, category, subcategory, sub2category, importRef, entry) {
         try {
             const newProducts = []
@@ -338,14 +336,14 @@ module.exports = ({ strapi }) => ({
 
     async updateSupplierInfo(entry, product, supplierInfo) {
 
-        let isUpdated = false;
+        let isUpdated = false; 
         let dbChange = 'skipped'
 
         let supplierInfoUpdate = supplierInfo.findIndex(o => o.name === entry.name)
 
         if (supplierInfoUpdate !== -1) {
-            if (parseFloat(supplierInfo[supplierInfoUpdate].wholesale).toFixed(2) !== parseFloat(product.wholesale).toFixed(2)) {
-
+            if (parseFloat(product.wholesale) > 0 && parseFloat(supplierInfo[supplierInfoUpdate].wholesale) !== parseFloat(product.wholesale)) {
+                
                 const price_progress = supplierInfo[supplierInfoUpdate].price_progress;
 
                 const price_progress_data = this.createPriceProgress(product)
@@ -797,300 +795,6 @@ module.exports = ({ strapi }) => ({
 
     },
 
-    getGlobalsatProductURL(data) {
-        try {
-            const category = data[" Category "].trim()
-            const subcategory1 = data[" Sub Category 1 "].trim()
-            const subcategory2 = data[" Sub Category 2 "].trim()
-            const description = data[" GS Description "].trim()
-            const gsCode = data["GS Code"]
-            const mpn = data.partNumber.toLowerCase().replace(".", "-").replace(/\//g, "");
-
-            const gsDescription = description.toLowerCase()
-                .replace(/\./gi, "-").replace(/''/gi, "")
-                .replace(/ - /gi, "-").replace(/\//g, "")
-                .replace(/"/gi, "")
-                .replace(/ /gi, "-").replace(/\+/g, "-plus");
-
-
-            let productUrl = 'https://www.globalsat.gr/';
-
-            switch (category) {
-                case "Bags":
-                    productUrl = productUrl.concat("it-axesouar-and-gaming/a_tsantes/b_backpacks/")
-                    break;
-                case "Charging":
-                    productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-fortisis/")
-                    switch (subcategory1) {
-                        case "Cables":
-                            productUrl = productUrl.concat("b_kalodia/")
-                            break;
-                        case "Car Adaptor":
-                            productUrl = productUrl.concat("b_antaptoras-aftokinitou/")
-                            break;
-                        case "Car Charger":
-                            productUrl = productUrl.concat("b_fortistis-aftokinitou/")
-                            break;
-                        case "PowerBanks":
-                            productUrl = productUrl.concat("b_powerbanks/")
-                            break;
-                        case "Travel Adaptor":
-                            productUrl = productUrl.concat("b_antaptoras-taxidiou/")
-                            break;
-                        case "Travel Charger":
-                            productUrl = productUrl.concat("b_fortistis-taxidiou/")
-                            break;
-                        case "Wireless Charger":
-                            productUrl = productUrl.concat("b_asurmatoi-fortistes/")
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case "Connectivity":
-                    productUrl = productUrl.concat("it-axesouar-and-gaming/a_perifereiaka-pc/b_web-cameras/")
-                    break;
-                case "Extended":
-                    switch (subcategory1) {
-                        case "Adaptors":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_antaptores/")
-                            switch (subcategory2) {
-                                case "SIM Cards":
-                                    productUrl = productUrl.concat("b_sim-cards/")
-                                    break;
-                                case "Converter":
-                                    productUrl = productUrl.concat("b_converter/")
-                                    break;
-                                default:
-                                    break;
-                            }
-                            break;
-                        case "Backpacks":
-                            productUrl = productUrl.concat("it-axesouar-and-gaming/a_tsantes/b_backpacks/")
-                            break;
-                        case "Car Holder":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-aftokinitou/")
-                            break;
-                        case "Consumable Batteries":
-                            if (description.includes("Rechargable")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_katanalotikes-mpataries/b_epanafortizomenes/")
-                            }
-                            else {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_katanalotikes-mpataries/b_alkalikes/")
-                            }
-                            break;
-                        case "Desktop":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-grafeiou/")
-                            break;
-                        case "E-Mobility":
-                            productUrl = productUrl.concat("exupni-metakinisi/a_ilektrokinita-ochimata/")
-                            switch (subcategory2) {
-                                case "Scooter":
-                                    productUrl = productUrl.concat("b_e-scooters/")
-                                    break;
-                                case "Bike":
-                                    productUrl = productUrl.concat("b_e-bikes/")
-                                    break;
-                                case "Accessories":
-                                    productUrl = productUrl.concat("b_axesouar-ilektrokiniton-ochimaton/")
-                                    break;
-                                default:
-                                    break;
-                            }
-                            break;
-                        case "Gadgets":
-                            if (description.includes("Lamp")) {
-                                productUrl = productUrl.concat("lampes-fotismos-and-fakoi/a_fotistika-and-provoleis/b_fotistika/")
-                            }
-                            else if (description.includes("Car Front Window Sunshade")) {
-                                productUrl = productUrl.concat("eidi-taxidiou-and-camping/a_axesouar-aftokinitou/b_axesouar-aftokinitou/")
-                            }
-                            else if (description.includes("Bracket", "Holder")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-grafeiou/")
-                            }
-                            else if (description.includes("AirTag")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_gadgets/b_loipa-gadgets/")
-                            }
-                            break;
-                        case "Holders":
-                            if (description.includes("Selfie Stick")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_gadgets/b_selfie-stick/")
-                            }
-                            else if (description.includes("Vehicle Backseat")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_gadgets/b_loipa-gadgets/")
-                            }
-                            else if (description.includes("Laptop Portable Stand")) {
-                                productUrl = productUrl.concat("it-axesouar-and-gaming/a_cooling-stands/b_cooling-stands/")
-                            }
-                            else if (description.includes("Screen/Dash Holder", "Backseat Car", "Car Mount")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-aftokinitou/")
-                            }
-                            else if (description.includes("Desktop Bracket")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-grafeiou/")
-                            }
-                            else if (description.includes("Motorcycle Holder")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-dikuklou/")
-                            }
-                            else if (description.includes("Motorcycle Holder")) {
-                                productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-dikuklou/")
-                            }
-                            break;
-                        case "microSD":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-mvimis/b_microsd/")
-                            break;
-                        case "Mouse":
-                            productUrl = productUrl.concat("it-axesouar-and-gaming/a_perifereiaka-pc/b_pontikia/")
-                            break;
-                        case "Others":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_gadgets/b_loipa-gadgets/")
-                            break;
-                        case "Smart Pen":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_gadgets/b_smart-pen/")
-                            break;
-                        case "USB Sticks":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-mvimis/b_usb-sticks/")
-                            break;
-                        case "Τηλεόραση & Περιφερειακά":
-                            productUrl = productUrl.concat("eikona-and-ichos/a_tileorasi-and-periferiaka/b_android-boxes/")
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case "Gadgets":
-                    productUrl = productUrl.concat("kiniti-tilefonia/a_vaseis-stirixis/b_vaseis-grafeiou/")
-                    break;
-                case "Gaming":
-                    switch (subcategory1) {
-                        case "Consoles":
-                            productUrl = productUrl.concat("it-axesouar-and-gaming/a_pc-and-console-gaming/b_konsoles/")
-                            break;
-                        case "Games":
-                            productUrl = productUrl.concat("it-axesouar-and-gaming/a_pc-and-console-gaming/b_paichnidia/")
-                            break;
-                        case "Peripherals":
-                            productUrl = productUrl.concat("it-axesouar-and-gaming/a_pc-and-console-gaming/b_perifereiaka/")
-                            break;
-                        case "Prepaid Cards":
-                            productUrl = productUrl.concat("it-axesouar-and-gaming/a_pc-and-console-gaming/b_prepaid-cards/")
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case "GAMING ACCESSORIES":
-                    if (description.includes("Backpack")) {
-                        productUrl = productUrl.concat("it-axesouar-and-gaming/a_tsantes/b_backpacks/")
-                    }
-                    else if (description.includes("Mouse Pad")) {
-                        productUrl = productUrl.concat("it-axesouar-and-gaming/a_pc-and-console-gaming/b_gaming-mousepads/")
-                    }
-                    else if (description.includes("Mouse")) {
-                        productUrl = productUrl.concat("it-axesouar-and-gaming/a_pc-and-console-gaming/b_gaming-pontikia/")
-                    }
-                    break;
-                case "Home":
-                    switch (subcategory1) {
-                        case "Connectivity":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-spitiou/b_connectivity/")
-                            break;
-                        case "Fixed Telephony":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-spitiou/b_statheri-tilefonia/")
-                            break;
-                        case "Smarthome":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-spitiou/b_smarthome/")
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case "Hubs & Card Readers":
-                    productUrl = productUrl.concat("kiniti-tilefonia/a_antaptores/b_converter/")
-                    break;
-                case "IT ACCESSORIES":
-                    productUrl = productUrl.concat("it-axesouar-and-gaming/a_pc-and-console-gaming/b_gaming-pontikia/")
-                    break;
-                case "MICE & KEYBOARDS":
-                    productUrl = productUrl.concat("it-axesouar-and-gaming/a_perifereiaka-pc/b_pontikia/")
-                    break;
-                case "Protection":
-                    switch (subcategory1) {
-                        case "Cases":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-prostasias/b_thikes-gia-smartphones/")
-                            break;
-                        case "Tempered Glass":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-prostasias/b_prostasia-othonis/")
-                            break;
-                        case "Tablet Smart Case":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-prostasias/b_thikes-gia-tablet/")
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case "Sound":
-                    switch (subcategory1) {
-                        case "Bluetooth":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-ichou/b_bluetooth/")
-                            break;
-                        case "Handsfree":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-ichou/b_handsfree/")
-                            break;
-                        case "Headphones":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-ichou/b_akoustika-kefalis/")
-                            break;
-                        case "Speaker":
-                        case "Speakers":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-ichou/b_forita-icheia/")
-                            break;
-                        case "True Wireless":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-ichou/b_true-wireless/")
-                            break;
-                        default:
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_axesouar-ichou/b_handsfree/")
-                            break;
-                    }
-                    break;
-                case "Wearables":
-                    switch (subcategory1) {
-                        case "Activity Tracker":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_wearables/b_activity-trackers/")
-                            break;
-                        case "Smartwatch":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_wearables/b_smartwatch/")
-                            break;
-                        case "Strap":
-                            productUrl = productUrl.concat("kiniti-tilefonia/a_wearables/b_axesouar-gia-wearables/")
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                case "Ηλεκτρικές Σκούπες":
-                    productUrl = productUrl.concat("eidi-spitiou-and-mikrosuskeues/a_ilektriki-skoupa/b_rompotiki-skoupa/")
-                    break;
-                case "Πληκτρολόγια Η/Υ":
-                    productUrl = productUrl.concat("it-axesouar-and-gaming/a_perifereiaka-pc/b_pliktrologia/")
-                    break;
-                case "Ποντικία Η/Υ":
-                    productUrl = productUrl.concat("it-axesouar-and-gaming/a_perifereiaka-pc/b_pontikia/")
-                    break;
-                case "Υγεία & Ευεξία":
-                    productUrl = productUrl.concat("prosopiki-frontida-and-paidi/a_ugeia-and-euexia/b_zugaries-somatos/")
-                    break;
-                default:
-                    break;
-            }
-
-            productUrl = productUrl.trim().concat(`${gsDescription}-${mpn}-${gsCode}`)
-
-            return productUrl
-        } catch (error) {
-            console.log(error)
-        }
-
-    },
-
     async getCategory(categoryMap, name, category, sub_category, sub_category2) {
         let cat = categoryMap.find(x => x.name.trim().toLowerCase() === category.trim().toLowerCase())
 
@@ -1181,79 +885,6 @@ module.exports = ({ strapi }) => ({
             return await uncategorized
         }
         return categoryID
-    },
-
-    async scrapOktabit(productUrl) {
-        try {
-            // const browser = await puppeteer.launch();
-            const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
-            const page = await browser.newPage();
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
-            await page.goto(productUrl, { waitUntil: "networkidle0" });
-
-            const bodyHandle = await page.$('body');
-            // const specs = await bodyHandle.$("div #specsTab");
-            let scrap = await bodyHandle.evaluate(() => {
-                let prod_chars = [];
-                const prodSpecs = document.querySelector("#product-specifications");
-                if (prodSpecs) {
-                    const charTable = prodSpecs.querySelector("table");
-                    const charTableBody = charTable.querySelector("tbody");
-                    const charRows = charTableBody.querySelectorAll("tr");
-                    for (let row of charRows) {
-                        prod_chars.push({
-                            name: row.querySelector("th").textContent.trim(),
-                            value: row.querySelector("td").textContent.trim(),
-                        })
-                    }
-                }
-                const descriptionwrapper = document.querySelector("#product-description");
-                let description = ''
-                if (descriptionwrapper)
-                    description = descriptionwrapper.textContent.trim()
-
-                let rows = document.querySelectorAll(".text-muted");
-                let EAN = ""
-                if (rows) {
-                    rows.forEach(row => {
-                        if (row.textContent.trim().includes("EAN/UPC:")) {
-                            EAN = row.textContent.trim().slice(8).trim();
-                        }
-                    })
-                }
-
-                let inOffer = false;
-                const offer = document.querySelector("#product-description");
-                if (offer)
-                    inOffer = true;
-
-                const body = document.querySelector(".content");
-                const galleryThumps = body.querySelector(".swiper-container.gallery-thumbs");
-                const slides = galleryThumps.querySelectorAll(".swiper-slide");
-
-                let imageUrls = []
-                for (let slide of slides) {
-                    let slideStyle = slide.getAttribute("style")
-                    let styles = slideStyle.split(";")
-                    styles.forEach(style => {
-                        let backgroundImage = style.includes("background-image:")
-                        if (backgroundImage) {
-                            let imageString = style.split("(")[1]
-                            let image = imageString.slice(1, imageString.length - 2)
-                            imageUrls.push(`https://www.oktabit.gr${image}`)
-                        }
-                    }
-                    )
-                }
-
-                return { prod_chars, description, EAN, inOffer, imageUrls };
-            });
-
-            await browser.close();
-            return { scrap }
-        } catch (error) {
-            console.log(error)
-        }
     },
 
     filterCategories(categories, isWhitelistSelected, whitelist_map, blacklist_map) {
@@ -1853,112 +1484,204 @@ module.exports = ({ strapi }) => ({
                 else if (minSupplierPrice.name.toLowerCase() === "dotmedia") {
                     let retail_price = parseFloat(minSupplierPrice.retail_price)
 
-                    if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
-                        if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
-                            prices.generalPrice = {
-                                price: parseFloat(existedProduct.price).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price
-                            }
-                        }
-                        else {
-                            prices.generalPrice = {
-                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
-                                isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
-                            }
-                        }
-                    }
-                    else {
-                        if (existedProduct.inventory > 0 || parseFloat(existedProduct.price) > parseFloat(retail_price)) {
-                            prices.generalPrice = {
-                                price: parseFloat(existedProduct.price).toFixed(2),
-                                isFixed: existedProduct.is_fixed_price
-                            }
-                        }
-                        else {
-                            prices.generalPrice = {
-                                price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
-                                isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
-                            }
-                        }
-                    }
-
-                    if (skroutz) {
-                        if (parseFloat(minPrices.skroutz) > parseFloat(retail_price)) {
+                    if (parseFloat(minSupplierPrice.wholesale) > 0) {
+                        if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
                             if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
-                                prices.skroutzPrice = skroutz
+                                prices.generalPrice = {
+                                    price: parseFloat(existedProduct.price).toFixed(2),
+                                    isFixed: existedProduct.is_fixed_price
+                                }
                             }
                             else {
-                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
-                                skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
-                                prices.skroutzPrice = skroutz
+                                prices.generalPrice = {
+                                    price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                    isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                                }
                             }
                         }
                         else {
-                            if (existedProduct.inventory > 0 || parseFloat(skroutz.price) > parseFloat(retail_price)) {
-                                prices.skroutzPrice = skroutz
+                            if (existedProduct.inventory > 0 || parseFloat(existedProduct.price) > parseFloat(retail_price)) {
+                                prices.generalPrice = {
+                                    price: parseFloat(existedProduct.price).toFixed(2),
+                                    isFixed: existedProduct.is_fixed_price
+                                }
                             }
                             else {
-                                skroutz.price = parseFloat(retail_price).toFixed(2)
-                                skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
-                                prices.skroutzPrice = skroutz
+                                prices.generalPrice = {
+                                    price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
+                                    isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                                }
                             }
+                        }
+
+                        if (skroutz) {
+                            if (parseFloat(minPrices.skroutz) > parseFloat(retail_price)) {
+                                if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                                    prices.skroutzPrice = skroutz
+                                }
+                                else {
+                                    skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                    skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                    prices.skroutzPrice = skroutz
+                                }
+                            }
+                            else {
+                                if (existedProduct.inventory > 0 || parseFloat(skroutz.price) > parseFloat(retail_price)) {
+                                    prices.skroutzPrice = skroutz
+                                }
+                                else {
+                                    skroutz.price = parseFloat(retail_price).toFixed(2)
+                                    skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                    prices.skroutzPrice = skroutz
+                                }
+                            }
+                        }
+                        else {
+                            if (parseFloat(retail_price) > parseFloat(minPrices.skroutz)) {
+                                prices.skroutzPrice = {
+                                    platform: "Skroutz",
+                                    price: parseFloat(retail_price).toFixed(2),
+                                    is_fixed_price: false,
+                                }
+                            }
+                            else {
+                                prices.skroutzPrice = {
+                                    platform: "Skroutz",
+                                    price: parseFloat(minPrices.skroutz).toFixed(2),
+                                    is_fixed_price: false,
+                                }
+                            }
+                        }
+
+                        if (shopflix) {
+                            if (parseFloat(minPrices.shopflix) > parseFloat(retail_price)) {
+                                if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                                    prices.shopflixPrice = shopflix
+                                }
+                                else {
+                                    shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                    shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                    prices.shopflixPrice = shopflix
+                                }
+                            }
+                            else {
+                                if (existedProduct.inventory > 0 || parseFloat(shopflix.price) > parseFloat(retail_price)) {
+                                    prices.shopflixPrice = shopflix
+                                }
+                                else {
+                                    shopflix.price = parseFloat(retail_price).toFixed(2)
+                                    shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                    prices.shopflixPrice = shopflix
+                                }
+                            }
+                        }
+                        else {
+                            if (parseFloat(retail_price) > parseFloat(minPrices.shopflix)) {
+                                prices.shopflixPrice = {
+                                    platform: "Shopflix",
+                                    price: parseFloat(retail_price).toFixed(2),
+                                    is_fixed_price: false,
+                                }
+                            }
+                            else {
+                                prices.shopflixPrice = {
+                                    platform: "Shopflix",
+                                    price: parseFloat(minPrices.shopflix).toFixed(2),
+                                    is_fixed_price: false,
+                                }
+                            }
+
                         }
                     }
                     else {
-                        if (parseFloat(retail_price) > parseFloat(minPrices.skroutz)) {
+                        if (parseFloat(existedProduct.price) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                                prices.generalPrice = {
+                                    price: parseFloat(existedProduct.price).toFixed(2),
+                                    isFixed: existedProduct.is_fixed_price
+                                }
+                            }
+                            else {
+                                prices.generalPrice = {
+                                    price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
+                                    isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                                }
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory > 0) {
+                                prices.generalPrice = {
+                                    price: parseFloat(existedProduct.price).toFixed(2),
+                                    isFixed: existedProduct.is_fixed_price
+                                }
+                            }
+                            else {
+                                prices.generalPrice = {
+                                    price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
+                                    isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                                }
+                            }
+                        }
+
+                        if (skroutz) {
+                            if (parseFloat(skroutz.price) > parseFloat(retail_price)) {
+                                if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                                    prices.skroutzPrice = skroutz
+                                }
+                                else {
+                                    skroutz.price = parseFloat(retail_price).toFixed(2)
+                                    skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                    prices.skroutzPrice = skroutz
+                                }
+                            }
+                            else {
+                                if (existedProduct.inventory > 0) {
+                                    prices.skroutzPrice = skroutz
+                                }
+                                else {
+                                    skroutz.price = parseFloat(retail_price).toFixed(2)
+                                    skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                    prices.skroutzPrice = skroutz
+                                }
+                            }
+                        }
+                        else {
                             prices.skroutzPrice = {
                                 platform: "Skroutz",
                                 price: parseFloat(retail_price).toFixed(2),
                                 is_fixed_price: false,
                             }
                         }
-                        else {
-                            prices.skroutzPrice = {
-                                platform: "Skroutz",
-                                price: parseFloat(minPrices.skroutz).toFixed(2),
-                                is_fixed_price: false,
-                            }
-                        }
-                    }
 
-                    if (shopflix) {
-                        if (parseFloat(minPrices.shopflix) > parseFloat(retail_price)) {
-                            if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
-                                prices.shopflixPrice = shopflix
+                        if (shopflix) {
+                            if (parseFloat(shopflix.price) > parseFloat(retail_price)) {
+                                if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                                    prices.shopflixPrice = shopflix
+                                }
+                                else {
+                                    shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                    shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                    prices.shopflixPrice = shopflix
+                                }
                             }
                             else {
-                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
-                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
-                                prices.shopflixPrice = shopflix
+                                if (existedProduct.inventory > 0) {
+                                    prices.shopflixPrice = shopflix
+                                }
+                                else {
+                                    shopflix.price = parseFloat(retail_price).toFixed(2)
+                                    shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                    prices.shopflixPrice = shopflix
+                                }
                             }
                         }
                         else {
-                            if (existedProduct.inventory > 0 || parseFloat(shopflix.price) > parseFloat(retail_price)) {
-                                prices.shopflixPrice = shopflix
-                            }
-                            else {
-                                shopflix.price = parseFloat(retail_price).toFixed(2)
-                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
-                                prices.shopflixPrice = shopflix
-                            }
-                        }
-                    }
-                    else {
-                        if (parseFloat(retail_price) > parseFloat(minPrices.shopflix)) {
                             prices.shopflixPrice = {
                                 platform: "Shopflix",
                                 price: parseFloat(retail_price).toFixed(2),
                                 is_fixed_price: false,
                             }
                         }
-                        else {
-                            prices.shopflixPrice = {
-                                platform: "Shopflix",
-                                price: parseFloat(minPrices.shopflix).toFixed(2),
-                                is_fixed_price: false,
-                            }
-                        }
-
                     }
                 }
                 else {
@@ -2098,47 +1821,68 @@ module.exports = ({ strapi }) => ({
                     }
                 }
                 else if (minSupplierPrice.name.toLowerCase() === "dotmedia") {
-                    if (parseFloat(product.retail_price) > parseFloat(minPrices.general)) {
+                    if (parseFloat(minSupplierPrice.wholesale) > 0) {
+                        if (parseFloat(product.retail_price) > parseFloat(minPrices.general)) {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(product.retail_price).toFixed(2),
+                                isFixed: false
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: false
+                            }
+                        }
+
+                        if (parseFloat(product.retail_price) > parseFloat(minPrices.skroutz)) {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(product.retail_price).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                        else {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(minPrices.skroutz).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+
+                        if (parseFloat(product.retail_price) > parseFloat(minPrices.shopflix)) {
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(product.retail_price).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                        else {
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(minPrices.shopflix).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                    }
+                    else {
                         prices.generalPrice = {
                             price: prices.generalPrice = parseFloat(product.retail_price).toFixed(2),
                             isFixed: false
                         }
-                    }
-                    else {
-                        prices.generalPrice = {
-                            price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
-                            isFixed: false
-                        }
-                    }
 
-                    if (parseFloat(product.retail_price) > parseFloat(minPrices.skroutz)) {
                         prices.skroutzPrice = {
                             platform: "Skroutz",
                             price: parseFloat(product.retail_price).toFixed(2),
                             is_fixed_price: false,
                         }
-                    }
-                    else {
-                        prices.skroutzPrice = {
-                            platform: "Skroutz",
-                            price: parseFloat(minPrices.skroutz).toFixed(2),
-                            is_fixed_price: false,
-                        }
-                    }
 
-                    if (parseFloat(product.retail_price) > parseFloat(minPrices.shopflix)) {
                         prices.shopflixPrice = {
                             platform: "Shopflix",
                             price: parseFloat(product.retail_price).toFixed(2),
                             is_fixed_price: false,
                         }
-                    }
-                    else {
-                        prices.shopflixPrice = {
-                            platform: "Shopflix",
-                            price: parseFloat(minPrices.shopflix).toFixed(2),
-                            is_fixed_price: false,
-                        }
+
                     }
                 }
                 else {
@@ -2245,7 +1989,8 @@ module.exports = ({ strapi }) => ({
                     barcode: entry.barcode,
                     category: entry.category.name,
                     category_slug: entry.category.slug,
-                    brand: entry.brand ? entry.brand?.name : ""
+                    brand: entry.brand ? entry.brand?.name : "",
+                    weight: entry.weight ? entry.weight : 0
                 }
 
                 let chars1 = []

@@ -31,7 +31,7 @@ module.exports = {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')
-        .parseDotMedia(ctx.request.body);
+        .parseDotMediaOnlyXml(ctx.request.body);
     }
     else if (ctx.request.body.entry.name === 'Westnet') {
       ctx.body = await strapi

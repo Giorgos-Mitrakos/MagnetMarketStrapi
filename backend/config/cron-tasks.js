@@ -51,7 +51,7 @@ module.exports = {
                 .service('parseService')
                 .parseGlobalsat({ entry, auth });
         },
-        options: { 
+        options: {
             rule: "45 * * * *",
         },
     },
@@ -160,7 +160,7 @@ module.exports = {
         },
     },
 
-    updateDOTMEDIA: {
+    updateDOTMEDIAwithScrapping: {
         task: async ({ strapi }) => {
             // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
             const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
@@ -179,10 +179,36 @@ module.exports = {
             await strapi
                 .plugin('import-products')
                 .service('parseService')
-                .parseDotMedia({ entry, auth });
+                .parseDotMediaWithScrapping({ entry, auth });
         },
         options: {
-            rule: "10 7,12,17,18,22 * * *",
+            rule: "10 7 * * *",
+        },
+    },
+
+    updateDOTMEDIAwithXML: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "DotMedia" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseDotMediaWithScrapping({ entry, auth });
+        },
+        options: {
+            rule: "10 10,16,18,22 * * *",
         },
     },
 
@@ -210,8 +236,8 @@ module.exports = {
                 .service('xmlService')
                 .createXml('Skroutz');
         },
-        options: { 
-            rule: "0 * * * *", 
+        options: {
+            rule: "15 * * * *",
         },
     },
 
@@ -223,9 +249,9 @@ module.exports = {
                 .plugin('export-platforms-xml')
                 .service('xmlService')
                 .createXml('Shopflix');
-        }, 
+        },
         options: {
-            rule: "4 * * * *",
+            rule: "17 * * * *",
         },
     },
 

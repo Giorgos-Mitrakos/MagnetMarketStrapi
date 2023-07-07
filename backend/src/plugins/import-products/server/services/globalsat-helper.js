@@ -277,7 +277,7 @@ module.exports = ({ strapi }) => ({
                 );
 
             const productPage = await page.$('section.product_page');
-
+ 
             const scrapProduct = await productPage.evaluate(() => {
 
                 const product = {}
