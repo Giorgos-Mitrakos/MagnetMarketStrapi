@@ -205,7 +205,7 @@ module.exports = {
             await strapi
                 .plugin('import-products')
                 .service('parseService')
-                .parseDotMediaWithScrapping({ entry, auth });
+                .parseDotMediaOnlyXml({ entry, auth });
         },
         options: {
             rule: "10 10,16,18,22 * * *",

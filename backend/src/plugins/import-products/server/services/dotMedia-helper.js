@@ -120,7 +120,7 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterWholesaleOrRetailExist(product) {
-
+            
             if (parseFloat(product.WholesalePrice) > 0 || parseFloat(product.Suggested_x0020_Web_x0020_Price) > 0) { return true }
 
         }
