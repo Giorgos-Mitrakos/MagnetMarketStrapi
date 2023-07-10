@@ -48,11 +48,37 @@ module.exports = ({ strapi }) => ({
 
     filterData(data, categoryMap) {
 
+        const unique_product = []
+        const not_unique_product = []
+        let numOfDup = 0
+
         const newData = data
             .filter(filterStock)
             .filter(filterWholesaleOrRetailExist)
             .filter(filterCategories)
             .filter(filterImages)
+            .filter(filterUnique)
+            .filter(filterRemoveDup) 
+            
+        function filterUnique(unique) {
+            if (unique_product.includes(unique.MakerID[0].trim().toString())) {
+                not_unique_product.push(unique.MakerID[0].trim().toString())
+                return false
+            }
+            else {
+                unique_product.push(unique.MakerID[0].trim().toString())
+                return true
+            }
+        }
+
+        function filterRemoveDup(unique) {
+            if (not_unique_product.includes(unique.MakerID[0].trim().toString())) {
+                return false
+            }
+            else {
+                return true
+            }
+        }
 
         function filterStock(stockName) {
             if (categoryMap.stock_map.length > 0) {
@@ -120,7 +146,7 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterWholesaleOrRetailExist(product) {
-            
+
             if (parseFloat(product.WholesalePrice) > 0 || parseFloat(product.Suggested_x0020_Web_x0020_Price) > 0) { return true }
 
         }
