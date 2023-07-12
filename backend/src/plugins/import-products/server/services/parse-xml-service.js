@@ -1320,12 +1320,14 @@ module.exports = ({ strapi }) => ({
                     let weightFlattenArray = weightInKilos.flat()
                     weightFlattenArray.forEach(wt => {
                         let result = wt.match(/\d{1,3}(.|,)\d{0,3}/)
-                        weightsList.push(result[0])
+                        if (result) { weightsList.push(result[0]) }
                     });
-                    let maxWeight = weightsList?.reduce((prev, current) => {
-                        return (parseFloat(prev.replace(",", ".")) > parseFloat(current.replace(",", "."))) ? prev : current
-                    })
-                    weight.push(parseFloat(maxWeight.replace(",", ".")) * 1000)
+                    if (weightsList.length > 0) {
+                        let maxWeight = weightsList?.reduce((prev, current) => {
+                            return (parseFloat(prev.replace(",", ".")) > parseFloat(current.replace(",", "."))) ? prev : current
+                        })
+                        weight.push(parseFloat(maxWeight.replace(",", ".")) * 1000)
+                    }
                 }
 
                 let weightInGrams = []
@@ -1342,12 +1344,14 @@ module.exports = ({ strapi }) => ({
                     let weightFlattenArray = weightInGrams.flat()
                     weightFlattenArray.forEach(wt => {
                         let result = wt.match(/\d{1,3}(.|,)\d{0,3}/)
-                        weightsList.push(result[0])
+                        if (result) { weightsList.push(result[0]) }
                     });
-                    let maxWeight = weightsList?.reduce((prev, current) => {
-                        return (parseFloat(prev.replace(",", ".")) > parseFloat(current.replace(",", "."))) ? prev : current
-                    })
-                    weight.push(parseFloat(maxWeight.replace(",", ".")))
+                    if (weightsList.length > 0) {
+                        let maxWeight = weightsList?.reduce((prev, current) => {
+                            return (parseFloat(prev.replace(",", ".")) > parseFloat(current.replace(",", "."))) ? prev : current
+                        })
+                        weight.push(parseFloat(maxWeight.replace(",", ".")))
+                    }
                 }
 
                 if (weight.length > 0) {

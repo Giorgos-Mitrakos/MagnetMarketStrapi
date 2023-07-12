@@ -52,7 +52,7 @@ module.exports = {
                 .parseGlobalsat({ entry, auth });
         },
         options: {
-            rule: "45 * * * *",
+            rule: "40 * * * *",
         },
     },
 
@@ -236,8 +236,8 @@ module.exports = {
                 .service('xmlService')
                 .createXml('Skroutz');
         },
-        options: {
-            rule: "15 * * * *",
+        options: { 
+            rule: "0 * * * *",
         },
     },
 
@@ -251,7 +251,7 @@ module.exports = {
                 .createXml('Shopflix');
         },
         options: {
-            rule: "17 * * * *",
+            rule: "58 * * * *",
         },
     },
 
