@@ -58,8 +58,8 @@ module.exports = ({ strapi }) => ({
             .filter(filterCategories)
             .filter(filterImages)
             .filter(filterUnique)
-            .filter(filterRemoveDup) 
-            
+            .filter(filterRemoveDup)
+
         function filterUnique(unique) {
             if (unique_product.includes(unique.MakerID[0].trim().toString())) {
                 not_unique_product.push(unique.MakerID[0].trim().toString())
@@ -175,10 +175,9 @@ module.exports = ({ strapi }) => ({
             await password.type(process.env.DOTMEDIA_PASSWORD)
             const submitLogin = await pageBody.$('#ctl00_cphLogin_btnLogin')
 
-            await Promise.all([
-                submitLogin.click('#loginSubmit'),
-                page.waitForSelector('#ctl00_cphLogin_ztLoginMes'),
-            ]);
+            submitLogin.click('#loginSubmit')
+
+            await page.waitForTimeout(5000)
 
             const cookies = await page.cookies();
             const cookiesJson = JSON.stringify(cookies, null, 2)

@@ -182,7 +182,7 @@ module.exports = {
                 .parseDotMediaWithScrapping({ entry, auth });
         },
         options: {
-            rule: "10 7 * * *",
+            rule: "10 5 * * *",
         },
     },
 

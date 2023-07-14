@@ -336,14 +336,20 @@ module.exports = ({ strapi }) => ({
 
     async updateSupplierInfo(entry, product, supplierInfo) {
 
-        let isUpdated = false; 
+        let isUpdated = false;
         let dbChange = 'skipped'
 
         let supplierInfoUpdate = supplierInfo.findIndex(o => o.name === entry.name)
 
         if (supplierInfoUpdate !== -1) {
+            if (parseFloat(supplierInfo[supplierInfoUpdate].wholesale) === 0 && parseFloat(product.wholesale) !== 0) {
+                parseFloat(supplierInfo[supplierInfoUpdate].wholesale) = parseFloat(product.wholesale)
+                isUpdated = true;
+                dbChange = 'updated'
+            }
+
             if (parseFloat(product.wholesale) > 0 && parseFloat(supplierInfo[supplierInfoUpdate].wholesale) !== parseFloat(product.wholesale)) {
-                
+
                 const price_progress = supplierInfo[supplierInfoUpdate].price_progress;
 
                 const price_progress_data = this.createPriceProgress(product)
@@ -1232,13 +1238,15 @@ module.exports = ({ strapi }) => ({
             const { mapCharNames, mapCharValues } = charMaps
 
             for (let entry of entries.related_products) {
-                const parsedChars = await this.parseChars(entry.prod_chars, mapCharNames, mapCharValues)
+                if (entry.prod_chars && entry.prod_chars.length > 0) {
+                    const parsedChars = await this.parseChars(entry.prod_chars, mapCharNames, mapCharValues)
 
-                const updateProduct = await strapi.entityService.update('api::product.product', entry.id, {
-                    data: {
-                        prod_chars: parsedChars,
-                    },
-                });
+                    const updateProduct = await strapi.entityService.update('api::product.product', entry.id, {
+                        data: {
+                            prod_chars: parsedChars,
+                        },
+                    });
+                }
             }
 
             return { "message": 'ok' }
@@ -1372,7 +1380,7 @@ module.exports = ({ strapi }) => ({
                     let retail_price = parseFloat(minSupplierPrice.retail_price) - 0.5
 
                     if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
-                        if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                        if (existedProduct.inventory > 0) {
                             prices.generalPrice = {
                                 price: parseFloat(existedProduct.price).toFixed(2),
                                 isFixed: existedProduct.is_fixed_price
@@ -1381,12 +1389,18 @@ module.exports = ({ strapi }) => ({
                         else {
                             prices.generalPrice = {
                                 price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
-                                isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                                isFixed: false
                             }
                         }
                     }
                     else {
-                        if (existedProduct.inventory > 0 || parseFloat(existedProduct.price) > parseFloat(retail_price)) {
+                        if (existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else if (parseFloat(existedProduct.price) > parseFloat(retail_price) && existedProduct.is_fixed_price) {
                             prices.generalPrice = {
                                 price: parseFloat(existedProduct.price).toFixed(2),
                                 isFixed: existedProduct.is_fixed_price
@@ -1403,17 +1417,20 @@ module.exports = ({ strapi }) => ({
                     if (skroutz) {
 
                         if (parseFloat(minPrices.skroutz) > parseFloat(retail_price)) {
-                            if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                            if (existedProduct.inventory > 0) {
                                 prices.skroutzPrice = skroutz
                             }
                             else {
                                 skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
-                                skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                skroutz.is_fixed_price = false
                                 prices.skroutzPrice = skroutz
                             }
                         }
                         else {
-                            if (existedProduct.inventory > 0 || parseFloat(skroutz.price) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else if (parseFloat(skroutz.price) > parseFloat(retail_price) && skroutz.is_fixed_price) {
                                 prices.skroutzPrice = skroutz
                             }
                             else {
@@ -1443,7 +1460,7 @@ module.exports = ({ strapi }) => ({
 
                     if (shopflix) {
                         if (parseFloat(minPrices.shopflix) > parseFloat(retail_price)) {
-                            if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                            if (existedProduct.inventory > 0) {
                                 prices.shopflixPrice = shopflix
                             }
                             else {
@@ -1453,7 +1470,10 @@ module.exports = ({ strapi }) => ({
                             }
                         }
                         else {
-                            if (existedProduct.inventory > 0 || parseFloat(shopflix.price) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else if (parseFloat(shopflix.price) > parseFloat(retail_price) && shopflix.is_fixed_price) {
                                 prices.shopflixPrice = shopflix
                             }
                             else {
@@ -1486,7 +1506,7 @@ module.exports = ({ strapi }) => ({
 
                     if (parseFloat(minSupplierPrice.wholesale) > 0) {
                         if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
-                            if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                            if (existedProduct.inventory > 0) {
                                 prices.generalPrice = {
                                     price: parseFloat(existedProduct.price).toFixed(2),
                                     isFixed: existedProduct.is_fixed_price
@@ -1500,7 +1520,13 @@ module.exports = ({ strapi }) => ({
                             }
                         }
                         else {
-                            if (existedProduct.inventory > 0 || parseFloat(existedProduct.price) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0) {
+                                prices.generalPrice = {
+                                    price: parseFloat(existedProduct.price).toFixed(2),
+                                    isFixed: existedProduct.is_fixed_price
+                                }
+                            }
+                            else if (parseFloat(existedProduct.price) > parseFloat(retail_price) && existedProduct.is_fixed_price) {
                                 prices.generalPrice = {
                                     price: parseFloat(existedProduct.price).toFixed(2),
                                     isFixed: existedProduct.is_fixed_price
@@ -1509,14 +1535,14 @@ module.exports = ({ strapi }) => ({
                             else {
                                 prices.generalPrice = {
                                     price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
-                                    isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                                    isFixed: false
                                 }
                             }
                         }
 
                         if (skroutz) {
                             if (parseFloat(minPrices.skroutz) > parseFloat(retail_price)) {
-                                if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                                if (existedProduct.inventory > 0) {
                                     prices.skroutzPrice = skroutz
                                 }
                                 else {
@@ -1526,12 +1552,15 @@ module.exports = ({ strapi }) => ({
                                 }
                             }
                             else {
-                                if (existedProduct.inventory > 0 || parseFloat(skroutz.price) > parseFloat(retail_price)) {
+                                if (existedProduct.inventory > 0) {
+                                    prices.skroutzPrice = skroutz
+                                }
+                                else if (parseFloat(skroutz.price) > parseFloat(retail_price) && skroutz.is_fixed_price) {
                                     prices.skroutzPrice = skroutz
                                 }
                                 else {
                                     skroutz.price = parseFloat(retail_price).toFixed(2)
-                                    skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                    skroutz.is_fixed_price = false
                                     prices.skroutzPrice = skroutz
                                 }
                             }
@@ -1555,7 +1584,7 @@ module.exports = ({ strapi }) => ({
 
                         if (shopflix) {
                             if (parseFloat(minPrices.shopflix) > parseFloat(retail_price)) {
-                                if (existedProduct.inventory > 0 || existedProduct.is_fixed_price) {
+                                if (existedProduct.inventory > 0) {
                                     prices.shopflixPrice = shopflix
                                 }
                                 else {
@@ -1565,12 +1594,15 @@ module.exports = ({ strapi }) => ({
                                 }
                             }
                             else {
-                                if (existedProduct.inventory > 0 || parseFloat(shopflix.price) > parseFloat(retail_price)) {
+                                if (existedProduct.inventory > 0) {
+                                    prices.shopflixPrice = shopflix
+                                }
+                                else if (parseFloat(shopflix.price) > parseFloat(retail_price) && shopflix.is_fixed_price) {
                                     prices.shopflixPrice = shopflix
                                 }
                                 else {
                                     shopflix.price = parseFloat(retail_price).toFixed(2)
-                                    shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                    shopflix.is_fixed_price = false
                                     prices.shopflixPrice = shopflix
                                 }
                             }
@@ -2488,13 +2520,17 @@ module.exports = ({ strapi }) => ({
             //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
             const { mapCharNames, mapCharValues } = importRef.charMaps
 
-            const parsedChars = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseChars(product.prod_chars, mapCharNames, mapCharValues)
+            if (product.prod_chars && product.prod_chars.length > 0) {
+                const parsedChars = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .parseChars(product.prod_chars, mapCharNames, mapCharValues)
+
+                product.prod_chars = parsedChars
+            }
 
             if (brandId) { product.brand = { id: brandId } }
-            product.prod_chars = parsedChars
+
 
             if (!entryCheck) {
                 try {
@@ -2528,9 +2564,9 @@ module.exports = ({ strapi }) => ({
                         if (entryCheck.prod_chars) {
                             if (entryCheck.prod_chars.find(x => x.name.toLowerCase().contains("βάρος") || x.name.toLowerCase().contains("specs"))) {
                                 let chars = entryCheck.prod_chars.find(x => x.name.toLowerCase().contains("βάρος"))
-                                console.log(chars)
+
                                 let specs = entryCheck.prod_chars.find(x => x).toLowerCase().contains("specs")
-                                console.log(specs)
+
                                 let value = chars.value.toLowerCase()
                                 // if (value.contains("kg")) {
                                 //     product.weight = parseInt(chars.value.replace("kg", "").replace(",", ".").trim()) * 1000
@@ -2666,10 +2702,17 @@ module.exports = ({ strapi }) => ({
             const skroutz = entryCheck.platform.find(x => x.platform === "Skroutz")
             const shopflix = entryCheck.platform.find(x => x.platform === "Shopflix")
 
+            if (isUpdated) {
+                data.supplierInfo = updatedSupplierInfo
+                dbChange = 'updated'
+            }
+
+            let info = data.supplierInfo ? data.supplierInfo : supplierInfo
+
             const productPrices = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .setPrice(entryCheck, supplierInfo, categoryInfo, product);
+                .setPrice(entryCheck, info, categoryInfo, product);
 
             if (isUpdated || !entryCheck.category
                 || entryCheck.category.id !== categoryInfo.id
@@ -2694,11 +2737,6 @@ module.exports = ({ strapi }) => ({
                     productPrices.skroutzPrice,
                     productPrices.shopflixPrice
                 ]
-                dbChange = 'updated'
-            }
-
-            if (isUpdated) {
-                data.supplierInfo = updatedSupplierInfo
                 dbChange = 'updated'
             }
 
