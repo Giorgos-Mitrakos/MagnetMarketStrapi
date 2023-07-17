@@ -33,6 +33,12 @@ module.exports = {
         .service('parseService')
         .parseDotMediaOnlyXml(ctx.request.body);
     }
+    else if (ctx.request.body.entry.name.toLowerCase() === 'telehermes') {
+      ctx.body = await strapi
+        .plugin('import-products')
+        .service('parseService')
+        .parseTelehermesXml(ctx.request.body);
+    }
     else if (ctx.request.body.entry.name === 'Westnet') {
       ctx.body = await strapi
         .plugin('import-products')

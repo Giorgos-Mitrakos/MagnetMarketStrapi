@@ -212,6 +212,32 @@ module.exports = {
         },
     },
 
+    updateTELEHERMES: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Telehermes" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseTelehermesXml({ entry, auth });
+        },
+        options: {
+            rule: "5 8,11,14,16,18,22 * * *",
+        },
+    },
+
     updateAll: {
         task: async ({ strapi }) => {
             // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).

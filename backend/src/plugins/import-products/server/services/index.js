@@ -13,6 +13,7 @@ const questHelper = require('./quest-helper');
 const globalsatHelper = require('./globalsat-helper');
 const westnetHelper = require('./westnet-helper');
 const dotMediaHelper = require('./dotMedia-helper');
+const telehermesHelper = require('./telehermes-helper');
 const imageHelper = require('./image-helper');
 
 module.exports = {
@@ -29,6 +30,7 @@ module.exports = {
   globalsatHelper,
   westnetHelper,
   dotMediaHelper,
+  telehermesHelper,
   imageHelper,
 };
 

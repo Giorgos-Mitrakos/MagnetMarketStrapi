@@ -133,10 +133,10 @@ module.exports = ({ strapi }) => ({
 
         function filterPriceRange(priceRange) {
 
-            let minPrice = categoryMap.minimumPrice ? parseFloat(categoryMap.minimumPrice).toFixed(2) : 0;
+            let minPrice = categoryMap.minimumPrice ? parseFloat(categoryMap.minimumPrice) : 0;
             let maxPrice;
             if (categoryMap.maximumPrice && categoryMap.maximumPrice > 0) {
-                maxPrice = parseFloat(categoryMap.maximumPrice).toFixed(2);
+                maxPrice = parseFloat(categoryMap.maximumPrice);
             }
             else {
                 maxPrice = 100000;

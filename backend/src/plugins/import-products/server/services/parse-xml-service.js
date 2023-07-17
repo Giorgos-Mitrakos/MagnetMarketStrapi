@@ -1406,6 +1406,137 @@ module.exports = ({ strapi }) => ({
         }
     },
 
+    async parseTelehermesXml({ entry, auth }) {
+        try {
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            const products = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .getData(entry, importRef.categoryMap);
+
+            // console.log("products:", products)
+            const { categories_map, char_name_map, char_value_map, stock_map,
+                isWhitelistSelected, whitelist_map, blacklist_map,
+                xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+            const { mapCharNames, mapCharValues } = importRef.charMaps
+
+            for (let dt of products) {
+
+                let mpn = dt.mpn[0].trim().toString()
+                let name = dt.title[0].trim()
+                let barcode = dt.ean ? dt.ean[0].trim() : null
+                let brand_name = dt.manufacturer[0].trim()
+
+                const { entryCheck, brandId } = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                //Κατασκευάζω το URL του προϊόντος του προμηθευτή
+                // let productUrl = `https://www.mywestnet.com/el${dt.url[0]}`
+
+
+                const chars = []
+
+                if (dt.specifications && dt.specifications[0].item) {
+                    for (let productChar of dt.specifications[0].item) {
+
+                        if (productChar.$.key.trim() === "Κατάσταση")
+                            continue
+
+                        const char = {}
+                        char.name = productChar.$.key
+                        char.value = productChar.$.value
+                        chars.push(char)
+                    }
+                }
+
+                const parsedChars = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .parseChars(chars, mapCharNames, mapCharValues)
+
+                const product = {
+                    entry,
+                    name,
+                    supplierCode: dt.sku[0],
+                    description: dt.full_description[0],
+                    short_description: dt.short_description[0],
+                    category: { title: dt.category_level_1[0] },
+                    subcategory: { title: dt.category_level_2[0] },
+                    sub2category: { title: null },
+                    mpn,
+                    barcode,
+                    // slug: dt.partNumber ? 
+                    //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                    //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                    // publishedAt: new Date(),
+                    stockLevel: parseInt(dt.availability[0]),
+                    wholesale: parseFloat(dt.wholesale_price[0]).toFixed(2),
+                    imagesSrc: [{ url: dt.image[0] }],
+                    brand: { id: await brandId },
+                    retail_price: parseFloat(dt.retail_price[0]).toFixed(2),
+                    related_import: entry.id,
+                    // supplierInfo: [{
+                    //     name: entry.name,
+                    //     in_stock: true,
+                    //     wholesale: dt.price,
+                    //     recycle_tax: dt.recycleTax,
+                    //     supplierProductId: dt.supplierCode,
+                    //     supplierProductURL: productUrl,
+                    //     retail_price: dt.suggestedPrice,
+                    //     price_progress: [{
+                    //         date: new Date(),
+                    //         wholesale: dt.price,
+                    //     }]
+                    // }],
+                    prod_chars: parsedChars
+                }
+
+                // αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+                if (!entryCheck) {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .createEntry(product, importRef, auth);
+
+                    } catch (error) {
+                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                    }
+                }
+                else {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .updateEntry(entryCheck, product, importRef);
+                    } catch (error) {
+                        console.log(error)
+                    }
+                }
+            }
+
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .deleteEntry(entry, importRef);
+
+            console.log("End of Import")
+            return { "message": "ok" }
+        }
+        catch (err) {
+            console.log(err)
+            return { "message": "Error" }
+        }
+    },
+
     async parseDamkalidisXml({ entry, auth }) {
         try {
             const importRef = {

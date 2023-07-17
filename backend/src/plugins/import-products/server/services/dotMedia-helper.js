@@ -50,7 +50,6 @@ module.exports = ({ strapi }) => ({
 
         const unique_product = []
         const not_unique_product = []
-        let numOfDup = 0
 
         const newData = data
             .filter(filterStock)

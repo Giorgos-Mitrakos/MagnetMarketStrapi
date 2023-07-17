@@ -1,10 +1,10 @@
 'use strict';
 
-const Axios = require('axios'); 
+const Axios = require('axios');
 
 module.exports = ({ strapi }) => ({
 
-    async getZegetronData(entry, categoryMap) {
+    async getTelehermesData(entry, categoryMap) {
         try {
             const { categories_map, char_name_map, char_value_map, stock_map,
                 isWhitelistSelected, whitelist_map, blacklist_map,
@@ -23,22 +23,17 @@ module.exports = ({ strapi }) => ({
             const data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
 
-            // const xPathFilter = await strapi
-            //     .plugin('import-products')
-            //     .service('helpers')
-            //     .xPathFilter(await data, entry);
+            const xPathFilter = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .xPathFilter(await data, entry);
 
             const xml = await strapi
                 .plugin('import-products')
                 .service('helpers').parseXml(await data.data)
 
-            console.log(xml.mywebstore.products[0].product.length)
-
-            const unique_product = {
-                mpn: []
-            }
-
-            const availableProducts = this.filterData(xml.mywebstore.products[0].product, categoryMap, unique_product)
+            console.log(xml.telehermes.products[0].product.length)
+            const availableProducts = this.filterData(xml.telehermes.products[0].product, categoryMap)
 
             console.log(availableProducts.length)
             return availableProducts
@@ -47,30 +42,52 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    filterData(data, categoryMap, unique_product) {
+    filterData(data, categoryMap) {
+
+        const unique_product = []
+        const not_unique_product = []
 
         const newData = data
-            // .filter(filterUnique)
+            .filter(filterUnique)
             .filter(filterStock)
             .filter(filterPriceRange)
             .filter(filterCategories)
             .filter(filterImages)
+            .filter(filterEmptyMpn)
+            .filter(filterRemoveDup)
 
         function filterUnique(unique) {
-            if (unique_product.mpn.includes(unique.part_number[0].trim().toString())) {
+            if (unique_product.includes(unique.mpn[0].trim().toString())) {
+                not_unique_product.push(unique.mpn[0].trim().toString())
                 return false
             }
             else {
-                unique_product.mpn.push(unique.part_number[0].trim().toString())
-                return true 
+                unique_product.push(unique.mpn[0].trim().toString())
+                return true
             }
+        }
+
+        function filterRemoveDup(unique) {
+            if (not_unique_product.includes(unique.mpn[0].trim().toString())) {
+                return false
+            }
+            else {
+                return true
+            }
+        }
+
+        function filterEmptyMpn(product) {
+
+            if (product.mpn[0].trim() !== "") {
+                return true }
+
         }
 
         function filterStock(stockName) {
             // console.log(categoryMap.stock_map[0])
             if (categoryMap.stock_map.length > 0) {
-                // let catIndex = categoryMap.stock_map[0].findIndex(x => x.name.trim() === stockName.stock[0].trim())
-                if (parseInt(categoryMap.stock_map[0].name) <= parseInt(stockName.stock[0])) {
+                let catIndex = categoryMap.stock_map.findIndex(x => stockName.availability[0].trim() === x.name.trim())
+                if (catIndex !== -1) {
                     return true
                 }
                 else {
@@ -83,8 +100,8 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterCategories(cat) {
-            let category = cat.category[0].trim()
-            let subcategory = null
+            let category = cat.category_level_1[0].trim()
+            let subcategory = cat.category_level_2[0].trim()
             let sub2category = null
 
             if (categoryMap.isWhitelistSelected) {
@@ -164,9 +181,9 @@ module.exports = ({ strapi }) => ({
                 maxPrice = 100000;
             }
 
-            const productPrice = priceRange.price[0].replace(",", ".")
+            const productPrice = priceRange.wholesale_price[0].replace(".", "").replace(",", ".")
 
-            if (productPrice >= minPrice && productPrice <= maxPrice) {
+            if (parseFloat(productPrice) !== parseFloat(0) && productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
             }
             else {
@@ -175,8 +192,8 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterImages(image) {
-            if (image.images[0].image && image.images[0].image.length > 0) {
-                return true 
+            if (image.image[0]) {
+                return true
             }
             else {
                 return false

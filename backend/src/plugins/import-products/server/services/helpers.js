@@ -473,6 +473,12 @@ module.exports = ({ strapi }) => ({
                     .service('dotMediaHelper')
                     .getDotMediaData(entry, categoryMap)
             }
+            else if (entry.name.toLowerCase() === "telehermes") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('telehermesHelper')
+                    .getTelehermesData(entry, categoryMap)
+            }
             // console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
@@ -1501,6 +1507,131 @@ module.exports = ({ strapi }) => ({
 
                     }
                 }
+                else if (minSupplierPrice.name.toLowerCase() === "telehermes"){
+                    let retail_price = parseFloat(minSupplierPrice.retail_price)
+
+                    if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
+                        if (existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: false
+                            }
+                        }
+                    }
+                    else {
+                        if (existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else if (parseFloat(existedProduct.price) > parseFloat(retail_price) && existedProduct.is_fixed_price) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
+                                isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                            }
+                        }
+                    }
+
+                    if (skroutz) {
+
+                        if (parseFloat(minPrices.skroutz) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else if (parseFloat(skroutz.price) > parseFloat(retail_price) && skroutz.is_fixed_price) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(retail_price).toFixed(2)
+                                skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+
+                    }
+                    else {
+                        if (parseFloat(retail_price) > parseFloat(minPrices.skroutz)) {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(retail_price).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                        else {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(minPrices.skroutz).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                    }
+
+                    if (shopflix) {
+                        if (parseFloat(minPrices.shopflix) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else if (parseFloat(shopflix.price) > parseFloat(retail_price) && shopflix.is_fixed_price) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(retail_price).toFixed(2)
+                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                    }
+                    else {
+                        if (parseFloat(retail_price) > parseFloat(minPrices.shopflix)) {
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(retail_price).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                        else {
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(minPrices.shopflix).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+
+                    }
+                }
                 else if (minSupplierPrice.name.toLowerCase() === "dotmedia") {
                     let retail_price = parseFloat(minSupplierPrice.retail_price)
 
@@ -1841,6 +1972,50 @@ module.exports = ({ strapi }) => ({
                         prices.shopflixPrice = {
                             platform: "Shopflix",
                             price: parseFloat(parseFloat(product.retail_price) - 0.5).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                    else {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(minPrices.shopflix).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                }
+                else if (minSupplierPrice.name.toLowerCase() === "telehermes"){
+                    if (parseFloat(product.retail_price) > parseFloat(minPrices.general)) {
+                        prices.generalPrice = {
+                            price: prices.generalPrice = parseFloat(product.retail_price).toFixed(2),
+                            isFixed: false
+                        }
+                    }
+                    else {
+                        prices.generalPrice = {
+                            price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                            isFixed: false
+                        }
+                    }
+
+                    if (parseFloat(product.retail_price) > parseFloat(minPrices.skroutz)) {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(product.retail_price).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                    else {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(minPrices.skroutz).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+
+                    if (parseFloat(product.retail_price) > parseFloat(minPrices.shopflix)) {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(product.retail_price).toFixed(2),
                             is_fixed_price: false,
                         }
                     }
