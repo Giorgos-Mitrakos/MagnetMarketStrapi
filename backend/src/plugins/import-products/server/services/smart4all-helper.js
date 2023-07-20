@@ -1,10 +1,11 @@
 'use strict';
 
-const Axios = require('axios'); 
+const Axios = require('axios');
+const xlsx = require('xlsx')
 
 module.exports = ({ strapi }) => ({
 
-    async getZegetronData(entry, categoryMap) {
+    async getSmart4AllData(entry, categoryMap) {
         try {
             const { categories_map, char_name_map, char_value_map, stock_map,
                 isWhitelistSelected, whitelist_map, blacklist_map,
@@ -23,54 +24,95 @@ module.exports = ({ strapi }) => ({
             const data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
 
-            // const xPathFilter = await strapi
-            //     .plugin('import-products')
-            //     .service('helpers')
-            //     .xPathFilter(await data, entry);
+            const xPathFilter = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .xPathFilter(await data, entry);
 
             const xml = await strapi
                 .plugin('import-products')
-                .service('helpers').parseXml(await data.data)
+                .service('helpers')
+                .parseXml(await data.data)
 
-            console.log(xml.mywebstore.products[0].product.length)
+            //Διαβάζω τις πληροφορίες από το excel ώστε να τις χρησιμοποιή
+            const wb = xlsx.readFile(`./public${entry.importedFile.url}`)
+            const ws = wb.SheetNames
+            let excel = []
+            ws.forEach(x => {
+                if (x !== "Φύλλο") {
+                    const sheet = wb.Sheets[x]
+                    const products = xlsx.utils.sheet_to_json(sheet)
+                    // console.log(products)
+                    excel = excel.concat(products)
+                }
+            })
 
-            const unique_product = {
-                mpn: []
-            }
+            const productsInExcel = excel.filter(x => {                
+                if (x["EAN"] !== undefined && !isNaN(x["EAN"])) {
+                    return true
+                }
+            }).filter(x => {
+                if (x["EAN"] !== "") {
+                    return true
+                }
+            })
 
-            const availableProducts = this.filterData(xml.mywebstore.products[0].product, categoryMap, unique_product)
+            // console.log(xml.mywebstore.products[0].product)
+            const availableProducts = this.filterData(xml.mywebstore.products[0].product, categoryMap)
 
             console.log(availableProducts.length)
-            return availableProducts
+            return { products: availableProducts, productsInExcel }
         } catch (error) {
             console.log(error)
         }
     },
 
-    filterData(data, categoryMap, unique_product) {
+    filterData(data, categoryMap) {
 
+        const unique_product = []
+        const not_unique_product = []
+
+        // console.log(data)
         const newData = data
             // .filter(filterUnique)
             .filter(filterStock)
             .filter(filterPriceRange)
             .filter(filterCategories)
             .filter(filterImages)
+            .filter(filterEmptyEAN)
+        // .filter(filterRemoveDup)
 
         function filterUnique(unique) {
-            if (unique_product.mpn.includes(unique.part_number[0].trim().toString())) {
+            if (unique_product.includes(unique.mpn[0].trim().toString())) {
+                not_unique_product.push(unique.mpn[0].trim().toString())
                 return false
             }
             else {
-                unique_product.mpn.push(unique.part_number[0].trim().toString())
-                return true 
+                unique_product.push(unique.mpn[0].trim().toString())
+                return true
+            }
+        }
+
+        function filterRemoveDup(unique) {
+            if (not_unique_product.includes(unique.mpn[0].trim().toString())) {
+                return false
+            }
+            else {
+                return true
+            }
+        }
+
+        function filterEmptyEAN(product) {
+
+            if (product.BARCODE[0]) {
+                return true
             }
         }
 
         function filterStock(stockName) {
-            // console.log(categoryMap.stock_map[0])
             if (categoryMap.stock_map.length > 0) {
-                // let catIndex = categoryMap.stock_map[0].findIndex(x => x.name.trim() === stockName.stock[0].trim())
-                if (parseInt(categoryMap.stock_map[0].name) <= parseInt(stockName.stock[0])) {
+                let catIndex = categoryMap.stock_map.findIndex(x => stockName.AVAILABILITY[0].trim() === x.name.trim())
+                if (catIndex !== -1) {
                     return true
                 }
                 else {
@@ -83,9 +125,10 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterCategories(cat) {
-            let category = cat.category[0].trim()
-            let subcategory = null
-            let sub2category = null
+            let categories = cat.CATEGORY[0].split(">")
+            let category = categories[0] ? categories[0].trim() : null
+            let subcategory = categories[1] ? categories[1].trim() : null
+            let sub2category = categories[2] ? categories[2].trim() : null
 
             if (categoryMap.isWhitelistSelected) {
                 if (categoryMap.whitelist_map.length > 0) {
@@ -164,9 +207,9 @@ module.exports = ({ strapi }) => ({
                 maxPrice = 100000;
             }
 
-            const productPrice = parseFloat(priceRange.price[0].replace(".", "").replace(",", "."))
+            const productPrice = parseFloat(priceRange.WHOLESALE_PRICE[0].replace(".", "").replace(",", "."))
 
-            if (productPrice >= minPrice && productPrice <= maxPrice) {
+            if (productPrice !== parseFloat(0) && productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
             }
             else {
@@ -175,8 +218,8 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterImages(image) {
-            if (image.images[0].image && image.images[0].image.length > 0) {
-                return true 
+            if (image.IMAGE[0]) {
+                return true
             }
             else {
                 return false

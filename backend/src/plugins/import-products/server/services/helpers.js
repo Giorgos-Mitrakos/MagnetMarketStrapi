@@ -479,6 +479,12 @@ module.exports = ({ strapi }) => ({
                     .service('telehermesHelper')
                     .getTelehermesData(entry, categoryMap)
             }
+            else if (entry.name.toLowerCase() === "smart4all") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('smart4allHelper')
+                    .getSmart4AllData(entry, categoryMap)
+            }
             // console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
@@ -815,7 +821,7 @@ module.exports = ({ strapi }) => ({
         if (cat) {
             let sub = cat.subcategory.find(x => x.name.trim().toLowerCase() === sub_category.toLowerCase().trim())
             if (sub) {
-                let sub2 = sub.subcategory.find(x => x.name.trim().toLowerCase() === sub_category2.toLowerCase().trim())
+                let sub2 = sub.subcategory.find(x => x.name.trim().toLowerCase() === sub_category2?.toLowerCase().trim())
                 if (sub2) {
                     if (sub2.contains.length > 0) {
                         for (let word of sub2.contains) {

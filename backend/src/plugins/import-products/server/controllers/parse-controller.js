@@ -30,7 +30,7 @@ module.exports = {
     else if (ctx.request.body.entry.name.toLowerCase() === 'dotmedia') {
       ctx.body = await strapi
         .plugin('import-products')
-        .service('parseService')
+        .service('parseService') 
         .parseDotMediaOnlyXml(ctx.request.body);
     }
     else if (ctx.request.body.entry.name.toLowerCase() === 'telehermes') {
@@ -39,31 +39,37 @@ module.exports = {
         .service('parseService')
         .parseTelehermesXml(ctx.request.body);
     }
-    else if (ctx.request.body.entry.name === 'Westnet') {
+    else if (ctx.request.body.entry.name.toLowerCase() === 'westnet') {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')
         .parseWestnetXml(ctx.request.body);
     }
-    else if (ctx.request.body.entry.name === 'Gerasis') {
+    else if (ctx.request.body.entry.name.toLowerCase() === 'gerasis') {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')
         .parseGerasisXml(ctx.request.body);
     }
-    else if (ctx.request.body.entry.name === 'Novatron') {
+    else if (ctx.request.body.entry.name.toLowerCase() === 'novatron') {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')
         .parseNovatronXml(ctx.request.body);
     }
-    else if (ctx.request.body.entry.name === 'QUEST') {
+    else if (ctx.request.body.entry.name.toLowerCase() === 'quest') {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')
         .parseQuestXml(ctx.request.body);
     }
-    else if (ctx.request.body.entry.name === 'Damkalidis') {
+    else if (ctx.request.body.entry.name.toLowerCase() === 'smart4all') {
+      ctx.body = await strapi
+        .plugin('import-products')
+        .service('parseService')
+        .parseSmart4AllXml(ctx.request.body);
+    }
+    else if (ctx.request.body.entry.name.toLowerCase() === 'damkalidis') {
       ctx.body = await strapi
         .plugin('import-products')
         .service('parseService')

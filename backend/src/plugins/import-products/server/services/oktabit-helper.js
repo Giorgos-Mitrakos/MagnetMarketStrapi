@@ -247,7 +247,7 @@ module.exports = ({ strapi }) => ({
                 maxPrice = 100000;
             }
 
-            const productPrice = priceRange.timi[0].replace(",", ".")
+            const productPrice = parseFloat(priceRange.timi[0].replace(".", "").replace(",", "."))
 
             if (productPrice >= minPrice && productPrice <= maxPrice) {
                 return true

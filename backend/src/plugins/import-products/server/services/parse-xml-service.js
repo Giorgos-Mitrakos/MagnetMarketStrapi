@@ -747,37 +747,38 @@ module.exports = ({ strapi }) => ({
                     }
                 }
 
+                if (!product.weight) {
+                    let diminsionChar = chars.find(x => x.name.includes("Dimensions"))
 
-                let diminsionChar = chars.find(x => x.name.includes("Dimensions"))
+                    if (diminsionChar && diminsionChar.value.trim() !== "") {
 
-                if (diminsionChar && diminsionChar.value.trim() !== "") {
+                        if (diminsionChar.value.includes("mm")) {
+                            let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
+                            if (result.length < 3) { continue }
+                            let length = parseFloat(result[0].replace(",", ".").trim())
+                            product.length = parseInt(length)
+                            let width = parseFloat(result[1].replace(",", ".").trim())
+                            product.width = parseInt(width)
+                            let height = parseFloat(result[2].replace(",", ".").trim())
+                            product.height = parseInt(height)
+                        }
+                        else {
+                            let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
+                            let length = parseFloat(result[0].replace(",", ".").trim()) * 10
+                            product.length = parseInt(length)
+                            let width = parseFloat(result[1].replace(",", ".").trim()) * 10
+                            product.width = parseInt(width)
+                            let height = parseFloat(result[2].replace(",", ".").trim()) * 10
+                            product.height = parseInt(height)
+                        }
 
-                    if (diminsionChar.value.includes("mm")) {
-                        let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
-                        if (result.length < 3) { continue }
-                        let length = parseFloat(result[0].replace(",", ".").trim())
-                        product.length = parseInt(length)
-                        let width = parseFloat(result[1].replace(",", ".").trim())
-                        product.width = parseInt(width)
-                        let height = parseFloat(result[2].replace(",", ".").trim())
-                        product.height = parseInt(height)
+                        // let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
+                        // let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
+
+                        // let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
+
+
                     }
-                    else {
-                        let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
-                        let length = parseFloat(result[0].replace(",", ".").trim()) * 10
-                        product.length = parseInt(length)
-                        let width = parseFloat(result[1].replace(",", ".").trim()) * 10
-                        product.width = parseInt(width)
-                        let height = parseFloat(result[2].replace(",", ".").trim()) * 10
-                        product.height = parseInt(height)
-                    }
-
-                    // let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
-                    // let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
-
-                    // let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
-
-
                 }
 
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
@@ -1481,6 +1482,144 @@ module.exports = ({ strapi }) => ({
                     imagesSrc: [{ url: dt.image[0] }],
                     brand: { id: await brandId },
                     retail_price: parseFloat(dt.retail_price[0]).toFixed(2),
+                    related_import: entry.id,
+                    // supplierInfo: [{
+                    //     name: entry.name,
+                    //     in_stock: true,
+                    //     wholesale: dt.price,
+                    //     recycle_tax: dt.recycleTax,
+                    //     supplierProductId: dt.supplierCode,
+                    //     supplierProductURL: productUrl,
+                    //     retail_price: dt.suggestedPrice,
+                    //     price_progress: [{
+                    //         date: new Date(),
+                    //         wholesale: dt.price,
+                    //     }]
+                    // }],
+                    prod_chars: parsedChars
+                }
+
+                // αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+                if (!entryCheck) {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .createEntry(product, importRef, auth);
+
+                    } catch (error) {
+                        console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                    }
+                }
+                else {
+                    try {
+                        await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .updateEntry(entryCheck, product, importRef);
+                    } catch (error) {
+                        console.log(error)
+                    }
+                }
+            }
+
+            await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .deleteEntry(entry, importRef);
+
+            console.log("End of Import")
+            return { "message": "ok" }
+        }
+        catch (err) {
+            console.log(err)
+            return { "message": "Error" }
+        }
+    },
+
+    async parseSmart4AllXml({ entry, auth }) {
+        try {
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            const { products, productsInExcel } = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .getData(entry, importRef.categoryMap);
+
+            // console.log("products:", productsInExcel)
+            const { categories_map, char_name_map, char_value_map, stock_map,
+                isWhitelistSelected, whitelist_map, blacklist_map,
+                xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+            const { mapCharNames, mapCharValues } = importRef.charMaps
+
+            for (let dt of products) {
+                let productInExcel = productsInExcel.find(x => {
+                    // console.log(x.EAN, "   ", dt.BARCODE[0], Number(x.EAN) === Number(dt.BARCODE[0]))
+                    return Number(x.EAN) === Number(dt.BARCODE[0])
+                })
+                if (!productInExcel)
+                    continue
+
+                let mpn = productInExcel.PN.trim().toString()
+                let name = productInExcel["Περιγραφή"].trim()
+                let barcode = dt.BARCODE ? dt.BARCODE[0].trim() : null
+                let brand_name = dt.MANUFACTURER[0].trim()
+
+                const { entryCheck, brandId } = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                // //Κατασκευάζω το URL του προϊόντος του προμηθευτή
+                // // let productUrl = `https://www.mywestnet.com/el${dt.url[0]}`
+
+                let typeOfPhone = ''
+                const chars = []
+
+                if (dt.FEATURES && dt.FEATURES[0].FEATURE) {
+                    for (let productChar of dt.FEATURES[0].FEATURE) {
+                        if (dt.CATEGORY[0].trim() === 'Τηλεφωνία > Phones') {
+                            if (productChar.FEATURE_NAME[0].trim() === 'Τύπος Συσκευής'
+                                && productChar.FEATURE_VALUE[0].trim() === 'Feature Phone / Bar') {
+                                typeOfPhone = "Κινητό"
+                            }
+                        }
+                        const char = {}
+                        char.name = productChar.FEATURE_NAME[0]
+                        char.value = productChar.FEATURE_VALUE[0]
+                        chars.push(char)
+                    }
+                }
+
+                const parsedChars = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .parseChars(chars, mapCharNames, mapCharValues)
+
+                let categories = dt.CATEGORY[0].split(">")
+                let category = categories[0] ? categories[0].trim() : null
+                let subcategory = categories[1] ? categories[1].trim() : null
+                let sub2category = typeOfPhone !== "" ? typeOfPhone : (categories[2] ? categories[2].trim() : null)
+
+                const product = {
+                    entry,
+                    name,
+                    supplierCode: dt.ID[0],
+                    description: dt.DESCRIPTION[0],
+                    short_description: dt.SHORT_DESCRIPTION[0],
+                    category: { title: category },
+                    subcategory: { title: subcategory },
+                    sub2category: { title: sub2category },
+                    mpn,
+                    barcode,
+                    wholesale: parseFloat(dt.WHOLESALE_PRICE[0]).toFixed(2),
+                    imagesSrc: [{ url: dt.IMAGE[0] }],
+                    brand: { id: await brandId },
                     related_import: entry.id,
                     // supplierInfo: [{
                     //     name: entry.name,

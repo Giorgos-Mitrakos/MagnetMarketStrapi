@@ -79,7 +79,8 @@ module.exports = ({ strapi }) => ({
         function filterEmptyMpn(product) {
 
             if (product.mpn[0].trim() !== "") {
-                return true }
+                return true
+            }
 
         }
 
@@ -181,9 +182,9 @@ module.exports = ({ strapi }) => ({
                 maxPrice = 100000;
             }
 
-            const productPrice = priceRange.wholesale_price[0].replace(".", "").replace(",", ".")
+            const productPrice = parseFloat(priceRange.wholesale_price[0].replace(".", "").replace(",", "."))
 
-            if (parseFloat(productPrice) !== parseFloat(0) && productPrice >= minPrice && productPrice <= maxPrice) {
+            if (productPrice !== parseFloat(0) && productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
             }
             else {
