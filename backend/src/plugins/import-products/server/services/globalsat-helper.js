@@ -190,75 +190,84 @@ module.exports = ({ strapi }) => ({
 
     async scrapGlobalsatCategory(page, category, subCategory, sub2Category, importRef, entry, auth) {
         try {
-            await strapi
+
+            const navigationParams = sub2Category.link === "https://b2b.globalsat.gr/kiniti-tilefonia/a_axesouar-prostasias/b_thikes-gia-smartphones/" ?
+                { waitUntil: "networkidle0", timeout: 0 } :
+                { waitUntil: "networkidle0" }
+
+            let status = await strapi
                 .plugin('import-products')
                 .service('helpers')
                 .retry(
-                    () => page.goto(`${sub2Category.link}?wbavlb=Διαθέσιμο&sz=3`, { waitUntil: "networkidle0" }),
+                    () => page.goto(`${sub2Category.link}?wbavlb=Διαθέσιμο&sz=3`, navigationParams),
                     10 // retry this 5 times
                 );
 
-            const listContainer = await page.$('div.list_container');
+            status = status.status();
+            
+            if (status !== 404) {
+                const listContainer = await page.$('div.list_container');
 
-            // const productLinksList = []
+                // const productLinksList = []
 
-            const productList = await listContainer.evaluate(() => {
-                const productsList = document.querySelectorAll(".product_box")
+                const productList = await listContainer.evaluate(() => {
+                    const productsList = document.querySelectorAll(".product_box")
 
-                let products = []
-                for (let prod of productsList) {
-                    const product = {}
+                    let products = []
+                    for (let prod of productsList) {
+                        const product = {}
 
-                    const productInfoWrapper = prod.querySelector('.product_info');
-                    const productTitleAnchor = productInfoWrapper.querySelector('h2 a');
-                    product.link = productTitleAnchor.getAttribute('href');
-                    product.name = productTitleAnchor.textContent.trim();
-                    product.supplierCode = productInfoWrapper.querySelector('.product_code span').textContent.trim();
+                        const productInfoWrapper = prod.querySelector('.product_info');
+                        const productTitleAnchor = productInfoWrapper.querySelector('h2 a');
+                        product.link = productTitleAnchor.getAttribute('href');
+                        product.name = productTitleAnchor.textContent.trim();
+                        product.supplierCode = productInfoWrapper.querySelector('.product_code span').textContent.trim();
 
-                    const productPriceWrapper = productInfoWrapper.querySelector('.price_row');
-                    const productPriceItems = productPriceWrapper.querySelectorAll('.price-item');
+                        const productPriceWrapper = productInfoWrapper.querySelector('.price_row');
+                        const productPriceItems = productPriceWrapper.querySelectorAll('.price-item');
 
-                    for (let item of productPriceItems) {
-                        const txtPrice = item.querySelector('.txt').textContent.trim()
-                        if (txtPrice === 'Τλ:') {
-                            product.initial_retail_price = item.querySelector('.initial_price')?.textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
+                        for (let item of productPriceItems) {
+                            const txtPrice = item.querySelector('.txt').textContent.trim()
+                            if (txtPrice === 'Τλ:') {
+                                product.initial_retail_price = item.querySelector('.initial_price')?.textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
 
-                            const sale_prices = item.querySelectorAll('.price')
-                            if (sale_prices.length === 1) {
-                                product.retail_price = item.querySelector('.price').textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
+                                const sale_prices = item.querySelectorAll('.price')
+                                if (sale_prices.length === 1) {
+                                    product.retail_price = item.querySelector('.price').textContent.replace('€', '').replace('.', '').replace(',', '.').trim()
+                                }
+                                else {
+                                    product.retail_price = sale_prices[1].textContent.replace('€', '').replace('.', '').replace(',', '.').trim();
+                                }
                             }
                             else {
-                                product.retail_price = sale_prices[1].textContent.replace('€', '').replace('.', '').replace(',', '.').trim();
+                                product.wholesale = item.querySelector('.price').textContent.replace('€', '').replace(".", "").replace(',', '.').trim()
                             }
                         }
-                        else {
-                            product.wholesale = item.querySelector('.price').textContent.replace('€', '').replace(".", "").replace(',', '.').trim()
-                        }
+
+                        const productAvailability = prod.querySelector('.tag_line span').textContent.trim();
+                        product.stockLevel = productAvailability
+
+                        products.push(product)
                     }
+                    return products
+                })
 
-                    const productAvailability = prod.querySelector('.tag_line span').textContent.trim();
-                    product.stockLevel = productAvailability
+                // console.log("Products in GLobalsat Site:", productList)
 
-                    products.push(product)
-                }
-                return products
-            })
-
-            // console.log("Products in GLobalsat Site:", productList)
-
-            const products = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .updateAndFilterScrapProducts(productList, category.title, subCategory.title, sub2Category.title, importRef, entry)
-
-            // console.log("Products after Filtering:", products.length) 
-
-            for (let product of products) {
-                await page.waitForTimeout(strapi
+                const products = await strapi
                     .plugin('import-products')
                     .service('helpers')
-                    .randomWait(5000, 10000))
-                await this.scrapGlobalsatProduct(page, category, subCategory, sub2Category, product.link, importRef, entry, auth)
+                    .updateAndFilterScrapProducts(productList, category.title, subCategory.title, sub2Category.title, importRef, entry)
+
+                // console.log("Products after Filtering:", products.length) 
+
+                for (let product of products) {
+                    await page.waitForTimeout(strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .randomWait(5000, 10000))
+                    await this.scrapGlobalsatProduct(page, category, subCategory, sub2Category, product.link, importRef, entry, auth)
+                }
             }
 
         } catch (error) {
@@ -277,7 +286,7 @@ module.exports = ({ strapi }) => ({
                 );
 
             const productPage = await page.$('section.product_page');
- 
+
             const scrapProduct = await productPage.evaluate(() => {
 
                 const product = {}

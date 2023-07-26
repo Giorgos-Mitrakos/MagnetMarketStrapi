@@ -23,9 +23,9 @@ module.exports = ({ strapi }) => ({
                 .xPathFilter(await data, entry);
 
             const xml = await strapi
-            .plugin('import-products')
-            .service('helpers')
-            .parseXml(xPathFilter)
+                .plugin('import-products')
+                .service('helpers')
+                .parseXml(xPathFilter)
 
             // return await xml;
 
@@ -36,7 +36,6 @@ module.exports = ({ strapi }) => ({
             // Φιλτράρω τα προϊόντα
             const availableProducts = this.filterData(xml.products.product, categoryMap)
 
-
             console.log("Προϊόντα μετά το φιλτράρισμα:", availableProducts.length)
 
             return availableProducts
@@ -45,10 +44,10 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    filterData(data, categoryMap) { 
+    filterData(data, categoryMap) {
 
         const newData = data
-            .filter(filterStock) 
+            .filter(filterStock)
             .filter(filterPriceRange)
             .filter(filterCategories)
             .filter(filterImages)
@@ -77,7 +76,7 @@ module.exports = ({ strapi }) => ({
                         if (categoryMap.whitelist_map[catIndex].subcategory.length > 0) {
                             let subIndex = categoryMap.whitelist_map[catIndex].subcategory.findIndex(x => x.name.trim() === cat.subcategory[0].trim())
                             if (subIndex !== -1) {
-                                true
+                                return true
                             }
                             else {
                                 return false
@@ -122,15 +121,16 @@ module.exports = ({ strapi }) => ({
 
             let minPrice = categoryMap.minimumPrice ? parseFloat(categoryMap.minimumPrice) : 0;
             let maxPrice;
-            if (categoryMap.maximumPrice && categoryMap.maximumPrice > 0) {
+            if (categoryMap.maximumPrice && parseFloat(categoryMap.maximumPrice) > 0) {
                 maxPrice = parseFloat(categoryMap.maximumPrice);
             }
             else {
                 maxPrice = 100000;
             }
 
-            const productPrice = parseFloat(priceRange.price[0].replace(".", "").replace(",", "."))
+            const productPrice = parseFloat(priceRange.price[0].replace(",", "."))
 
+            console.log("productPrice:", productPrice, "minPrice:", minPrice, "maxPrice:", maxPrice, productPrice >= minPrice && productPrice <= maxPrice)
             if (productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
             }
@@ -140,8 +140,8 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterImages(image) {
-            if (image.image && image.image!=="") {
-                return true 
+            if (image.image && image.image !== "") {
+                return true
             }
             else {
                 return false

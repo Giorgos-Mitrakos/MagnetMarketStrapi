@@ -23,7 +23,16 @@ module.exports = ({ strapi }) => ({
                 populate: {
                     export_categories: {
                         populate: {
-                            cat_percentage: true,
+                            cat_percentage: {
+                                populate: {
+                                    brand_perc:
+                                    {
+                                        populate: {
+                                            brand: true
+                                        }
+                                    }
+                                }
+                            },
                             products: {
                                 where: {
                                     $not: {
@@ -311,62 +320,66 @@ module.exports = ({ strapi }) => ({
 
     createPrice(supplierInfo, platform, product, categoryInfo) {
         try {
-            let productPlatformPrice = { price: product.price }
+
+            // let productPlatformPrice = { price: product.price }            
             if (product.platform) {
                 let productPlatform = product.platform.find(x => x.platform.toLowerCase().trim() === platform.name.toLowerCase().trim())
                 if (productPlatform && productPlatform.price) {
-                    productPlatformPrice.price = productPlatform.price
-                }
-            }
+                    return productPlatform.price
+                } 
+            } 
+            return product.price
 
-            if (product.inventory && product.inventory > 0) {
-                return productPlatformPrice.price
-            }
+            // if (product.inventory && product.inventory > 0) {
+            //     return productPlatformPrice.price
+            // }
 
-            const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
-            const taxRate = process.env.GENERAL_TAX_RATE
-            let addToPrice = Number(process.env.GENERAL_SHIPPING_PRICE)
+            // const generalCategoryPercentage = process.env.GENERAL_CATEGORY_PERCENTAGE
+            // const taxRate = process.env.GENERAL_TAX_RATE
+            // let addToPrice = Number(process.env.GENERAL_SHIPPING_PRICE)
 
-            let generalPercentage = ''
-            if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
+            // let generalPercentage = ''
+            // if (categoryInfo.cat_percentage && categoryInfo.cat_percentage.length > 0) {
 
-                let findPercentage = categoryInfo.cat_percentage.find(x => x.name?.toLowerCase() === platform.name.toLowerCase())
+            //     let findPercentage = categoryInfo.cat_percentage.find(x => x.name?.toLowerCase() === platform.name.toLowerCase())
 
-                if (!findPercentage) {
-                    findPercentage = categoryInfo.cat_percentage.find(x => x.name.toLowerCase() === "general")
-                }
+            //     if (!findPercentage) {
+            //         findPercentage = categoryInfo.cat_percentage.find(x => x.name.toLowerCase() === "general")
+            //     }
 
-                if (findPercentage) {
-                    addToPrice = findPercentage.add_to_price ? findPercentage.add_to_price : 0;
-                    if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
-                        let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === brandId)
-                        if (findBrandPercentage) {
-                            generalPercentage = findBrandPercentage.percentage
-                        }
-                        else {
-                            generalPercentage = findPercentage.percentage
-                        }
-                    }
-                    else {
-                        generalPercentage = findPercentage.percentage
-                    }
-                }
-                else {
-                    generalPercentage = generalCategoryPercentage
-                }
-            }
-            else {
-                generalPercentage = generalCategoryPercentage
-            }
+            //     if (findPercentage) { 
+            //         addToPrice = findPercentage.add_to_price ? findPercentage.add_to_price : 0;
+            //         if (findPercentage.brand_perc && findPercentage.brand_perc.length > 0) {
 
-            let minPrice = (parseFloat(supplierInfo.wholesale) + parseFloat(addToPrice) + parseFloat(supplierInfo.shipping)) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
+            //             let findBrandPercentage = findPercentage.brand_perc.find(x => x.brand.id === product.brand.id)
+            //             if (findBrandPercentage) {
 
-            if (minPrice > productPlatformPrice.price) {
-                return minPrice.toFixed(2)
-            }
-            else {
-                return productPlatformPrice.price
-            }
+            //                 generalPercentage = findBrandPercentage.percentage
+            //             }
+            //             else {
+            //                 generalPercentage = findPercentage.percentage
+            //             }
+            //         }
+            //         else {
+            //             generalPercentage = findPercentage.percentage
+            //         }
+            //     }
+            //     else {
+            //         generalPercentage = generalCategoryPercentage
+            //     }
+            // }
+            // else {
+            //     generalPercentage = generalCategoryPercentage
+            // }
+
+            // let minPrice = (parseFloat(supplierInfo.wholesale) + parseFloat(addToPrice) + parseFloat(supplierInfo.shipping)) * (taxRate / 100 + 1) * (generalPercentage / 100 + 1)
+
+            // if (minPrice > productPlatformPrice.price) {
+            //     return minPrice.toFixed(2)
+            // }
+            // else {
+            //     return productPlatformPrice.price
+            // }
 
         } catch (error) {
             console.log(error)

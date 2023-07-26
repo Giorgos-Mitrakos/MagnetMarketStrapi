@@ -288,7 +288,7 @@ module.exports = {
                 .service('xmlService')
                 .createXml('Skroutz');
         },
-        options: { 
+        options: {
             rule: "0 * * * *",
         },
     },
@@ -306,19 +306,4 @@ module.exports = {
             rule: "58 * * * *",
         },
     },
-
-    // createShopflixExcel: {
-    //     task: async ({ strapi }) => {
-    //         // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
-
-    //         await strapi
-    //             .plugin('export-platforms-xml')
-    //             .service('xmlService')
-    //             .createExcel();
-    //     },
-    //     options: {
-    //         rule: "15 * * * *",
-    //     },
-    // },
-
 }; 

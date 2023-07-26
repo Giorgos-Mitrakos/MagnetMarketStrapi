@@ -1513,7 +1513,7 @@ module.exports = ({ strapi }) => ({
 
                     }
                 }
-                else if (minSupplierPrice.name.toLowerCase() === "telehermes"){
+                else if (minSupplierPrice.name.toLowerCase() === "telehermes") {
                     let retail_price = parseFloat(minSupplierPrice.retail_price)
 
                     if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
@@ -1989,7 +1989,7 @@ module.exports = ({ strapi }) => ({
                         }
                     }
                 }
-                else if (minSupplierPrice.name.toLowerCase() === "telehermes"){
+                else if (minSupplierPrice.name.toLowerCase() === "telehermes") {
                     if (parseFloat(product.retail_price) > parseFloat(minPrices.general)) {
                         prices.generalPrice = {
                             price: prices.generalPrice = parseFloat(product.retail_price).toFixed(2),
@@ -2855,14 +2855,13 @@ module.exports = ({ strapi }) => ({
                     }
                 }
                 else {
-                    data.weight = parseInt(categoryInfo.average_weight ? categoryInfo.average_weight : 0)
+                    data.weight = categoryInfo.average_weight ? parseInt(categoryInfo.average_weight) : parseInt(0)
                     dbChange = 'updated'
                 }
             }
             else {
                 if (product.weight && product.weight > 0) {
-                    if (parseInt(entryCheck.weight) === parseInt(categoryInfo.average_weight)
-                        && parseInt(entryCheck.weight) !== parseInt(product.weight)) {
+                    if (parseInt(entryCheck.weight) !== parseInt(product.weight)) {
                         data.weight = parseInt(product.weight)
                         dbChange = 'updated'
                     }

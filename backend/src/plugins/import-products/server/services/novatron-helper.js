@@ -271,7 +271,13 @@ module.exports = ({ strapi }) => ({
                     product.in_offer = false
                 }
                 product.name = productDetailsSection.querySelector("h1.product-title").textContent.trim();
-                product.brand_name = product.name.split("-")[0].trim()
+                if(product.name.startsWith('TP-LINK')){
+                    product.brand_name='TP-LINK'
+                }
+                else
+                {
+                    product.brand_name = product.name.split("-")[0].trim()
+                }                
                 product.short_description = productDetailsSection.querySelector("p.mini-description").textContent.trim();
                 const productPriceWrapper = productDetailsSection.querySelector("div.product-price");
                 product.wholesale = productPriceWrapper.querySelector("span").textContent.replace('€', '').replace(',', '.').trim();
