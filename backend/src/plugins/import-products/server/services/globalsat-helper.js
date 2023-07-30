@@ -113,8 +113,17 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .filterCategories(categories, isWhitelistSelected, whitelist_map, blacklist_map)
 
-            // console.dir('newCategories:', newCategories)
-            // console.dir(newCategories)
+
+            const brandEntries = await strapi.entityService.findMany('api::brand.brand', {
+                fields: ['name'],
+            });
+
+            let sortedBrandArray = brandEntries.sort(function (a, b) {
+                // ASC  -> a.length - b.length
+                // DESC -> b.length - a.length
+                return b.name.length - a.name.length;
+            });
+
             for (let category of newCategories) {
                 // console.dir(category.subCategories)
                 for (let subCategory of category.subCategories) {
@@ -123,7 +132,7 @@ module.exports = ({ strapi }) => ({
                             .plugin('import-products')
                             .service('helpers')
                             .randomWait(5000, 10000))
-                        await this.scrapGlobalsatCategory(page, category, subCategory, sub2Category, importRef, entry, auth)
+                        await this.scrapGlobalsatCategory(page, category, subCategory, sub2Category, sortedBrandArray, importRef, entry, auth)
                     }
                 }
             }
@@ -188,7 +197,7 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapGlobalsatCategory(page, category, subCategory, sub2Category, importRef, entry, auth) {
+    async scrapGlobalsatCategory(page, category, subCategory, sub2Category, sortedBrandArray, importRef, entry, auth) {
         try {
 
             const navigationParams = sub2Category.link === "https://b2b.globalsat.gr/kiniti-tilefonia/a_axesouar-prostasias/b_thikes-gia-smartphones/" ?
@@ -204,7 +213,7 @@ module.exports = ({ strapi }) => ({
                 );
 
             status = status.status();
-            
+
             if (status !== 404) {
                 const listContainer = await page.$('div.list_container');
 
@@ -252,7 +261,13 @@ module.exports = ({ strapi }) => ({
                     return products
                 })
 
-                // console.log("Products in GLobalsat Site:", productList)
+                productList.forEach(prod => {
+                    const brandFound = sortedBrandArray.find(x => prod.name?.toLowerCase().startsWith(x.name.toLowerCase()))
+                    
+                    if (brandFound) {
+                        prod.brand = brandFound.name
+                    }
+                })
 
                 const products = await strapi
                     .plugin('import-products')

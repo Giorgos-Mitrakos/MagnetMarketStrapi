@@ -191,7 +191,7 @@ module.exports = ({ strapi }) => ({
                             }
                         }
 
-                        const brandID = await this.brandIdCheck(null, product.name)
+                        const brandID = await this.brandIdCheck(product.brand, product.name)
 
                         if (brandID) {
                             product.brand = {
