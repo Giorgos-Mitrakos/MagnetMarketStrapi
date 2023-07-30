@@ -191,9 +191,11 @@ module.exports = ({ strapi }) => ({
                             }
                         }
 
-                        if (checkIfEntry.brand) {
+                        const brandID = await this.brandIdCheck(null, product.name)
+
+                        if (brandID) {
                             product.brand = {
-                                id: checkIfEntry.brand.id
+                                id: brandID
                             }
                         }
                         await this.updateEntry(checkIfEntry, product, importRef)
@@ -594,7 +596,7 @@ module.exports = ({ strapi }) => ({
 
             return brandId;
         } catch (error) {
-            console.log(error)
+            console.log(brand, error, error.details.errors)
         }
     },
 
@@ -2840,6 +2842,22 @@ module.exports = ({ strapi }) => ({
                 data.model = product.model
                 dbChange = 'updated'
             }
+
+            //Εδώ να κάνω έλεγχο Κατασκευαστή
+            if (product.brand) {
+                if (entryCheck.brand) {
+                    if (entryCheck.brand.id !== product.brand.id) {
+                        data.brand = product.brand.id
+                        dbChange = 'updated'
+                    }
+                }
+                else {
+                    data.brand = product.brand.id
+                    dbChange = 'updated'
+                }
+                
+            }
+
 
             if (!entryCheck.weight) {
                 if (entryCheck.weight === 0) {

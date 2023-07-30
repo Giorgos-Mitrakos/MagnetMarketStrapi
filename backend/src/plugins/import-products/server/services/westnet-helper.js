@@ -130,7 +130,6 @@ module.exports = ({ strapi }) => ({
 
             const productPrice = parseFloat(priceRange.price[0].replace(",", "."))
 
-            console.log("productPrice:", productPrice, "minPrice:", minPrice, "maxPrice:", maxPrice, productPrice >= minPrice && productPrice <= maxPrice)
             if (productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
             }

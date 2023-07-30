@@ -747,42 +747,41 @@ module.exports = ({ strapi }) => ({
                     }
                 }
 
-                if (!product.weight) {
-                    let diminsionChar = chars.find(x => x.name.includes("Dimensions"))
 
-                    if (diminsionChar && diminsionChar.value.trim() !== "") {
+                let diminsionChar = chars.find(x => x.name.includes("Dimensions"))
 
-                        if (diminsionChar.value.includes("mm")) {
-                            let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
-                            if (result.length < 3) { continue }
-                            let length = parseFloat(result[0].replace(",", ".").trim())
-                            product.length = parseInt(length)
-                            let width = parseFloat(result[1].replace(",", ".").trim())
-                            product.width = parseInt(width)
-                            let height = parseFloat(result[2].replace(",", ".").trim())
-                            product.height = parseInt(height)
-                        }
-                        else {
-                            let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
-                            let length = parseFloat(result[0].replace(",", ".").trim()) * 10
-                            product.length = parseInt(length)
-                            let width = parseFloat(result[1].replace(",", ".").trim()) * 10
-                            product.width = parseInt(width)
-                            let height = parseFloat(result[2].replace(",", ".").trim()) * 10
-                            product.height = parseInt(height)
-                        }
+                if (diminsionChar && diminsionChar.value.trim() !== "") {
 
-                        // let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
-                        // let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
-
-                        // let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
-
-
+                    if (diminsionChar.value.includes("mm")) {
+                        let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
+                        if (!result || result.length < 3) { continue }
+                        let length = parseFloat(result[0].replace(",", ".").trim())
+                        product.length = parseInt(length)
+                        let width = parseFloat(result[1].replace(",", ".").trim())
+                        product.width = parseInt(width)
+                        let height = parseFloat(result[2].replace(",", ".").trim())
+                        product.height = parseInt(height)
+                    } 
+                    else {
+                        let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
+                        if (!result || result.length < 3) { continue }
+                        let length = parseFloat(result[0].replace(",", ".").trim()) * 10
+                        product.length = parseInt(length)
+                        let width = parseFloat(result[1].replace(",", ".").trim()) * 10
+                        product.width = parseInt(width)
+                        let height = parseFloat(result[2].replace(",", ".").trim()) * 10
+                        product.height = parseInt(height)
                     }
+
+                    // let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
+                    // let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
+
+                    // let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
+
+
                 }
 
                 //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
-
 
                 if (!entryCheck) {
                     try {
@@ -805,7 +804,7 @@ module.exports = ({ strapi }) => ({
                         console.log(error)
                     }
                 }
-            }
+            } 
 
             await strapi
                 .plugin('import-products')

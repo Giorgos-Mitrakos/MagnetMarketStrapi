@@ -463,7 +463,7 @@ module.exports = ({ strapi }) => ({
             await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .importScrappedProduct(scrapProduct, importRef, entry, auth)
+                .importScrappedProduct(scrapProduct, importRef, auth)
 
         } catch (error) {
             console.error(error)
