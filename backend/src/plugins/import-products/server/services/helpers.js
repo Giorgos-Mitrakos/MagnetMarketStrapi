@@ -3069,7 +3069,7 @@ module.exports = ({ strapi }) => ({
         try {
             let weight = 0
             if (product.length && product.width && product.height) {
-                let calcWweight = parseInt(product.length) * parseInt(product.width) * parseInt(product.height) / 5
+                let calcWweight = parseInt(product.length) * parseInt(product.width) * parseInt(product.height) / 5000
                 weight = parseInt(calcWweight)
             }
             else if (product.recycleTax) {

@@ -755,21 +755,21 @@ module.exports = ({ strapi }) => ({
                     if (diminsionChar.value.includes("mm")) {
                         let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
                         if (!result || result.length < 3) { continue }
-                        let length = parseFloat(result[0].replace(",", ".").trim())
+                        let length = parseFloat(result[0].replace(",", ".").trim())* 10
                         product.length = parseInt(length)
-                        let width = parseFloat(result[1].replace(",", ".").trim())
+                        let width = parseFloat(result[1].replace(",", ".").trim())* 10
                         product.width = parseInt(width)
-                        let height = parseFloat(result[2].replace(",", ".").trim())
+                        let height = parseFloat(result[2].replace(",", ".").trim())* 10
                         product.height = parseInt(height)
                     } 
                     else {
                         let result = diminsionChar.value.match(/\d+((\.|\,)\d+)?/gmi)
                         if (!result || result.length < 3) { continue }
-                        let length = parseFloat(result[0].replace(",", ".").trim()) * 10
+                        let length = parseFloat(result[0].replace(",", ".").trim()) 
                         product.length = parseInt(length)
-                        let width = parseFloat(result[1].replace(",", ".").trim()) * 10
+                        let width = parseFloat(result[1].replace(",", ".").trim())
                         product.width = parseInt(width)
-                        let height = parseFloat(result[2].replace(",", ".").trim()) * 10
+                        let height = parseFloat(result[2].replace(",", ".").trim())
                         product.height = parseInt(height)
                     }
 
