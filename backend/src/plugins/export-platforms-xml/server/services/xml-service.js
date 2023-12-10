@@ -35,9 +35,16 @@ module.exports = ({ strapi }) => ({
                             },
                             products: {
                                 where: {
-                                    $not: {
-                                        publishedAt: null
-                                    },
+                                    $or: [
+                                        {
+                                            $not: {
+                                                publishedAt: null
+                                            }
+                                        },
+                                        {
+                                            inventory: { $gte: 1 }
+                                        }
+                                    ]
                                 },
                                 populate: {
                                     image: true,
@@ -79,8 +86,31 @@ module.exports = ({ strapi }) => ({
             for (let category of entries.export_categories) {
                 let categoryPath = await this.createCategoryPath(category)
                 for (let product of category.products) {
+                    if(product.mpn==="BHR4215GL")
+                    continue
+
                     let { cheaperAvailability, availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
 
+                    if (!cheaperAvailability) {
+                        if (product.inventory && product.inventory !== 0) {
+                            if (!product.publishedAt) {
+                                await strapi.entityService.update('api::product.product', product.id, {
+                                    data: {
+                                        publishedAt: new Date()
+                                    },
+                                });
+                            }
+                        }
+                        else {
+                            await strapi.entityService.update('api::product.product', product.id, {
+                                data: {
+                                    deletedAt: new Date(),
+                                    publishedAt: null
+                                },
+                            });
+                            continue
+                        }
+                    }
                     if (!price) { continue }
                     let newEntry = {
                         uniqueID: product.id,
@@ -125,7 +155,30 @@ module.exports = ({ strapi }) => ({
             let finalEntries = []
             for (let category of entries.export_categories) {
                 for (let product of category.products) {
+                    if(product.mpn==="BHR4215GL")
+                    continue
+
                     let { cheaperAvailability, availability, price } = this.createAvailabilityAndPrice(product, suppliers, entries, category)
+                    if (!cheaperAvailability) {
+                        if (product.inventory && product.inventory !== 0) {
+                            if (!product.publishedAt) {
+                                await strapi.entityService.update('api::product.product', product.id, {
+                                    data: {
+                                        publishedAt: new Date()
+                                    },
+                                });
+                            }
+                        }
+                        else {
+                            await strapi.entityService.update('api::product.product', product.id, {
+                                data: {
+                                    deletedAt: new Date(),
+                                    publishedAt: null
+                                },
+                            });
+                            continue
+                        }
+                    }
                     if (!price) { continue }
                     let newEntry = {
                         SKU: product.id,
@@ -216,17 +269,21 @@ module.exports = ({ strapi }) => ({
 
             if (product.inventory && product.inventory > 0) {
                 if (platform.name.toLowerCase() === "skroutz") {
-                    availabilityAndPrice.availability = "Διαθέσιμο από 1-3 ημέρες"
+                    availabilityAndPrice.availability = "Άμεσα διαθέσιμο"
                 }
                 else {
                     availabilityAndPrice.availability = 0
-                }
+                } 
                 availabilityAndPrice.price = this.createPrice(null, platform, product, null)
 
                 return { availability: availabilityAndPrice.availability, price: availabilityAndPrice.price }
             }
             else {
                 let availableSuppliers = product.supplierInfo.filter(x => x.in_stock === true)
+
+                if (availableSuppliers.length === 0) {
+                    return { cheaperAvailability: null, availability: null, price: null }
+                }
 
                 availableSuppliers.forEach(x => {
                     const supplierAvailability = suppliers.find(supplier => supplier.name === x.name)
@@ -268,7 +325,7 @@ module.exports = ({ strapi }) => ({
         let availability = ""
 
         if (product.inventory && product.inventory > 0) {
-            if (platform.name.toLowerCase() === "skroutz") { availability = "Διαθέσιμο από 1-3 ημέρες" }
+            if (platform.name.toLowerCase() === "skroutz") { availability = "" }
             else {
                 availability = 0
             }
@@ -326,8 +383,8 @@ module.exports = ({ strapi }) => ({
                 let productPlatform = product.platform.find(x => x.platform.toLowerCase().trim() === platform.name.toLowerCase().trim())
                 if (productPlatform && productPlatform.price) {
                     return productPlatform.price
-                } 
-            } 
+                }
+            }
             return product.price
 
             // if (product.inventory && product.inventory > 0) {

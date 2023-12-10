@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@strapi/helper-plugin": "^4.9.1",
+    "@strapi/plugin-graphql": "^4.9.1",
     "@strapi/plugin-i18n": "^4.9.1",
     "@strapi/plugin-users-permissions": "^4.9.1",
     "@strapi/strapi": "^4.9.1",

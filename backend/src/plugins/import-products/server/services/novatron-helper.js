@@ -200,6 +200,9 @@ module.exports = ({ strapi }) => ({
                                     break;
                             }
 
+                            if(product.brand_name.toLowerCase().includes('dahua'))
+                            continue
+
                             products.push(product)
                         }
                         return products

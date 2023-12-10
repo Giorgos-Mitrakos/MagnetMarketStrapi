@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- *  footer controller
+ * footer controller
  */
 
 const { createCoreController } = require('@strapi/strapi').factories;

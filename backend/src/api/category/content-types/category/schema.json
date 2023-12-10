@@ -64,6 +64,12 @@
       "type": "decimal",
       "min": 0,
       "default": 0
+    },
+    "filters": {
+      "displayName": "Filters",
+      "type": "component",
+      "repeatable": true,
+      "component": "categories.filters"
     }
   }
 }

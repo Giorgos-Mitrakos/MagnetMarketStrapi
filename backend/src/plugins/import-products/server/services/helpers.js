@@ -198,7 +198,9 @@ module.exports = ({ strapi }) => ({
                                 id: brandID
                             }
                         }
-                        await this.updateEntry(checkIfEntry, product, importRef)
+
+                        if (checkIfEntry.brand && !checkIfEntry.brand.name.toLowerCase().includes("dahua"))
+                            await this.updateEntry(checkIfEntry, product, importRef)
                     }
                     else {
                         newProducts.push(product)
@@ -487,6 +489,12 @@ module.exports = ({ strapi }) => ({
                     .service('smart4allHelper')
                     .getSmart4AllData(entry, categoryMap)
             }
+            else if (entry.name.toLowerCase() === "cpi") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('cpiHelper')
+                    .getCpiData(entry, categoryMap)
+            }
             // console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
@@ -614,19 +622,22 @@ module.exports = ({ strapi }) => ({
                         {
                             $and: [
                                 { mpn: mpn },
-                                { mpn: { $notNull: true, } }
+                                { mpn: { $notNull: true, } },
+                                { barcode: { $null: true, } }
                             ]
                         },
                         {
                             $and: [
                                 { mpn: model },
-                                { mpn: { $notNull: true, } }
+                                { mpn: { $notNull: true, } },
+                                { barcode: { $null: true, } }
                             ]
                         },
                         {
                             $and: [
                                 { model: mpn },
-                                { mpn: { $notNull: true, } }
+                                { mpn: { $notNull: true, } },
+                                { barcode: { $null: true, } }
                             ]
                         },
                         {
@@ -638,7 +649,8 @@ module.exports = ({ strapi }) => ({
                         {
                             $and: [
                                 { name: name },
-                                { mpn: { $null: true, } }
+                                { mpn: { $null: true, } },
+                                { barcode: { $null: true, } }
                             ]
                         },
                     ]
@@ -1855,6 +1867,131 @@ module.exports = ({ strapi }) => ({
                         }
                     }
                 }
+                else if (minSupplierPrice.name.toLowerCase() === "novatron" && existedProduct.name.toLowerCase().includes("vigi")) {
+                    let retail_price = parseFloat(minSupplierPrice.retail_price)
+
+                    if (parseFloat(minPrices.general) > parseFloat(retail_price)) {
+                        if (existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                                isFixed: false
+                            }
+                        }
+                    }
+                    else {
+                        if (existedProduct.inventory > 0) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else if (parseFloat(existedProduct.price) > parseFloat(retail_price) && existedProduct.is_fixed_price) {
+                            prices.generalPrice = {
+                                price: parseFloat(existedProduct.price).toFixed(2),
+                                isFixed: existedProduct.is_fixed_price
+                            }
+                        }
+                        else {
+                            prices.generalPrice = {
+                                price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
+                                isFixed: existedProduct.inventory > 0 ? existedProduct.is_fixed_price : false
+                            }
+                        }
+                    }
+
+                    if (skroutz) {
+
+                        if (parseFloat(minPrices.skroutz) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(minPrices.skroutz).toFixed(2)
+                                skroutz.is_fixed_price = false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory > 0) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else if (parseFloat(skroutz.price) > parseFloat(retail_price) && skroutz.is_fixed_price) {
+                                prices.skroutzPrice = skroutz
+                            }
+                            else {
+                                skroutz.price = parseFloat(retail_price).toFixed(2)
+                                skroutz.is_fixed_price = existedProduct.inventory > 0 ? skroutz.is_fixed_price : false
+                                prices.skroutzPrice = skroutz
+                            }
+                        }
+
+                    }
+                    else {
+                        if (parseFloat(retail_price) > parseFloat(minPrices.skroutz)) {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(retail_price).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                        else {
+                            prices.skroutzPrice = {
+                                platform: "Skroutz",
+                                price: parseFloat(minPrices.skroutz).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                    }
+
+                    if (shopflix) {
+                        if (parseFloat(minPrices.shopflix) > parseFloat(retail_price)) {
+                            if (existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(minPrices.shopflix).toFixed(2)
+                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                        else {
+                            if (existedProduct.inventory > 0) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else if (parseFloat(shopflix.price) > parseFloat(retail_price) && shopflix.is_fixed_price) {
+                                prices.shopflixPrice = shopflix
+                            }
+                            else {
+                                shopflix.price = parseFloat(retail_price).toFixed(2)
+                                shopflix.is_fixed_price = existedProduct.inventory > 0 ? shopflix.is_fixed_price : false
+                                prices.shopflixPrice = shopflix
+                            }
+                        }
+                    }
+                    else {
+                        if (parseFloat(retail_price) > parseFloat(minPrices.shopflix)) {
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(retail_price).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+                        else {
+                            prices.shopflixPrice = {
+                                platform: "Shopflix",
+                                price: parseFloat(minPrices.shopflix).toFixed(2),
+                                is_fixed_price: false,
+                            }
+                        }
+
+                    }
+                }
                 else {
                     if (existedProduct.price > minPrices.general) {
                         if (existedProduct.is_fixed_price) {
@@ -2097,7 +2234,51 @@ module.exports = ({ strapi }) => ({
                             price: parseFloat(product.retail_price).toFixed(2),
                             is_fixed_price: false,
                         }
+                    }
+                }
+                else if (minSupplierPrice.name.toLowerCase() === "novatron" && product.name.toLowerCase().includes("vigi")) {
+                    let retail_price = parseFloat(minSupplierPrice.retail_price)
+                    if (parseFloat(retail_price) > parseFloat(minPrices.general)) {
+                        prices.generalPrice = {
+                            price: prices.generalPrice = parseFloat(retail_price).toFixed(2),
+                            isFixed: false
+                        }
+                    }
+                    else {
+                        prices.generalPrice = {
+                            price: prices.generalPrice = parseFloat(minPrices.general).toFixed(2),
+                            isFixed: false
+                        }
+                    }
 
+                    if (parseFloat(retail_price) > parseFloat(minPrices.skroutz)) {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(retail_price).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                    else {
+                        prices.skroutzPrice = {
+                            platform: "Skroutz",
+                            price: parseFloat(minPrices.skroutz).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+
+                    if (parseFloat(retail_price) > parseFloat(minPrices.shopflix)) {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(retail_price).toFixed(2),
+                            is_fixed_price: false,
+                        }
+                    }
+                    else {
+                        prices.shopflixPrice = {
+                            platform: "Shopflix",
+                            price: parseFloat(minPrices.shopflix).toFixed(2),
+                            is_fixed_price: false,
+                        }
                     }
                 }
                 else {
@@ -2689,7 +2870,7 @@ module.exports = ({ strapi }) => ({
 
     async importScrappedProduct(product, importRef, auth) {
         try {
-            if (!product.wholesale || isNaN(product.wholesale))
+            if (!product.wholesale || isNaN(product.wholesale || product.brand_name.toLowerCase().includes("dahua")))
                 return;
 
             // Αν δεν είναι Διαθέσιμο τότε προχώρα στο επόμενο
@@ -2775,6 +2956,10 @@ module.exports = ({ strapi }) => ({
     async updateEntry(entryCheck, product, importRef) {
 
         try {
+            // Τσεκάρω αν η προτεινόμενη τιμή είναι μικρότερη από την παλαιότερη
+            if (entryCheck.related_import.findIndex(x => x.name.toLowerCase() === "globalsat") !== -1
+                && entryCheck.supplierInfo.findIndex(x => { x.name.toLowerCase() === "globalsat" && Number(x.retail_price) < Number(product.retail_price) })!==-1)
+                return
 
             //Βρίσκω τον κωδικό της κατηγορίας ώστε να συνδέσω το προϊόν με την κατηγορία
             const categoryInfo = await this.getCategory(importRef.categoryMap.categories_map,
@@ -2855,7 +3040,7 @@ module.exports = ({ strapi }) => ({
                     data.brand = product.brand.id
                     dbChange = 'updated'
                 }
-                
+
             }
 
 
@@ -3069,7 +3254,7 @@ module.exports = ({ strapi }) => ({
         try {
             let weight = 0
             if (product.length && product.width && product.height) {
-                let calcWweight = parseInt(product.length) * parseInt(product.width) * parseInt(product.height) / 5000
+                let calcWweight = parseInt(product.length) * parseInt(product.width) * parseInt(product.height) / 5
                 weight = parseInt(calcWweight)
             }
             else if (product.recycleTax) {

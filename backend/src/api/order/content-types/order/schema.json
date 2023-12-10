@@ -1,0 +1,75 @@
+{
+  "kind": "collectionType",
+  "collectionName": "orders",
+  "info": {
+    "singularName": "order",
+    "pluralName": "orders",
+    "displayName": "Order",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "orders"
+    },
+    "billing_address": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::user-address.user-address"
+    },
+    "shipping_address": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::user-address.user-address"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "paymentPending",
+        "processing",
+        "shipping",
+        "backlog",
+        "canceled",
+        "failed",
+        "refund",
+        "draft"
+      ]
+    },
+    "date": {
+      "type": "date"
+    },
+    "shippingCost": {
+      "type": "decimal"
+    },
+    "payOnDeliveryCost": {
+      "type": "decimal"
+    },
+    "totalCost": {
+      "type": "decimal"
+    },
+    "order_items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item.order-item",
+      "mappedBy": "order"
+    },
+    "payment_method": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::payment-method.payment-method",
+      "inversedBy": "orders"
+    },
+    "shipping_method": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::shipping-method.shipping-method",
+      "inversedBy": "orders"
+    }
+  }
+}

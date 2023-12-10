@@ -53,10 +53,10 @@ module.exports = ({ strapi }) => ({
                     () => page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" }),
                     10, // retry this 10 times,
                     false
-                ); 
- 
+                );
+
             // await page.goto('https://www.questonline.gr', { waitUntil: "networkidle0" });
-            const pageUrl = page.url(); 
+            const pageUrl = page.url();
             await page.waitForTimeout(1500)
 
             if (pageUrl === "https://www.questonline.gr/Special-Pages/Logon?ReturnUrl=%2f") {
@@ -69,21 +69,27 @@ module.exports = ({ strapi }) => ({
                 }
                 await page.waitForTimeout(1500)
 
-                const formHandle = await bodyHandle.$('form');
+                const formHandle = await bodyHandle.$('#form');
+
+                const modal = await formHandle.$('.modal-content');
+                if (modal) {
+                    const closeModal = await modal.$('.close');
+                    await closeModal.click()
+                }
 
                 const usernameWrapper = await formHandle.$('#username');
                 const username = await usernameWrapper.$('input');
                 const passwordWrapper = await formHandle.$('#password');
                 const password = await passwordWrapper.$('input');
                 const button = await formHandle.$('#submit-button');
-                await username.type(process.env.QUEST_USERNAME, {delay: 200})
-                
-                await password.type(process.env.QUEST_PASSWORD, {delay: 200})
+                await username.type(process.env.QUEST_USERNAME, { delay: 200 })
+
+                await password.type(process.env.QUEST_PASSWORD, { delay: 200 })
                 await Promise.all([
                     await button.click(),
                     await page.waitForNavigation({
                         waitUntil: 'networkidle0',
-                      }) 
+                    })
                 ])
                 await page.cookies()
                     .then((cookies) => {
@@ -383,7 +389,7 @@ module.exports = ({ strapi }) => ({
 
             // await newPage.goto(productLink, { waitUntil: "networkidle0" });
 
-            await newPage.waitForTimeout(strapi 
+            await newPage.waitForTimeout(strapi
                 .plugin('import-products')
                 .service('helpers')
                 .randomWait(5000, 10000))
@@ -416,7 +422,7 @@ module.exports = ({ strapi }) => ({
                     if (src.startsWith('/')) {
                         product.imagesSrc.push({ url: `https://www.questonline.gr${src}?maxsidesize=1024` })
                     }
-                    else if(!src.endsWith('.jpg.aspx') && !src.endsWith('.png.aspx')){
+                    else if (!src.endsWith('.jpg.aspx') && !src.endsWith('.png.aspx')) {
                         product.imagesSrc.push({ url: `${src}?maxsidesize=1024` })
                     }
                 }
@@ -485,10 +491,10 @@ module.exports = ({ strapi }) => ({
 
             // await this.importQuestProduct(scrapProduct, category, subcategory, sub2category,
             //         importRef, entry, auth)
-            await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .importScrappedProduct(scrapProduct, importRef, auth)
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .importScrappedProduct(scrapProduct, importRef, auth)
 
         } catch (error) {
             console.log(error)

@@ -32,7 +32,11 @@
             "type": "decimal",
             "default": 0,
             "min": 0
-          },
+        },
+        "isActive": {
+            "type": "boolean",
+            "default": true
+        },
         "isUpload": {
             "type": "boolean",
             "default": false

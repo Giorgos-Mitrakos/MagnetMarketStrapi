@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * footer router.
+ * footer router
  */
 
 const { createCoreRouter } = require('@strapi/strapi').factories;

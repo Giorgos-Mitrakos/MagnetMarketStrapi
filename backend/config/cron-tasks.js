@@ -238,6 +238,32 @@ module.exports = {
         },
     },
 
+    updateCPI: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Cpi" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseCpiXml({ entry, auth });
+        },
+        options: {
+            rule: "25 18 * * *",
+        },
+    },
+
     updateSMART4ALL: {
         task: async ({ strapi }) => {
             // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
@@ -292,7 +318,7 @@ module.exports = {
             rule: "0 * * * *",
         },
     },
-
+ 
     createShopflixXml: {
         task: async ({ strapi }) => {
             // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).

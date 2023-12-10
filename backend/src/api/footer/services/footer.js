@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * footer service.
+ * footer service
  */
 
 const { createCoreService } = require('@strapi/strapi').factories;

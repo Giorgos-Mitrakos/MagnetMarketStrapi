@@ -15,6 +15,7 @@ const westnetHelper = require('./westnet-helper');
 const dotMediaHelper = require('./dotMedia-helper');
 const telehermesHelper = require('./telehermes-helper');
 const smart4allHelper = require('./smart4all-helper');
+const cpiHelper = require('./cpi-helper');
 const imageHelper = require('./image-helper');
 
 module.exports = {
@@ -33,6 +34,7 @@ module.exports = {
   dotMediaHelper,
   telehermesHelper,
   smart4allHelper,
+  cpiHelper,
   imageHelper,
 };
 

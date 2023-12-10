@@ -75,6 +75,12 @@ module.exports = {
         .service('parseService')
         .parseDamkalidisXml(ctx.request.body);
     }
+    else if (ctx.request.body.entry.name.toLowerCase() === 'cpi') {
+      ctx.body = await strapi
+        .plugin('import-products')
+        .service('parseService')
+        .parseCpiXml(ctx.request.body);
+    }
     else {
       console.log("Wrong file")
     }

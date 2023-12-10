@@ -1,0 +1,86 @@
+{
+  "kind": "collectionType",
+  "collectionName": "coupons",
+  "info": {
+    "singularName": "coupon",
+    "pluralName": "coupons",
+    "displayName": "Coupon"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "discountType": {
+      "type": "enumeration",
+      "enum": [
+        "Flat",
+        "Percentage"
+      ],
+      "default": "Flat",
+      "required": true
+    },
+    "discount": {
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "default": 0
+    },
+    "freeShipping": {
+      "type": "boolean",
+      "default": false
+    },
+    "expirationDate": {
+      "type": "datetime"
+    },
+    "minOrderCost": {
+      "type": "decimal",
+      "min": 0,
+      "required": true,
+      "default": 0
+    },
+    "maxOrderCost": {
+      "type": "decimal"
+    },
+    "exclusiveApply": {
+      "type": "boolean",
+      "default": true
+    },
+    "excludeOffers": {
+      "type": "boolean",
+      "default": true
+    },
+    "limitPerCoupon": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "limitPerUser": {
+      "type": "integer",
+      "default": 1,
+      "required": true,
+      "min": 0
+    },
+    "products": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::product.product"
+    },
+    "products_excludeds": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::product.product"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::category.category"
+    },
+    "categories_excludeds": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::category.category"
+    }
+  }
+}
