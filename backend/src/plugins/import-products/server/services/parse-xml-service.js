@@ -317,8 +317,6 @@ module.exports = ({ strapi }) => ({
                     .deleteEntry(entry, importRef);
             }
             else {
-
-
                 const { products, downloadingAllSuccess } = await strapi
                     .plugin('import-products')
                     .service('helpers')
@@ -328,101 +326,140 @@ module.exports = ({ strapi }) => ({
                     return { message: "Error" }
                 }
 
+                const categories = []
+
                 for (let dt of products) {
 
                     const { entryCheck, brandId } = await strapi
                         .plugin('import-products')
                         .service('helpers')
-                        .checkProductAndBrand(dt.mpn, dt.name, dt.barcode, dt.brand_name, null);
+                        .checkProductAndBrand(dt.part_no, dt.titlos, dt.ean_code, dt.brand_name, null);
 
                     //Κατασκευάζω το URL του προϊόντος του προμηθευτή
-                    let productUrl = `http://www.oktabit.gr/product_details.asp?productid=${dt.supplierCode}`
+                    // let productUrl = dt.url
 
+                    const chars = []
+
+                    for (const [key, value] of Object.entries(dt.product_attributes)) {
+                        const char = {}
+                        char.name = key
+                        char.value = value
+                        chars.push(char)
+                    }
+
+                    const { mapCharNames, mapCharValues } = importRef.charMaps
+
+                    const parsedChars = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .parseChars(chars, mapCharNames, mapCharValues)
+
+                    const imagesSrc = []
+
+                    if (dt.image) {
+                        imagesSrc.push({ url: dt.image })
+                    }
+
+                    if (dt.media) {
+                        dt.media.forEach(x => {
+                            imagesSrc.push({ url: x })
+                        })
+                    }
 
                     const product = {
                         entry,
-                        name: dt.name,
-                        supplierCode: dt.supplierCode,
+                        name: dt.titlos,
+                        supplierCode: dt.product_code,
                         description: dt.description,
-                        category: { title: dt.category.title },
-                        subcategory: { title: dt.subcategory.title },
-                        sub2category: { title: dt.sub2category.title },
-                        mpn: dt.mpn.toString(),
-                        barcode: dt.barcode.toString(),
+                        category: { title: dt.parent_category },
+                        subcategory: { title: dt.subcategory },
+                        sub2category: { title: dt.b2b_subcat },
+                        mpn: dt.part_no,
+                        barcode: dt.ean_code,
                         // slug: dt.partNumber ? 
                         //     slugify(`${dt.title?.toString()}-${dt.partNumber?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
                         //     slugify(`${dt.title?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
                         // publishedAt: new Date(),
-                        stockLevel: dt.stockLevel,
-                        wholesale: dt.wholesale,
-                        imagesSrc: dt.imagesSrc,
+                        stockLevel: dt.availability,
+                        wholesale: dt.timi_xontrikis,
+                        imagesSrc,
+                        technical_guide: { url: dt.technical_guide },
                         brand: { id: await brandId },
-                        retail_price: dt.retail_price,
-                        recycleTax: dt.recycleTax,
-                        link: productUrl,
+                        retail_price: dt.timi_lianikis,
+                        recycleTax: dt.kostos_anakyklosis_proiontos,
+                        link: dt.url,
                         related_import: entry.id,
-                        // supplierInfo: [{
-                        //     name: entry.name,
-                        //     in_stock: true,
-                        //     wholesale: dt.price,
-                        //     recycle_tax: dt.recycleTax,
-                        //     supplierProductId: dt.supplierCode,
-                        //     supplierProductURL: productUrl,
-                        //     retail_price: dt.suggestedPrice,
-                        //     price_progress: [{
-                        //         date: new Date(),
-                        //         wholesale: dt.price,
-                        //     }]
-                        // }],
-                        prod_chars: dt.prod_chars
+                        in_offer: dt.on_offer,
+                        retail_price: dt.timi_lianikis,
+                        prod_chars: parsedChars
                     }
 
-                    if (downloadingAllSuccess) {
-                        if (product.prod_chars) {
+                    //αναζητω κατηγοριές για να κάνω mapping
 
-                            let weightChar = product.prod_chars.find(x => x.name.includes("Βάρος"))
-                            if (weightChar) {
-                                if (weightChar.name.includes("κιλά") && !product.supplierCode === "281-69-ANPNAB2") {
-                                    if (weightChar.value.trim() !== "") {
-                                        let result = weightChar.value.match(/\d{1,3}(.|,)\d{0,3}/gmi)
-                                        let weightString = result.find(x => x !== undefined)
-                                        if (weightString && weightString.trim() !== "") {
-                                            let weight = parseFloat(weightString.replace("Kg", "").replace(",", ".").trim()) * 1000
-                                            product.weight = parseInt(weight)
-                                        }
-                                    }
-                                }
-                                else if (weightChar.name.includes("γραμμάρια") || product.supplierCode === "281-69-ANPNAB2") {
-                                    if (weightChar.value.trim() !== "") {
-                                        let result = weightChar.value.match(/\d{1,5}/gmi)
-                                        let weightString = result?.find(x => x !== undefined)
-                                        if (weightString) {
-                                            let weight = parseFloat(weightString.replace(",", ".").trim())
-                                            product.weight = parseInt(weight)
-                                        }
-                                    }
-                                }
-                            }
+                    // const category = categories.findIndex(x => x.category.title === product.category.title)
+                    // if (category !== -1) {
+                    //     const subcategory = categories[category].subcategory.findIndex(y => y.title === product.subcategory.title)
+                    //     if (subcategory === -1) {
+                    //         categories[category].subcategory.push(product.subcategory)
+                    //     }
+                    // }
+                    // else {
+                    //     categories.push({ category: product.category, subcategory: [product.subcategory] })
+                    // }
 
-                            // let diminsionChar = product.prod_chars.find(x => x.name.includes("Διαστάσεις "))
-                            // if (diminsionChar && diminsionChar.value.trim() !== "") {
-                            //     let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
-                            //     let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
+                    // let weightChar = product.prod_chars.find(x => x.name.toLowerCase().includes("βάρος"))
+                    // if (weightChar) {
+                    //     console.log(weightChar, product.name)
+                    // }
 
-                            //     let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
-                            //     let length = dim[0].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
-                            //     product.length = length.includes("-") ? length.split("-")[1] : length
-                            //     let width = dim[1].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
-                            //     product.width = width.includes("-") ? width.split("-")[1] : width
-                            //     let height = dim[2].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
-                            //     product.height = height.includes("-") ? height.split("-")[1] : height
+                    // if (downloadingAllSuccess) {
 
-                            // }
-                        }
-                    }
+                    //     if (product.prod_chars) {
 
-                    //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+                    //         let weightChar = product.prod_chars.find(x => x.name.toLowerCase().includes("βάρος") && !x.name.toLowerCase().includes("Μέγιστο"))
+                    //         if (weightChar) {
+                    //             if (weightChar.name.toLowerCase().includes("κιλά") && !product.supplierCode === "281-69-ANPNAB2") {
+                    //                 if (weightChar.value.trim() !== "") {
+                    //                     let result = weightChar.value.match(/\d{1,3}(.|,)\d{0,3}/gmi)
+                    //                     let weightString = result.find(x => x !== undefined)
+                    //                     if (weightString && weightString.trim() !== "") {
+                    //                         let weight = parseFloat(weightString.replace("Kg", "").replace(",", ".").trim()) * 1000
+                    //                         product.weight = parseInt(weight)
+                    //                     }
+                    //                 }
+                    //             }
+                    //             else if (weightChar.name.toLowerCase().includes("γραμμάρια") || product.supplierCode === "281-69-ANPNAB2") {
+                    //                 if (weightChar.value.trim() !== "") {
+                    //                     let result = weightChar.value.match(/\d{1,5}/gmi)
+                    //                     let weightString = result?.find(x => x !== undefined)
+                    //                     if (weightString) {
+                    //                         let weight = parseFloat(weightString.replace(",", ".").trim())
+                    //                         product.weight = parseInt(weight)
+                    //                     }
+                    //                 }
+                    //             }
+                    //         }
 
+                    //         // let diminsionChar = product.prod_chars.find(x => x.name.includes("Διαστάσεις "))
+                    //         // if (diminsionChar && diminsionChar.value.trim() !== "") {
+                    //         //     let removedSpecial = diminsionChar.value.replace(/and#\d{3,4};/gmi, ' x ').replace("x", ' ')
+                    //         //     let result = removedSpecial.replace("/", "-").match(/(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)\s*(x|and#215;|and#8206;|\s)\s*(\d+((\.|\,)\d+)?|\d+((\.|\,)\d+)?-\d+((\.|\,)\d+)?)/gmi)
+
+                    //         //     let dim = result[result.length - 1].match(/\d+((\.|\,)\d+)?/gmi)
+                    //         //     let length = dim[0].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                    //         //     product.length = length.includes("-") ? length.split("-")[1] : length
+                    //         //     let width = dim[1].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                    //         //     product.width = width.includes("-") ? width.split("-")[1] : width
+                    //         //     let height = dim[2].match(/\d+((\.|\,)\d+)?/gmi)[0].replace(",", ".").trim()
+                    //         //     product.height = height.includes("-") ? height.split("-")[1] : height
+
+                    //         // }
+                    //     }
+                    //     if(product.weight)
+                    //     console.log(product.weight)
+                    // }
+
+                    // αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
                     if (!entryCheck) {
                         if (downloadingAllSuccess) {
                             try {
@@ -449,6 +486,10 @@ module.exports = ({ strapi }) => ({
                     }
 
                 }
+
+                // categories.forEach(x => {
+                //     console.log("category", x.category, "subcategory", x.subcategory)
+                // })
 
                 await strapi
                     .plugin('import-products')
@@ -1849,11 +1890,11 @@ module.exports = ({ strapi }) => ({
                             slugify(`${name?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
                         publishedAt: new Date(),
                         // stockLevel: dt.instock[0].trim(),
-                        wholesale: parseFloat(dt.b2bprice[0].replace(',', '.')).toFixed(2),
+                        wholesale: parseFloat(dt.b2bprice[0].replace('.', '').replace(',', '.')).toFixed(2),
                         // imagesSrc: dt.image,
                         brand: { id: await brandId },
-                        retail_price: dt.msrp[0],
-                        recycleTax: dt.recycle[0],
+                        retail_price: dt.msrp[0].replace('.', '').replace(',', '.'),
+                        recycleTax: dt.recycle[0].replace('.', '').replace(',', '.'),
                         // link: dt.url[0].trim(),
                         related_import: entry.id,
 
