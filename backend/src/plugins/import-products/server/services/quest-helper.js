@@ -4,6 +4,7 @@ const slugify = require("slugify");
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const { env } = require("process");
+const userAgent = require('user-agents');
 
 module.exports = ({ strapi }) => ({
 
@@ -23,9 +24,12 @@ module.exports = ({ strapi }) => ({
                 categories: [],
             }
 
+            const agents = userAgent.random().toString()
+
             const page = await browser.newPage();
             await page.setViewport({ width: 1400, height: 600 })
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+            await page.setUserAgent(agents)
+            // await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
             await page.setRequestInterception(true)
 
@@ -146,7 +150,7 @@ module.exports = ({ strapi }) => ({
                     .service('helpers')
                     .randomWait(5000, 10000))
 
-                await this.scrapQuestSubcategories(browser, category, filteredCategories, importRef, entry, auth);
+                await this.scrapQuestSubcategories(browser,agents, category, filteredCategories, importRef, entry, auth);
             }
         } catch (error) {
             return { "message": "error" }
@@ -156,10 +160,10 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestSubcategories(browser, category, filteredCategories, importRef, entry, auth) {
+    async scrapQuestSubcategories(browser,agents, category, filteredCategories, importRef, entry, auth) {
         const newPage = await browser.newPage();
         await newPage.setViewport({ width: 1400, height: 600 })
-        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await newPage.setUserAgent(agents);
 
         await newPage.setRequestInterception(true)
 
@@ -206,7 +210,7 @@ module.exports = ({ strapi }) => ({
                     .service('helpers')
                     .randomWait(5000, 10000))
 
-                await this.scrapQuestSubcategories2(browser, category.title, sub, filteredCategories, importRef, entry, auth)
+                await this.scrapQuestSubcategories2(browser,agents, category.title, sub, filteredCategories, importRef, entry, auth)
             }
         } catch (error) {
             console.log(error)
@@ -216,10 +220,10 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestSubcategories2(browser, category, subcategory, filteredCategories, importRef, entry, auth) {
+    async scrapQuestSubcategories2(browser,agents, category, subcategory, filteredCategories, importRef, entry, auth) {
         const newPage = await browser.newPage();
         await newPage.setViewport({ width: 1400, height: 600 })
-        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await newPage.setUserAgent(agents);
 
         await newPage.setRequestInterception(true)
 
@@ -276,7 +280,7 @@ module.exports = ({ strapi }) => ({
                     .plugin('import-products')
                     .service('helpers')
                     .randomWait(5000, 10000))
-                await this.scrapQuestCategory(browser, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
+                await this.scrapQuestCategory(browser,agents, subcategory.link, category, subcategory.title, null, importRef, entry, auth)
             }
 
         } catch (error) {
@@ -287,10 +291,10 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestCategory(browser, link, category, subcategory, sub2category, importRef, entry, auth) {
+    async scrapQuestCategory(browser,agents, link, category, subcategory, sub2category, importRef, entry, auth) {
         const newPage = await browser.newPage();
         await newPage.setViewport({ width: 1400, height: 600 })
-        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await newPage.setUserAgent(agents);
 
         await newPage.setRequestInterception(true)
 
@@ -360,7 +364,7 @@ module.exports = ({ strapi }) => ({
                     .plugin('import-products')
                     .service('helpers')
                     .randomWait(5000, 10000))
-                await this.scrapQuestProduct(browser, product.link, category, subcategory, sub2category, importRef, entry, auth)
+                await this.scrapQuestProduct(browser,agents, product.link, category, subcategory, sub2category, importRef, entry, auth)
                 // }
             }
 
@@ -372,10 +376,10 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapQuestProduct(browser, productLink, category, subcategory, sub2category, importRef, entry, auth) {
+    async scrapQuestProduct(browser,agents, productLink, category, subcategory, sub2category, importRef, entry, auth) {
         const newPage = await browser.newPage();
         await newPage.setViewport({ width: 1400, height: 600 })
-        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await newPage.setUserAgent(agents);
 
 
         try {

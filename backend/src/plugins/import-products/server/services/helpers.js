@@ -5,7 +5,8 @@ const Axios = require('axios');
 const { JSDOM } = require("jsdom");
 const sharp = require('sharp');
 const FormData = require("form-data");
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 const fs = require('fs');
 const { env } = require("process");
 const { format } = require("path");
@@ -23,6 +24,7 @@ const stream = require('stream');
 module.exports = ({ strapi }) => ({
 
     async createBrowser() {
+        puppeteer.use(StealthPlugin())
         return await puppeteer.launch({
             headless: false,
             executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
@@ -495,6 +497,30 @@ module.exports = ({ strapi }) => ({
                     .service('cpiHelper')
                     .getCpiData(entry, categoryMap)
             }
+            else if (entry.name.toLowerCase() === "netone") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('netoneHelper')
+                    .getNetoneData(entry, categoryMap)
+            }
+            else if (entry.name.toLowerCase() === "allwan") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('allwanHelper')
+                    .getAllwanData(entry, categoryMap)
+            }
+            else if (entry.name.toLowerCase() === "damkalidis") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('damkalidisHelper')
+                    .getDamkalidisData(entry, categoryMap)
+            }
+            else if (entry.name.toLowerCase() === "iason") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('iasonHelper')
+                    .getIasonData(entry, categoryMap)
+            }
             // console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
@@ -528,11 +554,17 @@ module.exports = ({ strapi }) => ({
                         }
                     });
                 });
-                if (entry.name === "Logicom") {
+                if (entry.name.toLowerCase() === "logicom") {
                     return await strapi
                         .plugin('import-products')
                         .service('logicomHelper')
                         .getLogicomData(entry, await xml, categoryMap)
+                }
+                else if (entry.name.toLowerCase() === "iason") {
+                    return await strapi
+                        .plugin('import-products')
+                        .service('iasonHelper')
+                        .getIasonData(entry, await xml, categoryMap)
                 }
             }
         }
@@ -1143,7 +1175,7 @@ module.exports = ({ strapi }) => ({
             let additionalFileID = [];
             // const imageIDS = { mainImage: [], additionalImages: [], imgUrls: [] }
 
-            if (product.technical_guide.url !== "") {
+            if (product.technical_guide && product.technical_guide.url !== "") {
                 try {
                     const writer = fs.createWriteStream(`./public/tmp/${productName}_${index}.pdf`);
                     const response = await Axios({
@@ -1234,7 +1266,7 @@ module.exports = ({ strapi }) => ({
 
             return additionalFileID
         } catch (error) {
-            console.log("Error in converting Image:", error)
+            console.log("Error in upload additional File:", error)
         }
     },
 

@@ -50,6 +50,20 @@
     },
     "businessActivity": {
       "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "isInvoice": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "telephone": {
+      "type": "string"
+    },
+    "email_address": {
+      "type": "string"
     }
   }
 }

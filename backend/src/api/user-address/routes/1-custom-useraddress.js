@@ -2,13 +2,13 @@ module.exports = {
     routes: [
       {
         method: "POST",
-        path: "/user-address/testPost",
-        handler: "api::user-address.user-address.testPost",
+        path: "/user-address/updateUser",
+        handler: "api::user-address.user-address.updateUser",
       },
       {
         method: "GET",
-        path: "/user-address/testGet",
-        handler: "api::user-address.user-address.testGet",
+        path: "/user-address/getUser",
+        handler: "api::user-address.user-address.getUser",
       },
     ],
   };

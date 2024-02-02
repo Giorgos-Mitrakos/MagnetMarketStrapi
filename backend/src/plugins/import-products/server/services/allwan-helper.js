@@ -1,29 +1,29 @@
 'use strict';
 
 const Axios = require('axios');
-const xlsx = require('xlsx')
 
 module.exports = ({ strapi }) => ({
 
-    async getSmart4AllData(entry, categoryMap) {
+    async getAllwanData(entry, categoryMap) {
         try {
             const { categories_map, char_name_map, char_value_map, stock_map,
                 isWhitelistSelected, whitelist_map, blacklist_map,
                 xPath, minimumPrice, maximumPrice } = categoryMap
 
-            // console.log("newData:", newData.length)
-            const charMaps = await strapi
-                .plugin('import-products')
-                .service('helpers')
-                .parseCharsToMap(char_name_map, char_value_map);
+            // // console.log("newData:", newData.length)
+            // const charMaps = await strapi
+            //     .plugin('import-products')
+            //     .service('helpers')
+            //     .parseCharsToMap(char_name_map, char_value_map);
 
-            const { mapCharNames, mapCharValues } = charMaps
+            // const { mapCharNames, mapCharValues } = charMaps
 
-            const products = []
+            // const products = []
 
             const data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })
 
+            
             const xPathFilter = await strapi
                 .plugin('import-products')
                 .service('helpers')
@@ -31,87 +31,46 @@ module.exports = ({ strapi }) => ({
 
             const xml = await strapi
                 .plugin('import-products')
-                .service('helpers')
-                .parseXml(await data.data)
+                .service('helpers').parseXml(xPathFilter)
 
-            //Διαβάζω τις πληροφορίες από το excel ώστε να τις χρησιμοποιή
-            const wb = xlsx.readFile(`./public${entry.importedFile.url}`)
-            const ws = wb.SheetNames
-            let excel = []
-            ws.forEach(x => {
-                if (x !== "Φύλλο") {
-                    const sheet = wb.Sheets[x]
-                    const products = xlsx.utils.sheet_to_json(sheet)
-                    // console.log(products)
-                    excel = excel.concat(products)
-                }
-            })
+                console.log(xml)
+            const unique_product = {
+                mpn: []
+            }
 
-            const productsInExcel = excel.filter(x => {                
-                if (x["EAN"] !== undefined && !isNaN(x["EAN"])) {
-                    return true
-                }
-            }).filter(x => {
-                if (x["EAN"] !== "") {
-                    return true
-                }
-            })
+            // console.log(xml.STOREITEMS.CREATED[0].PRODUCT.length)
 
-            // console.log(excel)
-            const availableProducts = this.filterData(xml.mywebstore.products[0].product, categoryMap)
+            const availableProducts = this.filterData(xml.products.product, categoryMap,unique_product)
 
             console.log(availableProducts.length)
-            return { products: availableProducts, productsInExcel }
+            return availableProducts
         } catch (error) {
             console.log(error)
         }
     },
 
-    filterData(data, categoryMap) {
+    filterData(data, categoryMap,unique_product) {
 
-        const unique_product = []
-        const not_unique_product = []
-
-        // console.log(data)
         const newData = data
-            // .filter(filterUnique)
+            .filter(filterUnique)
             .filter(filterStock)
-            .filter(filterPriceRange)
             .filter(filterCategories)
+            .filter(filterPriceRange)
             .filter(filterImages)
-            // .filter(filterEmptyEAN)
-        // .filter(filterRemoveDup)
 
         function filterUnique(unique) {
-            if (unique_product.includes(unique.mpn[0].trim().toString())) {
-                not_unique_product.push(unique.mpn[0].trim().toString())
+            if (unique_product.mpn.includes(unique.sku[0].trim().toString())) {
                 return false
             }
             else {
-                unique_product.push(unique.mpn[0].trim().toString())
-                return true
-            }
-        }
-
-        function filterRemoveDup(unique) {
-            if (not_unique_product.includes(unique.mpn[0].trim().toString())) {
-                return false
-            }
-            else {
-                return true
-            }
-        }
-
-        function filterEmptyEAN(product) {
-
-            if (product.BARCODE[0]) {
+                unique_product.mpn.push(unique.sku[0].trim().toString())
                 return true
             }
         }
 
         function filterStock(stockName) {
             if (categoryMap.stock_map.length > 0) {
-                let catIndex = categoryMap.stock_map.findIndex(x => stockName.AVAILABILITY[0].trim() === x.name.trim())
+                let catIndex = categoryMap.stock_map.findIndex(x => x.name.trim() === stockName.diathesimotita[0].trim())
                 if (catIndex !== -1) {
                     return true
                 }
@@ -125,10 +84,9 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterCategories(cat) {
-            let categories = cat.CATEGORY[0].split(">")
-            let category = categories[0] ? categories[0].trim() : null
-            let subcategory = categories[1] ? categories[1].trim() : null
-            let sub2category = categories[2] ? categories[2].trim() : null
+            let category = cat.category[0].trim()
+            let subcategory = null
+            let sub2category = null
 
             if (categoryMap.isWhitelistSelected) {
                 if (categoryMap.whitelist_map.length > 0) {
@@ -207,9 +165,9 @@ module.exports = ({ strapi }) => ({
                 maxPrice = 100000;
             }
 
-            const productPrice = parseFloat(priceRange.WHOLESALE_PRICE[0].replace(".", "").replace(",", "."))
+            const productPrice = parseFloat(priceRange.price_without_tax[0])
 
-            if (productPrice !== parseFloat(0) && productPrice >= minPrice && productPrice <= maxPrice) {
+            if (productPrice >= minPrice && productPrice <= maxPrice) {
                 return true
             }
             else {
@@ -218,7 +176,7 @@ module.exports = ({ strapi }) => ({
         }
 
         function filterImages(image) {
-            if (image.IMAGE[0]) {
+            if (image.image_url[0]) {
                 return true
             }
             else {

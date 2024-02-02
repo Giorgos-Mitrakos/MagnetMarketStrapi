@@ -56,31 +56,57 @@ module.exports = {
         },
     },
 
-    // scrapNOVATRON: {
-    //     task: async ({ strapi }) => {
-    //         // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
-    //         const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
-    //             where: { name: "Novatron" },
-    //             populate: {
-    //                 importedFile: true,
-    //                 stock_map: {
-    //                     fields: ['name'],
-    //                     sort: 'name:asc',
-    //                 },
-    //             },
-    //         })
+    scrapNOVATRON: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Novatron" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
 
-    //         const auth = process.env.STRAPI_TOKEN
+            const auth = process.env.STRAPI_TOKEN
 
-    //         await strapi
-    //             .plugin('import-products')
-    //             .service('parseService')
-    //             .parseNovatronXml({ entry, auth });
-    //     },
-    //     options: {
-    //         rule: "0 * * * *",
-    //     },
-    // },
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseNovatronXml({ entry, auth });
+        },
+        options: {
+            rule: "4 10 * * *",
+        },
+    },
+
+    updateWestnet: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "Westnet" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseWestnetXml({ entry, auth });
+        },
+        options: {
+            rule: "58 21 * * *",
+        },
+    },
 
     updateOKTABIT: {
         task: async ({ strapi }) => {

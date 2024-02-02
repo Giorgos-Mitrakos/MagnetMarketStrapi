@@ -16,6 +16,10 @@ const dotMediaHelper = require('./dotMedia-helper');
 const telehermesHelper = require('./telehermes-helper');
 const smart4allHelper = require('./smart4all-helper');
 const cpiHelper = require('./cpi-helper');
+const allwanHelper = require('./allwan-helper');
+const damkalidisHelper = require('./damkalidis-helper');
+const netoneHelper = require('./netone-helper');
+const iasonHelper = require('./iason-helper');
 const imageHelper = require('./image-helper');
 
 module.exports = {
@@ -35,6 +39,10 @@ module.exports = {
   telehermesHelper,
   smart4allHelper,
   cpiHelper,
+  allwanHelper,
+  damkalidisHelper,
+  netoneHelper,
+  iasonHelper,
   imageHelper,
 };
 

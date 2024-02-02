@@ -2,6 +2,7 @@
 
 const Axios = require('axios');
 const fs = require('fs');
+const userAgent = require('user-agents');
 
 module.exports = ({ strapi }) => ({
 
@@ -200,7 +201,8 @@ module.exports = ({ strapi }) => ({
         try {
             let page = await browser.newPage();
             await page.setViewport({ width: 1200, height: 500 })
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+            await page.setUserAgent(userAgent.random().toString())
+            // await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
             if (fs.existsSync('./public/DotMediaCookies.json')) {
                 fs.readFile('./public/DotMediaCookies.json', async (err, data) => {
@@ -240,7 +242,8 @@ module.exports = ({ strapi }) => ({
 
         const page = await browser.newPage();
         await page.setViewport({ width: 1200, height: 500 })
-        await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await page.setUserAgent(userAgent.random().toString())
+        // await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
         await page.waitForTimeout(strapi
             .plugin('import-products')

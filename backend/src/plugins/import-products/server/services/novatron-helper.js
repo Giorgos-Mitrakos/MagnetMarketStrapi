@@ -5,6 +5,7 @@ const slugify = require("slugify");
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const { env } = require("process");
+const userAgent = require('user-agents');
 
 module.exports = ({ strapi }) => ({
 
@@ -15,9 +16,12 @@ module.exports = ({ strapi }) => ({
             .service('helpers')
             .createBrowser()
 
+        const agents = userAgent.random().toString()
+
         const page = await browser.newPage();
         await page.setViewport({ width: 1200, height: 500 })
-        await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await page.setUserAgent(agents)
+        // await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
         await page.setRequestInterception(true)
 
@@ -115,8 +119,8 @@ module.exports = ({ strapi }) => ({
                 .service('helpers')
                 .filterCategories(scrapProduct, importRef.categoryMap.isWhitelistSelected, importRef.categoryMap.whitelist_map, importRef.categoryMap.blacklist_map)
 
-            await this.scrapNovatronCategory(browser, newCategories, importRef, entry, auth)
-            await browser.close();
+            await this.scrapNovatronCategory(browser, agents, newCategories, importRef, entry, auth)
+            // await browser.close();
         } catch (error) {
             return { "message": "error" }
         }
@@ -125,12 +129,13 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapNovatronCategory(browser, novatronCategories, importRef, entry, auth) {
+    async scrapNovatronCategory(browser, agents, novatronCategories, importRef, entry, auth) {
         const newPage = await browser.newPage();
         await newPage.setViewport({ width: 1400, height: 600 })
-        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await newPage.setUserAgent(agents)
+        // await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
 
-        await newPage.setRequestInterception(true)
+        await newPage.setRequestInterception(true) 
 
         newPage.on('request', (request) => {
             if (request.resourceType() === 'image') request.abort()
@@ -200,8 +205,8 @@ module.exports = ({ strapi }) => ({
                                     break;
                             }
 
-                            if(product.brand_name.toLowerCase().includes('dahua'))
-                            continue
+                            if (product.brand_name.toLowerCase().includes('dahua'))
+                                continue
 
                             products.push(product)
                         }
@@ -219,7 +224,7 @@ module.exports = ({ strapi }) => ({
                                 .plugin('import-products')
                                 .service('helpers')
                                 .randomWait(5000, 10000))
-                        await this.scrapNovatronProduct(browser, prod.link, cat.title, sub.title, importRef, entry, auth)
+                        await this.scrapNovatronProduct(browser, agents, prod.link, cat.title, sub.title, importRef, entry, auth)
                     }
                 }
             }
@@ -231,12 +236,12 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async scrapNovatronProduct(browser, productLink, category, subcategory,
+    async scrapNovatronProduct(browser, agents, productLink, category, subcategory,
         importRef, entry, auth) {
 
         const newPage = await browser.newPage();
         await newPage.setViewport({ width: 1400, height: 600 })
-        await newPage.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+        await newPage.setUserAgent(agents);
 
         try {
             await strapi
@@ -274,13 +279,12 @@ module.exports = ({ strapi }) => ({
                     product.in_offer = false
                 }
                 product.name = productDetailsSection.querySelector("h1.product-title").textContent.trim();
-                if(product.name.startsWith('TP-LINK')){
-                    product.brand_name='TP-LINK'
+                if (product.name.startsWith('TP-LINK')) {
+                    product.brand_name = 'TP-LINK'
                 }
-                else
-                {
+                else {
                     product.brand_name = product.name.split("-")[0].trim()
-                }                
+                }
                 product.short_description = productDetailsSection.querySelector("p.mini-description").textContent.trim();
                 const productPriceWrapper = productDetailsSection.querySelector("div.product-price");
                 product.wholesale = productPriceWrapper.querySelector("span").textContent.replace('€', '').replace(',', '.').trim();

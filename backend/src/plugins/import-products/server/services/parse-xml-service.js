@@ -1707,17 +1707,26 @@ module.exports = ({ strapi }) => ({
 
                 const { mapCharNames, mapCharValues } = importRef.charMaps
 
+                let problematic = []
                 for (let dt of products) {
                     let productInExcel = productsInExcel.find(x => {
-                        // console.log(x.EAN, "   ", dt.BARCODE[0], Number(x.EAN) === Number(dt.BARCODE[0]))
-                        return Number(x.EAN) === Number(dt.BARCODE[0])
+                        // console.log(x)
+                        if (x["Περιγραφή"].trim() === dt.NAME[0].trim() ||
+                            x["Περιγραφή"].trim() === dt.SHORT_DESCRIPTION[0].trim() ||
+                            x.EAN.toString() == dt.BARCODE[0].toString())
+                            return true
                     })
-                    if (!productInExcel)
+                    if (!productInExcel) {
+                        problematic.push(dt.NAME[0])
                         continue
+                    }
+                    else if (!productInExcel.EAN && !dt.BARCODE[0] && !productInExcel.PN)
+                        continue
+
 
                     let mpn = productInExcel.PN.trim().toString()
                     let name = productInExcel["Περιγραφή"].trim()
-                    let barcode = dt.BARCODE ? dt.BARCODE[0].trim() : null
+                    let barcode = dt.BARCODE ? dt.BARCODE[0].trim() : (productInExcel.EAN ? productInExcel.EAN.trim() : null)
                     let brand_name = dt.MANUFACTURER[0].trim()
 
                     const { entryCheck, brandId } = await strapi
@@ -1791,6 +1800,7 @@ module.exports = ({ strapi }) => ({
 
                     if (!entryCheck) {
                         try {
+                            console.log(dt.IMAGE[0], dt.NAME[0])
                             await strapi
                                 .plugin('import-products')
                                 .service('helpers')
@@ -1811,12 +1821,13 @@ module.exports = ({ strapi }) => ({
                         }
                     }
                 }
-
+                console.log(problematic)
                 await strapi
                     .plugin('import-products')
                     .service('helpers')
                     .deleteEntry(entry, importRef);
             }
+
             console.log("End of Import")
             return { "message": "ok" }
         }
@@ -1974,324 +1985,595 @@ module.exports = ({ strapi }) => ({
         }
     },
 
-    async parseDamkalidisXml({ entry, auth }) {
+    async parseNetoneXml({ entry, auth }) {
         try {
-            const importRef = {
-                created: 0,
-                updated: 0,
-                republished: 0,
-                deleted: 0,
-                related_entries: []
-            }
-            // let created = 0
-            // let updated = 0
-            // let deleted = 0
-            // const related_entries = []
-
-            const data = await strapi
+            const importRef = await strapi
                 .plugin('import-products')
                 .service('helpers')
-                .getData(entry);
+                .createImportRef(entry);
 
-            // console.log(data)
+            if (!entry.isActive) {
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
+            }
+            else {
+                const products = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .getData(entry, importRef.categoryMap);
 
-            // async function readWestnetFile() {
+                if (products.length === 0)
+                    return { "message": "xml is empty" }
 
-            //     let req = Axios.get(`${entry.importedURL}`)
-            //         .then((data) => { return data })
+                const { categories_map, char_name_map, char_value_map, stock_map,
+                    isWhitelistSelected, whitelist_map, blacklist_map,
+                    xPath, minimumPrice, maximumPrice } = importRef.categoryMap
 
-            //     return await req
-            // }
+                const { mapCharNames, mapCharValues } = importRef.charMaps
 
-            // function parseXml(xml) {
-            //     return new Promise((resolve, reject) => {
-            //         parser.parseString(xml, (err, result) => {
-            //             if (err) {
-            //                 reject(err);
-            //             } else {
-            //                 resolve(result);
-            //             }
-            //         });
-            //     });
-            // }
+                // console.log(products[0].image[0])
+                // const products = []
 
-            // async function parseWestnet(result) {
-            //     // try {
+                // for (let dt of products) {
 
-            //     if (result.products.length === 0 || result.products?.product.length === 0)
-            //         return
+                //     let mpn = dt.mpn[0].trim().toString()
+                //     let name = dt.description[0].trim()
+                //     let barcode = dt.EAN ? dt.EAN[0].trim() : null
+                //     let brand_name = dt.brand[0].trim()
+                //     let weightFromData = null
+                //     if (dt.weight_kg) {
+                //         weightFromData = parseFloat(dt.weight_kg[0].replace("kg", "").replace(",", ".").trim()) * 1000
+                //     }
 
-            //     const categoryMap = await strapi
-            //         .plugin('import-products')
-            //         .service('helpers')
-            //         .getImportMapping(entry);
+                //     const { entryCheck, brandId } = await strapi
+                //         .plugin('import-products')
+                //         .service('helpers')
+                //         .checkProductAndBrand(mpn, name, barcode, brand_name, null);
 
-            //     const { categories_map, char_name_map, char_value_map, stock_map,
-            //         isWhitelistSelected, whitelist_map, blacklist_map } = await categoryMap
+                //     const product = {
+                //         entry,
+                //         name,
+                //         supplierCode: dt.code[0].trim(),
+                //         description: dt.chars[0],
+                //         category: { title: dt.CATEGORY[0].split(" / ")[0].trim() },
+                //         subcategory: dt.CATEGORY[0].split(" / ")[1] ? { title: dt.CATEGORY[0].split(" / ")[1].trim() } : { title: null },
+                //         sub2category: dt.CATEGORY[0].split(" / ")[2] ? { title: dt.CATEGORY[0].split(" / ")[2].trim() } : { title: null },
+                //         mpn,
+                //         barcode,
+                //         weight: weightFromData ? parseInt(weightFromData) : 0,
+                //         slug: mpn ?
+                //             slugify(`${name?.toString()}-${dt.mpn?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                //             slugify(`${name?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                //         publishedAt: new Date(),
+                //         // stockLevel: dt.instock[0].trim(),
+                //         wholesale: parseFloat(dt.b2bprice[0].replace('.', '').replace(',', '.')).toFixed(2),
+                //         // imagesSrc: dt.image,
+                //         brand: { id: await brandId },
+                //         retail_price: dt.msrp[0].replace('.', '').replace(',', '.'),
+                //         recycleTax: dt.recycle[0].replace('.', '').replace(',', '.'),
+                //         // link: dt.url[0].trim(),
+                //         related_import: entry.id,
 
-            //     const newData = result.products.product
-            //         .filter(filterStock)
-            //         .filter(filterCategories)
+                //         // prod_chars: dt.prod_chars
+                //     }
 
-            //     function filterStock(stockName) {
-            //         if (stock_map.length > 0) {
-            //             let catIndex = stock_map.findIndex(x => parseInt(x.name.trim()) < parseInt(stockName.availability[0].trim()))
-            //             if (catIndex !== -1) {
-            //                 return true
-            //             }
-            //             else {
-            //                 return false
-            //             }
-            //         }
-            //         else {
-            //             return true
-            //         }
-            //     }
+                //     // const stripContent = dt.chars[0]?.replace(/(<([^>]+)>)/ig, '').trim();
 
-            //     function filterCategories(cat) {
-            //         if (isWhitelistSelected) {
-            //             if (whitelist_map.length > 0) {
-            //                 let catIndex = whitelist_map.findIndex(x => x.name.trim() === cat.category[0].trim())
-            //                 if (catIndex !== -1) {
-            //                     return true
-            //                 }
-            //                 else {
-            //                     return false
-            //                 }
-            //             }
-            //             return true
-            //         }
-            //         else {
-            //             if (blacklist_map.length > 0) {
-            //                 let catIndex = blacklist_map.findIndex(x => x.name.trim() === cat.category[0].trim())
-            //                 if (catIndex !== -1) {
-            //                     return false
-            //                 }
-            //                 else {
-            //                     return true
-            //                 }
-            //             }
-            //             return true
-            //         }
-            //     }
+                //     // product.description = stripContent ? stripContent : ""
 
-            //     console.log(newData.length)
+                //     // const chars = []
 
-            //     const { mapCharNames, mapCharValues } = importRef.charMaps
+                //     // if (dt.product_chars) {
+                //     //     for (let productChar of dt.product_chars[0].char) {
+                //     //         const char = {}
+                //     //         char.name = productChar.char_name[0]
+                //     //         char.value = productChar.char_value[0]
+                //     //         chars.push(char)
+                //     //     }
 
-            //     for (let dt of newData) {
+                //     //     const parsedChars = await strapi
+                //     //         .plugin('import-products')
+                //     //         .service('helpers')
+                //     //         .parseChars(chars, mapCharNames, mapCharValues)
 
-            //         let mpn = dt.partNumber[0].toString()
-
-            //         const entryCheck = await strapi
-            //             .plugin('import-products')
-            //             .service('helpers')
-            //             .checkIfProductExists(mpn);
-
-            //         const brandId = await strapi
-            //             .plugin('import-products')
-            //             .service('helpers')
-            //             .brandIdCheck(dt.manufacturer[0].trim());
-
-            //         //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
-            //         if (!entryCheck) {
-            //             try {
-            //                 const imageUrls = [dt.image[0]]
-
-            //                 const prod_chars = []
-
-            //                 dt.specs[0].spec.forEach(spec => {
-            //                     prod_chars.push({
-            //                         name: spec.name[0].trim(),
-            //                         value: spec.value[0].trim(),
-            //                     })
-            //                 });
-
-            //                 //Κάνω mapping τα χαρακτηριστικά του αρχείου με το πώς θέλω να αποθηκευτούν στη βάση
-            //                 const parsedChars = await strapi
-            //                     .plugin('import-products')
-            //                     .service('helpers')
-            //                     .parseChars(prod_chars, mapCharNames, mapCharValues)
-
-            //                 const categoryInfo = await strapi
-            //                     .plugin('import-products')
-            //                     .service('helpers')
-            //                     .getCategory(categories_map, dt.name[0], dt.category[0], null, null);
-
-            //                 const productPrice = await strapi
-            //                     .plugin('import-products')
-            //                     .service('helpers')
-            //                     .setPriceOnCreation(dt.price[0], categoryInfo, brandId);
-
-            //                 const data = {
-            //                     name: dt.name[0],
-            //                     description: dt.description ? dt.description[0] : null,
-            //                     categories: categoryInfo.id,
-            //                     price: parseFloat(productPrice),
-            //                     mpn: mpn ? mpn : null,
-            //                     barcode: dt.barCode ? dt.barCode[0] : null,
-            //                     slug: slugify(`${dt.name[0]}-${mpn}`, { lower: true, remove: /[*+~=#.,°;_()/'"!:@]/g }),
-            //                     publishedAt: new Date(),
-            //                     status: 'InStock',
-            //                     brand: { id: brandId },
-            //                     related_import: entry.id,
-            //                     supplierInfo: [{
-            //                         name: entry.name,
-            //                         wholesale: dt.price[0],
-            //                         recycle_tax: dt.recycle_tax[0],
-            //                         supplierProductId: dt.id[0].toString(),
-            //                         in_offer: dt.in_offer[0]
-            //                     }],
-            //                     prod_chars: parsedChars
-            //                 }
-
-            //                 const newEntry = await strapi.entityService.create('api::product.product', {
-            //                     data: data,
-            //                 });
-
-            //                 related_entries.push(newEntry.id)
-            //                 created += 1;
-
-            //                 console.log(imageUrls)
-
-            //                 let responseImage = await strapi
-            //                     .plugin('import-products')
-            //                     .service('helpers')
-            //                     .getAndConvertImgToWep(imageUrls, data, newEntry.id, auth);
-
-            //                 const { mainImageID } = await responseImage
-            //                 let imgID = mainImageID.data ? mainImageID.data[0] : undefined
-
-            //                 //Δημιουργώ αυτόματα το SEO για το προϊόν
-            //                 await strapi
-            //                     .plugin('import-products')
-            //                     .service('helpers')
-            //                     .saveSEO(imgID, data, newEntry.id);
-
-            //             } catch (error) {
-            //                 console.log(error)
-            //             }
-            //         }
-            //         else {
-            //             try {
-            //                 related_entries.push(entryCheck.id)
-            //                 const supplierInfo = entryCheck.supplierInfo
-            //                 const relatedImport = entryCheck.related_import;
-            //                 const relatedImportId = []
-            //                 relatedImport.forEach(x => {
-            //                     relatedImportId.push(x.id)
-            //                 })
-            //                 relatedImportId.push(entry.id)
-            //                 let searchSupplierInfo = supplierInfo.find((o, i) => {
-            //                     if (o.name === entry.name) {
-            //                         supplierInfo[i] = {
-            //                             name: entry.name,
-            //                             wholesale: dt.price[0],
-            //                             recycle_tax: dt.recycle_tax[0],
-            //                             supplierProductId: dt.id[0].toString(),
-            //                         }
-            //                         return true;
-            //                     }
-            //                 })
+                //     //     product.prod_chars = parsedChars
+                //     // }
 
 
-            //                 if (!searchSupplierInfo) {
-            //                     supplierInfo.push({
-            //                         name: entry.name,
-            //                         wholesale: dt.price[0],
-            //                         recycle_tax: dt.recycle_tax[0],
-            //                         supplierProductId: dt.id.toString(),
-            //                     })
-            //                 }
+                //     if (dt.image) {
+                //         const imageUrls = []
+                //         for (let image of dt.image) {
+                //             imageUrls.push({ url: image })
+                //         }
 
-            //                 const productPrice = await strapi
-            //                     .plugin('import-products')
-            //                     .service('helpers')
-            //                     .setPriceOnUpdate(entryCheck, supplierInfo);
+                //         product.imagesSrc = imageUrls
+                //     }
 
-            //                 await strapi.entityService.update('api::product.product', entryCheck.id, {
-            //                     data: {
-            //                         price: parseFloat(productPrice),
-            //                         supplierInfo: supplierInfo,
-            //                         related_import: relatedImportId
-            //                     },
-            //                 });
-            //                 updated += 1
-            //             } catch (error) {
-            //                 console.log(error)
-            //             }
-            //         }
-            //     }
+                //     //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
 
-            //     const importXmlFile = await strapi.entityService.findMany('plugin::import-products.importxml',
-            //         {
-            //             populate: { related_products: true },
-            //             filters: { id: entry.id },
-            //         });
+                //     if (!entryCheck) {
 
-            //     for (let product of importXmlFile[0].related_products) {
+                //         try {
+                //             const response = await strapi
+                //                 .plugin('import-products')
+                //                 .service('helpers')
+                //                 .createEntry(product, importRef, auth);
 
-            //         if (!related_entries.includes(product.id)) {
-            //             const checkProduct = await strapi.entityService.findOne('api::product.product', product.id, {
-            //                 // fields: ['supplierInfo', 'name'],
-            //                 populate: { supplierInfo: true },
-            //             })
+                //             await response
+                //         } catch (error) {
+                //             console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                //         }
+                //     }
+                //     else {
+                //         try {
+                //             await strapi
+                //                 .plugin('import-products')
+                //                 .service('helpers')
+                //                 .updateEntry(entryCheck, product, importRef);
+                //         } catch (error) {
+                //             console.log(error)
+                //         }
+                //     }
 
-            //             let supplierInfo = checkProduct.supplierInfo
+                // }
 
-            //             if (supplierInfo.length > 1) {
-            //                 const index = supplierInfo.findIndex((o) => {
-            //                     return o.name === entry.name
-            //                 })
-            //                 supplierInfo.splice(index, 1)
-
-            //                 await strapi.entityService.update('api::product.product', product.id, {
-            //                     data: {
-            //                         supplierInfo: supplierInfo,
-            //                     },
-            //                 });
-            //                 updated += 1
-            //             }
-            //             else {
-            //                 await strapi.entityService.delete('api::product.product', product.id);
-            //                 deleted += 1;
-            //             }
-            //         }
-            //     }
-
-            //     const updateImport = await strapi.entityService.update('plugin::import-products.importxml', entry.id,
-            //         {
-            //             data: {
-            //                 report: `Created: ${created}, Updated: ${updated}, Deleted: ${deleted}`,
-            //             },
-            //         })
-
-            //     return { "message": "ok" }
-            //     // } catch (error) {
-            //     //     return { "message": "Error" }
-            //     // }
-            // }
-
-            // const response = await readWestnetFile()
-            //     .then((response) => parseXml(response.data))
-            //     .then((result) => console.log(result))
-            //     // .then((result) => parseWestnet(result))
-            //     // .then((response) => {
-            //     //     console.log("End of Import")
-            //     //     if (response) {
-            //     //         if (response.message === "Error") { return { "message": "Error" } }
-            //     //         else { return { "message": "ok" } }
-            //     //     }
-            //     //     else {
-            //     //         return { "message": "xml is empty" }
-            //     //     }
-            //     // })
-            //     .catch((err) => console.log(err))
-
-            // return response
+                // await strapi
+                //     .plugin('import-products')
+                //     .service('helpers')
+                //     .deleteEntry(entry, importRef);
+            }
+            console.log("End of Import")
+            return { "message": "ok" }
         }
         catch (err) {
-            return { "message": "Error" }
+            console.log(err);
+        }
+    },
+
+    async parseAllwanXml({ entry, auth }) {
+        try {
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            if (!entry.isActive) {
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
+            }
+            else {
+                const products = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .getData(entry, importRef.categoryMap);
+
+                if (products.length === 0)
+                    return { "message": "xml is empty" }
+
+                const { categories_map, char_name_map, char_value_map, stock_map,
+                    isWhitelistSelected, whitelist_map, blacklist_map,
+                    xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+                const { mapCharNames, mapCharValues } = importRef.charMaps
+
+                console.log(products[0])
+                // // const products = []
+
+                for (let dt of products) {
+
+                    let mpn = dt.sku[0].trim().toString()
+                    let name = dt.name[0].trim()
+                    let barcode = null
+                    let brand_name = dt.name[0].split(" ")[0].trim()
+
+                    if (brand_name === "Πακέτο" || brand_name === "" || parseFloat(dt.price_without_tax) === 0) continue
+
+                    // let weightFromData = null
+                    // if (dt.weight_kg) {
+                    //     weightFromData = parseFloat(dt.weight_kg[0].replace("kg", "").replace(",", ".").trim()) * 1000
+                    // }
+
+                    const { entryCheck, brandId } = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                    const product = {
+                        entry,
+                        name,
+                        supplierCode: dt.sku[0].trim(),
+                        description: dt.description[0],
+                        category: { title: dt.category[0].trim() },
+                        subcategory: { title: null },
+                        sub2category: { title: null },
+                        mpn,
+                        barcode,
+                        // weight: weightFromData ? parseInt(weightFromData) : 0,
+                        slug: mpn ?
+                            slugify(`${name?.toString()}-${dt.mpn?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                            slugify(`${name?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                        publishedAt: new Date(),
+                        // stockLevel: dt.instock[0].trim(),
+                        wholesale: parseFloat(dt.price_without_tax[0]).toFixed(2),
+                        // imagesSrc: dt.image,
+                        brand: { id: await brandId },
+                        // retail_price: dt.msrp[0].replace('.', '').replace(',', '.'),
+                        // recycleTax: dt.recycle[0].replace('.', '').replace(',', '.'),
+                        // link: dt.url[0].trim(),
+                        related_import: entry.id,
+
+                        // prod_chars: dt.prod_chars
+                    }
+
+                    // const stripContent = dt.chars[0]?.replace(/(<([^>]+)>)/ig, '').trim();
+
+                    // product.description = stripContent ? stripContent : ""
+
+                    // const chars = []
+
+                    // if (dt.product_chars) {
+                    //     for (let productChar of dt.product_chars[0].char) {
+                    //         const char = {}
+                    //         char.name = productChar.char_name[0]
+                    //         char.value = productChar.char_value[0]
+                    //         chars.push(char)
+                    //     }
+
+                    //     const parsedChars = await strapi
+                    //         .plugin('import-products')
+                    //         .service('helpers')
+                    //         .parseChars(chars, mapCharNames, mapCharValues)
+
+                    //     product.prod_chars = parsedChars
+                    // }
+
+
+                    if (dt.image_url) {
+                        const imageUrls = []
+                        for (let image of dt.image_url) {
+                            imageUrls.push({ url: image })
+                        }
+
+                        product.imagesSrc = imageUrls
+                    }
+
+                    console.log(product)
+
+                    // αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω
+
+                    // if (!entryCheck) {
+
+                    //     try {
+                    //         const response = await strapi
+                    //             .plugin('import-products')
+                    //             .service('helpers')
+                    //             .createEntry(product, importRef, auth);
+
+                    //         await response
+                    //     } catch (error) {
+                    //         console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                    //     }
+                    // }
+                    // else {
+                    //     try {
+                    //         await strapi
+                    //             .plugin('import-products')
+                    //             .service('helpers')
+                    //             .updateEntry(entryCheck, product, importRef);
+                    //     } catch (error) {
+                    //         console.log(error)
+                    //     }
+                    // }
+
+                }
+
+                // await strapi
+                //     .plugin('import-products')
+                //     .service('helpers')
+                //     .deleteEntry(entry, importRef);
+            }
+            console.log("End of Import")
+            return { "message": "ok" }
+        }
+        catch (err) {
+            console.log(err);
+        }
+    },
+
+    async parseIasonXml({ entry, auth }) {
+        try {
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            if (!entry.isActive) {
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
+            }
+            else {
+
+                const products = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .getData(entry, importRef.categoryMap);
+
+                if (products.length === 0)
+                    return { "message": "xml is empty" }
+
+                const { categories_map, char_name_map, char_value_map, stock_map,
+                    isWhitelistSelected, whitelist_map, blacklist_map,
+                    xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+                const { mapCharNames, mapCharValues } = importRef.charMaps
+
+                // console.log(products[0].image[0])
+                // const products = []
+
+                for (let dt of products) {
+
+                    let mpn = dt["international-code"][0]._.trim().toString()
+                    let name = dt.name[0]._.trim()
+                    let barcode = dt.barcode[0]._ ? dt.barcode[0]._.trim() : null
+                    let brand_name = dt.brand[0]._.trim()
+                    let weightFromData = dt.weight[0]._ ? parseFloat(dt.weight[0]._.trim()) * 1000 : null
+                    let recyclingTax = dt["recycling-tax"][0]._ ? parseFloat(dt["recycling-tax"][0]._) : 0
+                    let batteryRecyclingTax = dt["battery-recycling-tax"][0]._ ? parseFloat(dt["battery-recycling-tax"][0]._) : 0
+
+                    const { entryCheck, brandId } = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                    const product = {
+                        entry,
+                        name,
+                        supplierCode: dt.sku[0]._.trim(),
+                        // description: dt.chars[0],
+                        category: { title: dt.category[0]._.split(">")[0].trim() },
+                        subcategory: dt.category[0]._.split(">")[1] ? { title: dt.category[0]._.split(">")[1].trim() } : { title: null },
+                        sub2category: dt.category[0]._.split(">")[2] ? { title: dt.category[0]._.split(">")[2].trim() } : { title: null },
+                        mpn,
+                        barcode,
+                        weight: weightFromData ? parseInt(weightFromData) : 0,
+                        slug: mpn ?
+                            slugify(`${name?.toString()}-${dt.mpn?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                            slugify(`${name?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                        publishedAt: new Date(),
+                        // stockLevel: dt.instock[0].trim(),
+                        wholesale: parseFloat(dt.price[0]._).toFixed(2),
+                        // imagesSrc: dt.image,
+                        brand: { id: await brandId },
+                        // retail_price: dt.msrp[0].replace('.', '').replace(',', '.'),
+                        recycleTax: parseFloat(recyclingTax + batteryRecyclingTax).toFixed(2),
+                        // link: dt.url[0].trim(),
+                        related_import: entry.id,
+
+                        // prod_chars: dt.prod_chars
+                    }
+
+                    const chars = []
+
+                    if (dt.properties[0].property && dt.properties[0].property.length > 0) {
+                        for (let productChar of dt.properties[0].property) {
+                            const char = {}
+                            char.name = productChar["$"].code
+                            char.value = productChar._
+                            chars.push(char)
+                        }
+
+                        const parsedChars = await strapi
+                            .plugin('import-products')
+                            .service('helpers')
+                            .parseChars(chars, mapCharNames, mapCharValues)
+
+                        product.prod_chars = parsedChars
+                    }
+
+                    // const stripContent = dt.chars[0]?.replace(/(<([^>]+)>)/ig, '').trim();
+
+                    // product.description = stripContent ? stripContent : ""
+
+                    if (dt["image-url"][0]._) {
+                        const imageUrls = []
+                        imageUrls.push({ url: dt["image-url"][0]._ })
+
+                        product.imagesSrc = imageUrls
+                    }
+
+                    // console.log(product)
+
+                    //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+                    if (!entryCheck) {
+
+                        try {
+                            const response = await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .createEntry(product, importRef, auth);
+
+                            await response
+                        } catch (error) {
+                            console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                        }
+                    }
+                    else {
+                        try {
+                            await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .updateEntry(entryCheck, product, importRef);
+                        } catch (error) {
+                            console.log(error)
+                        }
+                    }
+
+                }
+
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
+            }
+            console.log("End of Import")
+            return { "message": "ok" } 
+        }
+        catch (err) {
+            console.log(err);
+        }
+    },
+
+    async parseDamkalidisXml({ entry, auth }) {
+        try {
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            if (!entry.isActive) {
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
+            }
+            else {
+                const products = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .getData(entry, importRef.categoryMap);
+
+                // if (products.length === 0)
+                //     return { "message": "xml is empty" }
+
+                // const { categories_map, char_name_map, char_value_map, stock_map,
+                //     isWhitelistSelected, whitelist_map, blacklist_map,
+                //     xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+                // const { mapCharNames, mapCharValues } = importRef.charMaps
+
+                // // console.log(products[0].image[0])
+                // // const products = []
+
+                // for (let dt of products) {
+
+                //     let mpn = dt.mpn[0].trim().toString()
+                //     let name = dt.description[0].trim()
+                //     let barcode = dt.EAN ? dt.EAN[0].trim() : null
+                //     let brand_name = dt.brand[0].trim()
+                //     let weightFromData = null
+                //     if (dt.weight_kg) {
+                //         weightFromData = parseFloat(dt.weight_kg[0].replace("kg", "").replace(",", ".").trim()) * 1000
+                //     }
+
+                //     const { entryCheck, brandId } = await strapi
+                //         .plugin('import-products')
+                //         .service('helpers')
+                //         .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                //     const product = {
+                //         entry,
+                //         name,
+                //         supplierCode: dt.code[0].trim(),
+                //         description: dt.chars[0],
+                //         category: { title: dt.CATEGORY[0].split(" / ")[0].trim() },
+                //         subcategory: dt.CATEGORY[0].split(" / ")[1] ? { title: dt.CATEGORY[0].split(" / ")[1].trim() } : { title: null },
+                //         sub2category: dt.CATEGORY[0].split(" / ")[2] ? { title: dt.CATEGORY[0].split(" / ")[2].trim() } : { title: null },
+                //         mpn,
+                //         barcode,
+                //         weight: weightFromData ? parseInt(weightFromData) : 0,
+                //         slug: mpn ?
+                //             slugify(`${name?.toString()}-${dt.mpn?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                //             slugify(`${name?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                //         publishedAt: new Date(),
+                //         // stockLevel: dt.instock[0].trim(),
+                //         wholesale: parseFloat(dt.b2bprice[0].replace('.', '').replace(',', '.')).toFixed(2),
+                //         // imagesSrc: dt.image,
+                //         brand: { id: await brandId },
+                //         retail_price: dt.msrp[0].replace('.', '').replace(',', '.'),
+                //         recycleTax: dt.recycle[0].replace('.', '').replace(',', '.'),
+                //         // link: dt.url[0].trim(),
+                //         related_import: entry.id,
+
+                //         // prod_chars: dt.prod_chars
+                //     }
+
+                //     // const stripContent = dt.chars[0]?.replace(/(<([^>]+)>)/ig, '').trim();
+
+                //     // product.description = stripContent ? stripContent : ""
+
+                //     // const chars = []
+
+                //     // if (dt.product_chars) {
+                //     //     for (let productChar of dt.product_chars[0].char) {
+                //     //         const char = {}
+                //     //         char.name = productChar.char_name[0]
+                //     //         char.value = productChar.char_value[0]
+                //     //         chars.push(char)
+                //     //     }
+
+                //     //     const parsedChars = await strapi
+                //     //         .plugin('import-products')
+                //     //         .service('helpers')
+                //     //         .parseChars(chars, mapCharNames, mapCharValues)
+
+                //     //     product.prod_chars = parsedChars
+                //     // }
+
+
+                //     if (dt.image) {
+                //         const imageUrls = []
+                //         for (let image of dt.image) {
+                //             imageUrls.push({ url: image })
+                //         }
+
+                //         product.imagesSrc = imageUrls
+                //     }
+
+                //     //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+                //     if (!entryCheck) {
+
+                //         try {
+                //             const response = await strapi
+                //                 .plugin('import-products')
+                //                 .service('helpers')
+                //                 .createEntry(product, importRef, auth);
+
+                //             await response
+                //         } catch (error) {
+                //             console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                //         }
+                //     }
+                //     else {
+                //         try {
+                //             await strapi
+                //                 .plugin('import-products')
+                //                 .service('helpers')
+                //                 .updateEntry(entryCheck, product, importRef);
+                //         } catch (error) {
+                //             console.log(error)
+                //         }
+                //     }
+
+                // }
+
+                // await strapi
+                //     .plugin('import-products')
+                //     .service('helpers')
+                //     .deleteEntry(entry, importRef);
+            }
+            console.log("End of Import")
+            return { "message": "ok" }
+        }
+        catch (err) {
+            console.log(err);
         }
     },
 });
