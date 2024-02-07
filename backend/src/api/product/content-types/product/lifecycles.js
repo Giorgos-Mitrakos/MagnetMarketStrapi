@@ -6,7 +6,7 @@ module.exports = {
         const { where } = event.params;
 
         const entry = await strapi.entityService.findOne('api::product.product', where.id, {
-            populate: { image: true, additionalImages: true,additionalFiles: true }
+            populate: { image: true, additionalImages: true, additionalFiles: true }
         });
 
         try {
@@ -85,24 +85,19 @@ module.exports = {
         event.params.data.slug = slugify(`${data.name}-${data.mpn}`, { lower: true, remove: /[*±+~=#.,°;_()/'"!:@]/g })
 
     },
-    // async beforeUpdate(event) {
-    //     const { data, where, select, populate } = event.params;
+    async beforeUpdate(event) {
+        const { data, where, select, populate } = event.params;
 
-    //     console.log(data)
-
-    //     // const entry = await strapi.entityService.findOne('api::product.product', where.id, {
-    //     //     populate: { supplierInfo: true }
-    //     // });
-
-    //     // const isAllSuppliersOutOfStock = entry.supplierInfo.every(supplier => supplier.in_stock === false)
-
-    //     // if (isAllSuppliersOutOfStock && entry.publishedAt) {
-    //     //     const entry = await strapi.entityService.update('api::product.product', where.id, {
-    //     //         data: { publishedAt: null }
-    //     //     });
-    //     // }
-
-
-    // }, 
+        const entry = await strapi.entityService.findOne('api::product.product', where.id, {
+            // populate: { supplierInfo: true }
+        });
+        
+        if (data.publishedAt) {
+            data.need_verify=false            
+        }
+        else if(entry.publishedAt){
+            data.need_verify=false 
+        }
+    },
 
 };

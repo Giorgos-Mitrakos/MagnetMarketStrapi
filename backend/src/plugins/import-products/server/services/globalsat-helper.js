@@ -4,11 +4,13 @@ const slugify = require("slugify");
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const { env } = require("process");
+const userAgent = require('user-agents');
 
 module.exports = ({ strapi }) => ({
 
     async saveGlobalsatCookies(page) {
         try {
+            
             const body = await page.$('body');
             // const closePopUp = await body.waitForSelector('.closeModal');
             // if (closePopUp)
@@ -25,10 +27,17 @@ module.exports = ({ strapi }) => ({
             // const v = await (await settingsSwitch.getProperty("checked")).jsonValue()
             // if (v) {
             //     await settingsSwitch.click()
-            // }
+            // } 
+            
+///// Εδώ δεν ζητάει consent
 
-            const consentButton = await body.waitForSelector('.consent-give');
-            await consentButton.click()
+
+        //     const consentButton = await body.waitForSelector('.consent-give');
+        //     console.log(body.innerHTML)
+        //     if (consentButton)
+        //    { 
+        //     console.log(consentButton)
+        //     await consentButton.click()}
 
             // const loginOpen = await body.$('.login_nav_head');
             // await loginOpen.click();
@@ -40,8 +49,8 @@ module.exports = ({ strapi }) => ({
 
             const username = await loginForm.$('#UserName');
             const password = await loginForm.$('#Password');
-            await username.type(process.env.GLOBALSAT_USERNAME)
-            await password.type(process.env.GLOBALSAT_PASSWORD)
+            await username.type(process.env.GLOBALSAT_USERNAME,{ delay: Math.random() * 100 })
+            await password.type(process.env.GLOBALSAT_PASSWORD,{ delay: Math.random() * 100 })
             const submitLogin = await loginForm.$('button')
 
             await Promise.all([
@@ -57,7 +66,7 @@ module.exports = ({ strapi }) => ({
                 else {
                     console.log("File written successfully\n");
                 }
-            });
+            }); 
 
         } catch (error) {
 
@@ -70,9 +79,12 @@ module.exports = ({ strapi }) => ({
             .service('helpers')
             .createBrowser()
         try {
+
+            const agents = userAgent.random().toString()
+
             const page = await browser.newPage();
             await page.setViewport({ width: 1200, height: 500 })
-            await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+            await page.setUserAgent(agents);
 
             if (fs.existsSync('./public/GlobalsatCookies.json')) {
                 fs.readFile('./public/GlobalsatCookies.json', async (err, data) => {
@@ -96,7 +108,7 @@ module.exports = ({ strapi }) => ({
 
             const pageUrl = page.url();
             await page.waitForTimeout(1500)
-
+            
             if (pageUrl === "https://b2b.globalsat.gr/account/login/") {
                 await this.saveGlobalsatCookies(page)
             }

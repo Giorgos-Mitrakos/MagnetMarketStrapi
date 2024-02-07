@@ -3278,11 +3278,16 @@ module.exports = ({ strapi }) => ({
                 }
             }
 
-
             if (entryCheck.publishedAt === null) {
-                data.publishedAt = new Date()
-                data.deletedAt = null
-                dbChange = 'republished'
+                if (product.entry.name.toLowerCase() === "globalsat") {
+                    data.need_verify = true
+                    dbChange = 'updated'
+                }
+                else {
+                    data.publishedAt = new Date()
+                    data.deletedAt = null
+                    dbChange = 'republished'
+                }
             }
 
             if (Object.keys(data).length !== 0) {
