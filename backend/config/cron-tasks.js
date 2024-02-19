@@ -104,7 +104,7 @@ module.exports = {
                 .parseWestnetXml({ entry, auth });
         },
         options: {
-            rule: "58 21 * * *",
+            rule: "54 7,11",
         },
     },
 
@@ -182,7 +182,7 @@ module.exports = {
                 .parseZegetronXml({ entry, auth });
         },
         options: {
-            rule: "10 9,13 * * *",
+            rule: "54 8,12 * * *",
         },
     },
 
@@ -313,6 +313,84 @@ module.exports = {
         },
         options: {
             rule: "55 * * * *",
+        },
+    },
+
+    updateACICataloge: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "AciHellas" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('parseService')
+                .parseAciJson({ entry, auth });
+        },
+        options: {
+            rule: "50 6,13,19 * * *",
+        },
+    },
+
+    updateACIAvailability: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "AciHellas" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('aciHelper') 
+                .getAciAvailability({ entry, auth });
+        },
+        options: {
+            rule: "55 7,9,11,15,17,21 * * *",
+        },
+    },
+
+    updateACIAttributes: {
+        task: async ({ strapi }) => {
+            // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
+            const entry = await strapi.db.query('plugin::import-products.importxml').findOne({
+                where: { name: "AciHellas" },
+                populate: {
+                    importedFile: true,
+                    stock_map: {
+                        fields: ['name'],
+                        sort: 'name:asc',
+                    },
+                },
+            })
+
+            const auth = process.env.STRAPI_TOKEN
+
+            await strapi
+                .plugin('import-products')
+                .service('aciHelper') 
+                .getAciAttributes({ entry, auth });
+        },
+        options: {
+            rule: "5 2 * * 2,6",
         },
     },
 

@@ -521,6 +521,12 @@ module.exports = ({ strapi }) => ({
                     .service('iasonHelper')
                     .getIasonData(entry, categoryMap)
             }
+            else if (entry.name.toLowerCase() === "acihellas") {
+                return await strapi
+                    .plugin('import-products')
+                    .service('aciHelper')
+                    .getAciCatalog(entry, categoryMap)
+            }
             // console.log("Ξεκινάω να κατεβάζω τα xml...")
             let data = await Axios.get(`${entry.importedURL}`,
                 { headers: { "Accept-Encoding": "gzip,deflate,compress" } })

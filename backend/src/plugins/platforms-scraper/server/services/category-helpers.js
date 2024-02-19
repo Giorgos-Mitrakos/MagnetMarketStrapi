@@ -2,9 +2,10 @@
 
 const puppeteer = require('puppeteer');
 const xlsx = require('xlsx')
+const userAgent = require('user-agents');
 
 module.exports = ({ strapi }) => ({
-  async getPlatforms() {
+  async getPlatforms() { 
     const platforms = await strapi.db.query('api::platform.platform').findMany({
       populate: {
         platformCategories: true,
@@ -15,16 +16,19 @@ module.exports = ({ strapi }) => ({
   },
 
   async scrapPlatformCategories({ platform }) {
+    const browser = await strapi
+            .plugin('import-products')
+            .service('helpers')
+            .createBrowser()
     try {
       await this.updatePlatformCategories(platform)
 
       const categoriesToScrap = platform.platformCategories.filter(category => category.isChecked === true)
 
-      // const browser = await puppeteer.launch()
-      const browser = await puppeteer.launch({ headless: false, executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' });
+      const agents = userAgent.random().toString()
       const page = await browser.newPage();
       await page.setViewport({ width: 1400, height: 600 })
-      await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36");
+      await page.setUserAgent(agents);
 
       if (platform.name === "Skroutz") {
         for (let category of categoriesToScrap) {
@@ -35,9 +39,12 @@ module.exports = ({ strapi }) => ({
         }
       }
 
-      await browser.close();
+      
     } catch (error) {
       console.log(error)
+    }
+    finally{
+      await browser.close();
     }
   },
 

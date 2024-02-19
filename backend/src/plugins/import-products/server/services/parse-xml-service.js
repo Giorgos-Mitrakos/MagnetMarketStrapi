@@ -2423,7 +2423,141 @@ module.exports = ({ strapi }) => ({
                     .deleteEntry(entry, importRef);
             }
             console.log("End of Import")
-            return { "message": "ok" } 
+            return { "message": "ok" }
+        }
+        catch (err) {
+            console.log(err);
+        }
+    },
+
+    async parseAciJson({ entry, auth }) {
+        try {
+            const importRef = await strapi
+                .plugin('import-products')
+                .service('helpers')
+                .createImportRef(entry);
+
+            if (!entry.isActive) {
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
+            }
+            else {
+
+                const products = await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .getData(entry, importRef.categoryMap);
+
+                if (products.length === 0)
+                    return { "message": "xml is empty" }
+
+                const { categories_map, char_name_map, char_value_map, stock_map,
+                    isWhitelistSelected, whitelist_map, blacklist_map,
+                    xPath, minimumPrice, maximumPrice } = importRef.categoryMap
+
+                const { mapCharNames, mapCharValues } = importRef.charMaps
+
+                // λίστα κατηγορίών για mapping
+                // let categoriesList = []
+
+                for (let dt of products) {
+
+                    // if (!categoriesList.includes(dt.Category))
+                    //     categoriesList.push(dt.Category)
+
+                    let mpn = dt.OEM
+                    let name = dt.Description.split("(")[dt.Description.split("(").length - 2]
+                    let barcode = dt.Gtin ? dt.Gtin : null
+                    let brand_name = dt.Brand
+                    // let weightFromData = dt.weight[0]._ ? parseFloat(dt.weight[0]._.trim()) * 1000 : null
+                    let recyclingTax = dt.RecycleCharges ? parseFloat(dt.RecycleCharges) : 0
+
+                    const { entryCheck, brandId } = await strapi
+                        .plugin('import-products')
+                        .service('helpers')
+                        .checkProductAndBrand(mpn, name, barcode, brand_name, null);
+
+                    const product = {
+                        entry,
+                        name,
+                        supplierCode: dt.Code,
+                        description: dt.FullDescription,
+                        category: { title: dt.Category },
+                        subcategory: { title: null },
+                        sub2category: { title: null },
+                        mpn,
+                        barcode,
+                        // weight: weightFromData ? parseInt(weightFromData) : 0,
+                        slug: mpn ?
+                            slugify(`${name?.toString()}-${mpn.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }) :
+                            slugify(`${name?.toString()}`, { lower: true, remove: /[^A-Za-z0-9-_.~-\s]*$/g }),
+                        publishedAt: new Date(),
+                        // stockLevel: dt.instock[0].trim(),
+                        wholesale: parseFloat(dt.Price).toFixed(2),
+                        // imagesSrc: dt.image,
+                        brand: { id: await brandId },
+                        // retail_price: dt.msrp[0].replace('.', '').replace(',', '.'),
+                        recycleTax: parseFloat(recyclingTax).toFixed(2),
+                        link: dt.URL,
+                        related_import: entry.id,
+
+                        // prod_chars: dt.prod_chars
+                    }
+
+                    if (dt.pictureURL) {
+                        const imageUrls = []
+                        imageUrls.push({ url: dt.pictureURL })
+
+                        product.imagesSrc = imageUrls
+                    }
+
+                    //αν δεν υπάρχει το προϊόν το δημιουργώ αλλιώς ενημερώνω 
+
+                    if (!entryCheck) {
+
+                        try {
+                            const response = await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .createEntry(product, importRef, auth);
+
+                            await response
+                        } catch (error) {
+                            console.error("errors in create:", error, error.details?.errors, "Προϊόν:", dt.title)
+                        }
+                    }
+                    else {
+                        try {
+                            await strapi
+                                .plugin('import-products')
+                                .service('helpers')
+                                .updateEntry(entryCheck, product, importRef);
+                        } catch (error) {
+                            console.log(error)
+                        }
+                    }
+
+                }
+
+                // console.log(categoriesList.sort())
+
+                // var builder = new xml2js.Builder();
+                // var xml = builder.buildObject({ data: { categories: categoriesList.sort() } });
+
+                // fs.writeFile('./public/tmp/AciCategories.xml', xml, (err) => {
+                //     if (err)
+                //         console.log(err);
+                // })
+
+                await strapi
+                    .plugin('import-products')
+                    .service('helpers')
+                    .deleteEntry(entry, importRef);
+            }
+            console.log("End of Import")
+            return { "message": "ok" }
         }
         catch (err) {
             console.log(err);
@@ -2576,4 +2710,4 @@ module.exports = ({ strapi }) => ({
             console.log(err);
         }
     },
-});
+}); 

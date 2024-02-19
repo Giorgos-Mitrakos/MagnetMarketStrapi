@@ -20,6 +20,7 @@ const allwanHelper = require('./allwan-helper');
 const damkalidisHelper = require('./damkalidis-helper');
 const netoneHelper = require('./netone-helper');
 const iasonHelper = require('./iason-helper');
+const aciHelper = require('./aci-helper');
 const imageHelper = require('./image-helper');
 
 module.exports = {
@@ -43,6 +44,7 @@ module.exports = {
   damkalidisHelper,
   netoneHelper,
   iasonHelper,
+  aciHelper,
   imageHelper,
 };
 

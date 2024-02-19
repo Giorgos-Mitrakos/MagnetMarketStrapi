@@ -99,6 +99,12 @@ module.exports = {
         .service('parseService')
         .parseAllwanXml(ctx.request.body);
     }
+    else if (ctx.request.body.entry.name.toLowerCase() === 'acihellas') {
+      ctx.body = await strapi
+        .plugin('import-products')
+        .service('parseService')
+        .parseAciJson(ctx.request.body);
+    }
     else {
       console.log("Wrong file")
     }
