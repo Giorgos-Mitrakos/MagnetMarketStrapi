@@ -2450,7 +2450,7 @@ module.exports = ({ strapi }) => ({
                     .service('helpers')
                     .getData(entry, importRef.categoryMap);
 
-                if (products.length === 0)
+                if (!products || products.length === 0)
                     return { "message": "xml is empty" }
 
                 const { categories_map, char_name_map, char_value_map, stock_map,

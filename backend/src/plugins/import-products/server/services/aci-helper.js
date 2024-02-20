@@ -8,8 +8,8 @@ module.exports = ({ strapi }) => ({
         try {
             const data = await Axios.post(`https://www.acihellas.gr/api/customerprices`,
                 {
-                    email: process.env.ACI_USERNAME,
-                    password: process.env.ACI_PASSWORD,
+                    email: "demo",
+                    password: "d3m0Acc0unT",
                     english: false
                 }
                 ,
@@ -20,6 +20,8 @@ module.exports = ({ strapi }) => ({
                         "Content-type": "application/x-www-form-urlencoded"
                     },
                 })
+
+                console.log(data.data.Success)
 
             if (data.data.Success === 0)
                 return []
